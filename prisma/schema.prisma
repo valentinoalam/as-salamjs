@@ -1,0 +1,326 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  PETUGAS_PENDAFTARAN
+  PETUGAS_KEUANGAN
+  PETUGAS_INVENTORY
+  PETUGAS_PENYEMBELIHAN
+  MEMBER
+}
+
+model User {
+  id        String    @id @default(cuid()) @db.Char(36)
+  name      String?
+  email     String?   @unique
+  password  String?   @default("password123")
+  urlAvatar String? 
+  role      Role      @default(MEMBER)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  mudhohi   Mudhohi[]
+  accounts  Account[]
+  sessions  Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum CaraBayar {
+  TUNAI
+  TRANSFER
+}
+
+enum PaymentStatus {
+  BELUM_BAYAR
+  MENUNGGU_KONFIRMASI
+  LUNAS
+  BATAL
+}
+
+enum HewanStatus {
+  TERDAFTAR
+  SIAP_SEMBELIH
+  DISEMBELIH
+  DITIMBANG
+  DIINVENTORI
+  DIDISTRIBUSI
+}
+
+model Pembayaran {
+  id               String   @id @default(cuid()) @db.Char(36)
+  mudhohiId        String   @unique
+  cara_bayar       CaraBayar
+  paymentStatus    PaymentStatus
+  dibayarkan       Int
+  urlTandaBukti    String?
+  createdAt        DateTime  @default(now()) @map("date_created")
+  mudhohi          Mudhohi  @relation(fields: [mudhohiId], references: [id])
+}
+
+model Mudhohi {
+  id               String   @id @default(cuid()) @db.Char(36)
+  userId           String   @db.Char(36)
+  paymentId        String
+  nama_pengqurban  String?   @db.VarChar(200)
+  nama_peruntukan  String?   @db.VarChar(200)
+  
+  pesan_khusus     String?   @db.VarChar(500)
+  keterangan       String?   @db.VarChar(500)
+  potong_sendiri   Boolean
+  ambil_daging     Boolean?
+  mengambilDaging  Boolean   @default(false)
+  dash_code        String
+  barcode_image    String?
+  createdAt        DateTime  @default(now()) @map("date_created")
+  user             User      @relation(fields: [userId], references: [id])
+  payment          Pembayaran?
+  hewan            HewanQurban[]
+}
+
+model HewanQurban {
+  id                String       @id @default(cuid())
+  tipeId            Int       
+  animalId          Int          @unique @default(autoincrement()) // External ID for the animal
+  // Animal slaughter progress
+  status            HewanStatus  @default(TERDAFTAR)
+  slaughtered       Boolean      @default(false)
+  slaughteredAt     DateTime?
+  meatPackageCount  Int          @default(0)
+  onInventory       Boolean      @default(false)
+  receivedByMdhohi  Boolean      @default(false)
+  isKolektif        Boolean      @default(false)
+  slotTersisa       Int?          // Jika Kolektif
+  // ... relationships
+  mudhohi           Mudhohi[]
+  tipe              TipeHewan    @relation(fields: [tipeId], references: [id])
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
+
+model TipeHewan {
+  id              Int          @id @default(autoincrement())
+  nama            String       @unique // Type of animal (e.g., "Sapi", "Kambing")
+  icon            String?
+  jmlKantong      Int?
+  harga           Int
+  note            String
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  hewan           HewanQurban[]
+  paketQurban     ProdukHewan[]
+}
+
+enum jenisProduk {
+  KEPALA
+  BADAN
+  KULIT
+  TORPEDO
+  KAKI
+  DAGING
+}
+
+// Weight tracking
+model ProdukHewan {
+  id              Int          @id @default(autoincrement())
+  nama            String       @unique // daging sapi 5 kg
+  tipeId          Int?
+  berat           Float?
+  // Product tracking
+  targetPaket     Int              @default(0)
+  pkgOrigin       Int              @default(0)  //from slaughter counter
+  pkgReceived     Int              @default(0)  //arrive at inventory counter
+  pkgDelivered    Int              @default(0)  //transfered to mustahik
+
+  jenisProduk     jenisProduk
+  tipe_hewan      TipeHewan?    @relation(fields: [tipeId], references: [id])
+  history         ProductLog[]
+
+  DistribusiLog DistribusiLog[]
+
+  ErrorLog ErrorLog[]
+}
+
+enum Counter {
+  INVENTORY
+  PENYEMBELIHAN
+}
+
+model ProductLog {
+  id                Int         @id @default(autoincrement())
+  produk            ProdukHewan @relation(fields: [produkId], references: [id])
+  produkId          Int
+  event             String      // "add" or "decrease"
+  place             Counter
+  value             Int
+  note              String
+  timestamp         DateTime    @default(now())
+}
+
+model ErrorLog {
+  id                Int         @id @default(autoincrement())
+  produk            ProdukHewan @relation(fields: [produkId], references: [id])
+  produkId          Int
+  event             String      // "add" or "decrease"
+  note              String
+  timestamp         DateTime    @default(now())
+}
+
+// Distribution tracking
+model Distribution {
+  id          String     @id @default(cuid())
+  category    String  // "Pengqurban Sapi", "Pengqurban Kambing", "Panitia", "RT RW", "Lembaga"
+  target      Int     @default(0)
+  realized    Int     @default(0)
+
+  Penerima Penerima[]
+}
+
+//distribusi log mencatat paket apa saja yang diberikan kepada penerima
+model DistribusiLog {
+  id                String           @id @default(cuid())
+  penerimaId        String
+  penerima          Penerima         @relation(fields: [penerimaId], references: [id])
+  produkQurban      ProdukHewan[]
+  numberOfPackages  Int
+
+  createdAt         DateTime         @default(now())
+}
+
+model Penerima {
+  id               String  @id @default(cuid()) @db.Char(36)
+  distributionId   String
+  noKupon          String?
+  receivedBy       String?
+  institusi        String?
+  noKk             String?
+  alamat           String?
+  phone            String?
+  createdAt        DateTime  @default(now()) @map("date_created")
+  receivedAt       DateTime?
+  keterangan       String?   @db.VarChar(500)
+  tanda_terima     String?   @db.VarChar(1000)
+  isDiterima       Boolean   @default(true)
+  category         Distribution  @relation(fields: [distributionId], references: [id])
+  DistribusiLog    DistribusiLog[]
+}
+
+model ProgresSapi {
+  id       Int     @id @default(autoincrement())
+  sembelih Boolean @default(false)
+}
+
+model ProgresKambing {
+  id       Int     @id @default(autoincrement())
+  sembelih Boolean @default(false)
+}
+
+// Weight tracking
+model HasilTimbang {
+  id           Int              @id @default(autoincrement())
+  name         String           @unique
+  hasil        Int              @default(0)
+  target_value Int              @default(0)
+  history      TimbangHistory[]
+}
+
+model TimbangHistory {
+  id              Int         @id @default(autoincrement())
+  hasil_timbang   HasilTimbang @relation(fields: [hasil_timbang_id], references: [id])
+  hasil_timbang_id Int
+  operation       String      // "add" or "decrease"
+  value           Int
+  timestamp       DateTime    @default(now())
+}
+
+// Inventory tracking
+model Inventory {
+  id           Int                @id @default(autoincrement())
+  name         String             @unique
+  hasil        Int                @default(0)
+  target_value Int                @default(0)
+  history      InventoryHistory[]
+}
+
+model InventoryHistory {
+  id           Int       @id @default(autoincrement())
+  inventory    Inventory @relation(fields: [inventory_id], references: [id])
+  inventory_id Int
+  operation    String    // "add" or "decrease"
+  value        Int
+  timestamp    DateTime  @default(now())
+}
+
+
+// Financial tracking
+enum TransactionType {
+  PEMASUKAN
+  PENGELUARAN
+}
+
+enum TransactionCategory {
+  QURBAN_PAYMENT
+  OPERATIONAL
+  SUPPLIES
+  TRANSPORT
+  SALARY
+  OTHER
+}
+
+model Transaction {
+  id          String             @id @default(cuid())
+  amount      Int
+  description String
+  type        TransactionType
+  category    TransactionCategory
+  date        DateTime
+  receiptUrl  String?
+  createdBy   String             // User ID who created the transaction
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
