@@ -1,6 +1,6 @@
 
 import React, { useState, ReactNode } from "react";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { AuthContext, User, UserRole } from "@/hooks/use-auth";
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {

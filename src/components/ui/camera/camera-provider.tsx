@@ -186,6 +186,7 @@ export const CameraProvider = ({ children }: CameraProviderProps) => {
       setActiveDeviceId(nextDevice.deviceId);
     }
   };
+
   return (
     <CameraContext.Provider
       value={{
@@ -193,9 +194,9 @@ export const CameraProvider = ({ children }: CameraProviderProps) => {
         activeDeviceId,
         images,
         devices,
-        playerRef,
-        canvasRef,
-        containerRef,
+        playerRef: playerRef as React.RefObject<HTMLVideoElement>,
+        canvasRef: canvasRef as React.RefObject<HTMLCanvasElement>,
+        containerRef: containerRef as React.RefObject<HTMLDivElement>,
         notSupported,
         permissionDenied,
 

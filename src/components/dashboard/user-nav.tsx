@@ -1,5 +1,3 @@
-'use client';
-
 import { signOut, useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -16,7 +14,7 @@ import Link from 'next/link';
 
 export function UserNav() {
   const { data: session } = useSession();
-  console.log(session)
+
   if (!session?.user) {
     return null;
   }

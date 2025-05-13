@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
 import { PaymentStatus, type CaraBayar } from "@prisma/client"
 import { randomUUID } from "crypto"
+import { generateAnimalId } from "@/lib/animal"
 
 export async function getMudhohiStats() {
   const totalMudhohi = await prisma.mudhohi.count()
@@ -197,6 +198,7 @@ export async function createMudhohi(data: {
         hewan = await prisma.hewanQurban.create({
           data: {
             tipeId: 1, // Sapi
+            animalId: await generateAnimalId(1),
             isKolektif: true,
             slotTersisa: 6, // 7 total, using 1 now
           },
@@ -221,10 +223,12 @@ export async function createMudhohi(data: {
       })
 
       if (!hewan) {
+        const tipeId = data.tipeHewanId
         // Create a new hewan
         hewan = await prisma.hewanQurban.create({
           data: {
-            tipeId: data.tipeHewanId,
+            tipeId,
+            animalId: await generateAnimalId(tipeId),
             isKolektif: false,
           },
         })

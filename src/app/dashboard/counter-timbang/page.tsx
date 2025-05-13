@@ -8,8 +8,6 @@ export default async function CounterTimbangPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold">Counter Timbang</h1>
-
       <CounterTimbang initialProdukDaging={produkDaging} allProducts={allProducts} />
     </div>
   )

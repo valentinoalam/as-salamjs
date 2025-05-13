@@ -3,7 +3,7 @@ import { getHewanQurban } from "@/lib/db"
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
-  const type = (searchParams.get("type") as "sapi" | "kambing") || "sapi"
+  const type = (searchParams.get("type") as "Sapi" | "Domba") || "Sapi"
   const page = Number.parseInt(searchParams.get("page") || "1")
   const pageSize = Number.parseInt(searchParams.get("pageSize") || "10")
 

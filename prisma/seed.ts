@@ -1,9 +1,67 @@
-import { PrismaClient, jenisProduk, HewanStatus, CaraBayar, PaymentStatus, Role } from "@prisma/client"
+import { PrismaClient, jenisProduk, HewanStatus, CaraBayar, PaymentStatus, Role, Prisma, JenisHewan } from "@prisma/client"
 import { hash } from "bcryptjs"
-
 const prisma = new PrismaClient()
 
+export async function generateAnimalId(tipeId: number): Promise<string> {
+  // 1. Ambil data TipeHewan
+  const tipeHewan = await prisma.tipeHewan.findUnique({
+    where: { id: tipeId },
+    select: {
+      nama: true,
+      jenis: true,
+      target: true
+    }
+  });
+
+  if (!tipeHewan) {
+    throw new Error('TipeHewan tidak ditemukan');
+  }
+
+  // 2. Hitung total hewan dengan tipe ini
+  const totalHewan = await prisma.hewanQurban.count({
+    where: { tipeId }
+  });
+
+  // 3. Tentukan apakah perlu grup khusus
+  type SingleQurban = 'KAMBING' | 'DOMBA';
+  const isSingleQurban = (jenis: JenisHewan): jenis is SingleQurban => {
+    return jenis === JenisHewan.KAMBING || jenis === JenisHewan.DOMBA;
+  };
+  
+  // Kemudian di dalam fungsi:
+  const inLargeQuota =  isSingleQurban(tipeHewan.jenis) || tipeHewan.target > 100;
+
+  // 4. Generate ID sesuai logika
+  if (inLargeQuota) {
+    const groupIndex = Math.floor(totalHewan / 50);
+    const remainder = totalHewan % 50;
+    const currentNumber = remainder + 1;
+    
+    const groupChar = String.fromCharCode(65 + groupIndex);
+    const formattedNumber = currentNumber.toString().padStart(2, '0');
+    
+    return `${tipeHewan.nama}_${groupChar}-${formattedNumber}`;
+  }
+  
+  // Untuk kasus normal (non-kambing/domba dan target ≤ 100)
+  return `${tipeHewan.nama}_${totalHewan + 1}`;
+}
+
 async function main() {
+  console.log("🌱 Starting seeding...")
+
+  // Clean up existing data
+  console.log("🧹 Cleaning up existing data...")
+  await prisma.user.deleteMany({})
+  
+  await prisma.hewanQurban.deleteMany({})
+  await prisma.tipeHewan.deleteMany({})
+  await prisma.produkHewan.deleteMany({})
+  await prisma.penerima.deleteMany({})
+  await prisma.distribution.deleteMany({})
+  
+
+
   // Create Admin User with password
   const adminPassword = await hash("admin123", 10)
   const admin = await prisma.user.upsert({
@@ -72,6 +130,8 @@ async function main() {
     create: {
       id: 1,
       nama: "Sapi",
+      target: 60,
+      jenis: "SAPI",
       icon: "🐮",
       jmlKantong: 7,
       harga: 24150000,
@@ -89,23 +149,12 @@ async function main() {
     create: {
       id: 2,
       nama: "Domba",
+      target: 350,
+      jenis: "DOMBA",
       icon: "🐐",
       jmlKantong: 2,
       harga: 2700000,
       note: "Domba (berat 23-26 kg)",
-    },
-  })
-
-  const sapiKolektif = await prisma.tipeHewan.upsert({
-    where: { id: 3 },
-    update: {},
-    create: {
-      id: 3,
-      nama: "Sapi Kolektif",
-      icon: "🐮",
-      jmlKantong: 1,
-      harga: 3450000,
-      note: "Sapi Patungan (berat ±300 kg)",
     },
   })
 
@@ -193,45 +242,7 @@ async function main() {
       create: category,
     })
   }
-
-  // Create HewanQurban (50 sapi)
-  for (let i = 1; i <= 50; i++) {
-    await prisma.hewanQurban.upsert({
-      where: { animalId: i },
-      update: {},
-      create: {
-        animalId: i,
-        tipeId: 1, // Sapi
-        status: HewanStatus.TERDAFTAR,
-        slaughtered: false,
-        meatPackageCount: 0,
-        onInventory: false,
-        receivedByMdhohi: false,
-        isKolektif: false,
-      },
-    })
-  }
-
-  // Create HewanQurban (350 domba)
-  for (let i = 51; i <= 400; i++) {
-    await prisma.hewanQurban.upsert({
-      where: { animalId: i },
-      update: {},
-      create: {
-        animalId: i,
-        tipeId: 2, // Domba
-        status: HewanStatus.TERDAFTAR,
-        slaughtered: false,
-        meatPackageCount: 0,
-        onInventory: false,
-        receivedByMdhohi: false,
-        isKolektif: false,
-      },
-    })
-  }
-
-  // Create some Mudhohi with Pembayaran
-  for (let i = 1; i <= 20; i++) {
+  async function generateMudhohi(i:number, animalId: string) {
     const mudhohi = await prisma.mudhohi.create({
       data: {
         userId: admin.id,
@@ -243,7 +254,7 @@ async function main() {
         mengambilDaging: i % 2 === 0,
         dash_code: `DASH-${i}`,
         hewan: {
-          connect: [{ animalId: i }],
+          connect: [{ animalId }],
         },
       },
     })
@@ -256,7 +267,58 @@ async function main() {
         dibayarkan: i % 2 === 0 ? 24150000 : 2700000,
       },
     })
+  } 
+
+  const totalSapi = await prisma.hewanQurban.count({
+    where: {
+      tipeId: 1
+    }
+  });
+  if(totalSapi< 51)
+    // Create HewanQurban (50 sapi)
+    for (let i = 1; i <= 50; i++) {
+      const tipeId = 1
+      const animalId = await generateAnimalId(tipeId)
+      try {
+        await prisma.hewanQurban.create({
+          data: {
+            tipeId, // Sapi
+            animalId,
+            status: HewanStatus.TERDAFTAR,
+            slaughtered: false,
+            meatPackageCount: 0,
+            onInventory: false,
+            receivedByMdhohi: false,
+            isKolektif: false,
+          },
+        })
+      } catch (e) {
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+          console.error('ID hewan sudah ada:', animalId);
+        }
+      }
+      generateMudhohi(i, animalId)
+    }
+  // Create HewanQurban (350 domba)
+  for (let i = 51; i <= 400; i++) {
+    const tipeId = 2
+    const animalId = await generateAnimalId(tipeId)
+    await prisma.hewanQurban.create({
+      data: {
+        animalId,
+        tipeId, // Domba
+        status: HewanStatus.TERDAFTAR,
+        slaughtered: false,
+        meatPackageCount: 0,
+        onInventory: false,
+        receivedByMdhohi: false,
+        isKolektif: false,
+      },
+    })
+    generateMudhohi(i, animalId)
   }
+
+
 
   // Create some Penerima
   for (let i = 1; i <= 50; i++) {

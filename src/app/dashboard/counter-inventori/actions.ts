@@ -33,7 +33,7 @@ export async function createDistribusi(penerimaId: string, produkIds: number[], 
   }
 }
 
-export async function updateMudhohiReceived(animalId: number, received: boolean) {
+export async function updateMudhohiReceived(animalId: string, received: boolean) {
   try {
     await dbUpdateMudhohiReceived(animalId, received)
     revalidatePath("/counter-inventori")

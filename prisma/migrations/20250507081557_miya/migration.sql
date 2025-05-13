@@ -166,7 +166,7 @@ CREATE TABLE `ProgresSapi` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `ProgresKambing` (
+CREATE TABLE `ProgresDomba` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `sembelih` BOOLEAN NOT NULL DEFAULT false,
 

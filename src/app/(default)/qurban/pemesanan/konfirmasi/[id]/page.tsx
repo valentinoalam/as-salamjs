@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button"
 import { getMudhohiById } from "./actions"
 
 export default async function KonfirmasiPage({ params }: { params: { id: string } }) {
-  const mudhohi = await getMudhohiById(params.id)
+  const { id } = await params;
+  const mudhohi = await getMudhohiById(id)
 
   if (!mudhohi) {
     notFound()

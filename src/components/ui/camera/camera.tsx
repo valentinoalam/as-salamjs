@@ -30,7 +30,7 @@ interface CameraProps {
 }
 
 const Camera: FC<CameraProps> = ({ onClosed, onCapturedImages }) => {
-  const camera = useRef<CameraType>();
+  const camera = useRef<CameraType>(null);
   const { images, addImage, numberOfCameras, resetImages, stopStream } =
     useCamera();
 

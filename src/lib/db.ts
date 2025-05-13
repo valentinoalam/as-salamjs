@@ -9,9 +9,15 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma
 export default prisma
 
 // Helper functions for database operations
-
-export async function getHewanQurban(type: "sapi" | "kambing", page = 1, pageSize = 10) {
-  const tipeId = type === "sapi" ? 1 : 2
+const calculateOffset = (page: number, pageSize: number, group?: string) => {
+  if (group) {
+    const groupIndex = group.charCodeAt(0) - 65;
+    return (groupIndex * 50) + ((page - 1) * pageSize);
+  }
+  return (page - 1) * pageSize;
+};
+export async function getHewanQurban(type: "Sapi" | "Domba", page = 1, pageSize = 10) {
+  const tipeId = type === "Sapi" ? 1 : 2
   const skip = (page - 1) * pageSize
 
   return await prisma.hewanQurban.findMany({
@@ -22,8 +28,8 @@ export async function getHewanQurban(type: "sapi" | "kambing", page = 1, pageSiz
   })
 }
 
-export async function countHewanQurban(type: "sapi" | "kambing") {
-  const tipeId = type === "sapi" ? 1 : 2
+export async function countHewanQurban(type: "Sapi" | "Domba") {
+  const tipeId = type === "Sapi" ? 1 : 2
 
   return await prisma.hewanQurban.count({
     where: { tipeId },
@@ -108,7 +114,7 @@ export async function countMudhohi() {
   return await prisma.mudhohi.count()
 }
 
-export async function updateHewanStatus(animalId: number, status: HewanStatus, slaughtered = false) {
+export async function updateHewanStatus(animalId: string, status: HewanStatus, slaughtered = false) {
   const hewan = await prisma.hewanQurban.findUnique({
     where: { animalId },
     include: { tipe: true },
@@ -161,7 +167,7 @@ export async function updateHewanStatus(animalId: number, status: HewanStatus, s
   })
 }
 
-export async function updateMudhohiReceived(animalId: number, received: boolean) {
+export async function updateMudhohiReceived(animalId: string, received: boolean) {
   return await prisma.hewanQurban.update({
     where: { animalId },
     data: {
@@ -326,20 +332,20 @@ export async function getProgresSapi() {
   })
 }
 
-export async function getProgresKambing() {
-  return await prisma.progresKambing.findMany({
+export async function getProgresDomba() {
+  return await prisma.progresDomba.findMany({
     orderBy: { id: "asc" },
   })
 }
 
-export async function updateSembelih(id: number, sembelih: boolean, type: "sapi" | "kambing") {
+export async function updateSembelih(id: number, sembelih: boolean, type: "sapi" | "domba") {
   if (type === "sapi") {
     return await prisma.progresSapi.update({
       where: { id },
       data: { sembelih },
     })
   } else {
-    return await prisma.progresKambing.update({
+    return await prisma.progresDomba.update({
       where: { id },
       data: { sembelih },
     })

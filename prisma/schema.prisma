@@ -98,7 +98,7 @@ model Pembayaran {
   dibayarkan       Int
   urlTandaBukti    String?
   createdAt        DateTime  @default(now()) @map("date_created")
-  mudhohi          Mudhohi  @relation(fields: [mudhohiId], references: [id])
+  mudhohi          Mudhohi  @relation(fields: [mudhohiId], references: [id], onDelete: Cascade)
 }
 
 model Mudhohi {
@@ -116,7 +116,7 @@ model Mudhohi {
   dash_code        String
   barcode_image    String?
   createdAt        DateTime  @default(now()) @map("date_created")
-  user             User      @relation(fields: [userId], references: [id])
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   payment          Pembayaran?
   hewan            HewanQurban[]
 }
@@ -124,7 +124,7 @@ model Mudhohi {
 model HewanQurban {
   id                String       @id @default(cuid())
   tipeId            Int       
-  animalId          Int          @unique @default(autoincrement()) // External ID for the animal
+  animalId          String          @unique // External ID for the animal
   // Animal slaughter progress
   status            HewanStatus  @default(TERDAFTAR)
   slaughtered       Boolean      @default(false)
@@ -139,19 +139,28 @@ model HewanQurban {
   tipe              TipeHewan    @relation(fields: [tipeId], references: [id])
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
+  @@index([tipeId])
+}
+
+enum JenisHewan {
+  UNTA
+  SAPI
+  DOMBA
+  KAMBING
 }
 
 model TipeHewan {
   id              Int          @id @default(autoincrement())
-  nama            String       @unique // Type of animal (e.g., "Sapi", "Kambing")
+  nama            String       @unique // Type of animal (e.g., "Sapi", "Domba")
   icon            String?
+  target          Int    
   jmlKantong      Int?
   harga           Int
   note            String
 
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
-
+  jenis           JenisHewan
   hewan           HewanQurban[]
   paketQurban     ProdukHewan[]
 }
@@ -214,7 +223,7 @@ model ErrorLog {
 // Distribution tracking
 model Distribution {
   id          String     @id @default(cuid())
-  category    String  // "Pengqurban Sapi", "Pengqurban Kambing", "Panitia", "RT RW", "Lembaga"
+  category    String  // "Pengqurban Sapi", "Pengqurban Domba", "Panitia", "RT RW", "Lembaga"
   target      Int     @default(0)
   realized    Int     @default(0)
 
@@ -255,7 +264,7 @@ model ProgresSapi {
   sembelih Boolean @default(false)
 }
 
-model ProgresKambing {
+model ProgresDomba {
   id       Int     @id @default(autoincrement())
   sembelih Boolean @default(false)
 }

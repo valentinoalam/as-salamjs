@@ -32,8 +32,8 @@ import { jenisProduk } from '@prisma/client';
 import { Progress } from '@/components/ui/progress';
 
 export default async function DashboardPage() {
-  const sapiData = await getHewanQurban("sapi")
-  const kambingData = await getHewanQurban("kambing")
+  const sapiData = await getHewanQurban("Sapi")
+  const dombaData = await getHewanQurban("Domba")
   const produkDaging = await getProdukHewan(jenisProduk.DAGING)
   const produkLainnya = await getProdukHewan()
   const distribution = await getDistribution()
@@ -77,7 +77,7 @@ export default async function DashboardPage() {
   ];
 
   const pieChartData = [
-    { name: 'Kambing', value: 45 },
+    { name: 'Domba', value: 45 },
     { name: 'Sapi Patungan', value: 30 },
     { name: 'Sapi Utuh', value: 10 },
   ];
@@ -100,7 +100,7 @@ export default async function DashboardPage() {
       <Tabs defaultValue="sapi" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="sapi">Status Sapi</TabsTrigger>
-          <TabsTrigger value="kambing">Status Kambing</TabsTrigger>
+          <TabsTrigger value="domba">Status Domba</TabsTrigger>
         </TabsList>
         <TabsContent value="sapi">
           <Card>
@@ -124,20 +124,20 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="kambing">
+        <TabsContent value="domba">
           <Card>
             <CardHeader>
-              <CardTitle>Status Kambing</CardTitle>
+              <CardTitle>Status Domba</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-5 gap-2">
-                {kambingData.map((kambing) => (
-                  <div key={kambing.id} className="flex flex-col items-center justify-center p-2 border rounded-md">
-                    <span className="text-lg">🐐{kambing.animalId}</span>
+                {dombaData.map((domba) => (
+                  <div key={domba.id} className="flex flex-col items-center justify-center p-2 border rounded-md">
+                    <span className="text-lg">🐐{domba.animalId}</span>
                     <div className="flex flex-col items-center">
-                      <span className="text-2xl">{kambing.slaughtered ? "✅" : "⬜️"}</span>
-                      {kambing.slaughtered && (
-                        <span className="text-xs mt-1">{kambing.receivedByMdhohi ? "🧑‍🤝‍🧑✓" : "🧑‍🤝‍🧑✗"}</span>
+                      <span className="text-2xl">{domba.slaughtered ? "✅" : "⬜️"}</span>
+                      {domba.slaughtered && (
+                        <span className="text-xs mt-1">{domba.receivedByMdhohi ? "🧑‍🤝‍🧑✓" : "🧑‍🤝‍🧑✗"}</span>
                       )}
                     </div>
                   </div>
@@ -313,7 +313,7 @@ export default async function DashboardPage() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalHewan}</div>
             <p className="text-xs text-muted-foreground">
-              40 kambing, 45 sapi
+              40 domba, 45 sapi
             </p>
           </CardContent>
         </Card>

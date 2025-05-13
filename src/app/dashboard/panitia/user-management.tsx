@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "@/hooks/use-toast"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Role } from "@prisma/client"
 import { createUser, updateUserRole, deleteUser } from "./actions"
@@ -17,7 +17,6 @@ type User = {
   id: string
   name: string | null
   email: string | null
-  image: string | null
   urlAvatar: string | null
   role: Role
   createdAt: Date
@@ -60,7 +59,7 @@ export default function UserManagement({ initialUsers }: UserManagementProps) {
         })
 
         // Add the new user to the list
-        setUsers((prev) => [...prev, result.user])
+        setUsers((prev) => [...prev, result.user as User])
 
         // Reset form
         setFormData({
@@ -252,7 +251,7 @@ export default function UserManagement({ initialUsers }: UserManagementProps) {
               <div key={user.id} className="flex items-center justify-between p-4 border rounded-md">
                 <div className="flex items-center gap-4">
                   <Avatar>
-                    <AvatarImage src={user.urlAvatar || user.image || undefined} alt={user.name || "User"} />
+                    <AvatarImage src={user.urlAvatar || undefined} alt={user.name || "User"} />
                     <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
                   </Avatar>
                   <div>

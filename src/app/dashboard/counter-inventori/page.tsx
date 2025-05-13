@@ -9,8 +9,6 @@ export default async function CounterInventoriPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold">Counter Inventori</h1>
-
       <CounterInventori
         initialProducts={products}
         distributions={distributions}

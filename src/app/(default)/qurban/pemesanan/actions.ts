@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
 import { type CaraBayar, PaymentStatus } from "@prisma/client"
 import { randomUUID } from "crypto"
+import { generateAnimalId } from "@/lib/animal"
 
 export async function getTipeHewan() {
   return await prisma.tipeHewan.findMany({
@@ -97,6 +98,7 @@ export async function createPemesanan(data: {
         hewan = await prisma.hewanQurban.create({
           data: {
             tipeId: 1, // Sapi
+            animalId: await generateAnimalId(1),
             isKolektif: true,
             slotTersisa: 6, // 7 total, using 1 now
           },
@@ -125,6 +127,7 @@ export async function createPemesanan(data: {
         hewan = await prisma.hewanQurban.create({
           data: {
             tipeId: data.tipeHewanId,
+            animalId: await generateAnimalId(1),
             isKolektif: false,
           },
         })

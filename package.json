@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "node server.js",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -15,7 +15,7 @@
     "postinstall": "prisma generate"
   },
   "prisma": {
-    "seed": "node --loader ts-node/esm prisma/seed.ts"
+    "seed": "node --no-warnings --loader ts-node/esm prisma/seed.ts"
   },
   "dependencies": {
     "@auth/core": "^0.34.2",
@@ -77,6 +77,7 @@
     "react-icons": "^5.5.0",
     "react-resizable-panels": "^3.0.1",
     "recharts": "2.15.3",
+    "schema-dts": "^1.1.5",
     "socket.io": "latest",
     "socket.io-client": "latest",
     "sonner": "^2.0.3",

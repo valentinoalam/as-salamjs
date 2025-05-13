@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, ReactNode } from "react";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 export type AnimalType = "goat" | "sheep" | "cow" | "camel";
 export type OrderStatus = 

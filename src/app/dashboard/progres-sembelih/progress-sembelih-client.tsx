@@ -6,147 +6,129 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "@/hooks/use-toast"
 import { updateHewanStatus, updateMudhohiReceived } from "./actions"
 import { HewanStatus } from "@prisma/client"
-import { Download } from "lucide-react"
-import { exportToExcel } from "@/lib/excel"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
 type HewanQurban = {
   id: string
-  animalId: number
+  animalId: string
   status: HewanStatus
   slaughtered: boolean
+  onInventory: boolean
   receivedByMdhohi: boolean
 }
 
 interface ProgressSembelihProps {
   initialSapiData: HewanQurban[]
-  initialKambingData: HewanQurban[]
-  sapiPages: number
-  kambingPages: number
-  kambingGroups: string[]
+  initialDombaData: HewanQurban[]
 }
 
-export default function ProgressSembelih({
-  initialSapiData,
-  initialKambingData,
-  sapiPages,
-  kambingPages,
-  kambingGroups,
-}: ProgressSembelihProps) {
-  const [sapiData, setSapiData] = useState<HewanQurban[]>(initialSapiData)
-  const [kambingData, setKambingData] = useState<HewanQurban[]>(initialKambingData)
-  const [sapiPage, setSapiPage] = useState(1)
-  const [kambingPage, setKambingPage] = useState(1)
-  const [kambingGroup, setKambingGroup] = useState("A")
+interface ProgressProps {
+  tipeHewan: "Sapi" | "Domba"
+  socket?: any
+  isConnected: boolean
+  initialHewanData: HewanQurban[]
+}
+
+const ProgressTab = ({ tipeHewan, socket, isConnected, initialHewanData }: ProgressProps) => {
+  const [data, setData] = useState<HewanQurban[]>(initialHewanData)
   const [loading, setLoading] = useState(false)
-  const { socket, isConnected } = useSocket()
+  const [currentPage, setCurrentPage] = useState(1)
+  const [currentGroup, setCurrentGroup] = useState('A')
+  const [meta, setMeta] = useState({ target: 0, total: 0 })
 
-  useEffect(() => {
-    if (!socket) return
-
-    const handleUpdateHewan = (data: {
-      animalId: number
-      status: HewanStatus
-      slaughtered: boolean
-      receivedByMdhohi: boolean
-      tipeId: number
-    }) => {
-      if (data.tipeId === 1) {
-        // Sapi
-        setSapiData((prev) =>
-          prev.map((item) =>
-            item.animalId === data.animalId
-              ? { ...item, status: data.status, slaughtered: data.slaughtered, receivedByMdhohi: data.receivedByMdhohi }
-              : item,
-          ),
-        )
-      } else if (data.tipeId === 2) {
-        // Kambing
-        setKambingData((prev) =>
-          prev.map((item) =>
-            item.animalId === data.animalId
-              ? { ...item, status: data.status, slaughtered: data.slaughtered, receivedByMdhohi: data.receivedByMdhohi }
-              : item,
-          ),
-        )
+  // Fungsi untuk menghitung paginasi dinamis
+  const calculatePagination = (target: number, total: number) => {
+    if (total > 100) {
+      return { 
+        useGroups: true, 
+        itemsPerGroup: 50,
+        pageSize: 10 
       }
     }
-
-    socket.on("update-hewan", handleUpdateHewan)
-
-    return () => {
-      socket.off("update-hewan", handleUpdateHewan)
+    if (target <= 100 && total <= 50) return { 
+      useGroups: false, 
+      pageSize: 10 
     }
-  }, [socket])
-
-  const fetchSapiPage = async (page: number) => {
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/hewan?type=sapi&page=${page}&pageSize=10`)
-      const data = await res.json()
-      setSapiData(data)
-      setSapiPage(page)
-    } catch (error) {
-      console.error("Error fetching sapi data:", error)
-      toast({
-        title: "Error",
-        description: "Failed to fetch sapi data. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
+    if (total > 50 && total <= 60) return { 
+      useGroups: false, 
+      pageSize: 15 
+    }
+    if (total > 60 && total <= 100) return { 
+      useGroups: false, 
+      pageSize: 20 
+    }
+    return { 
+      useGroups: false, 
+      pageSize: 10 
     }
   }
 
-  const fetchKambingPage = async (page: number, group?: string) => {
+  // Modifikasi fetch function untuk SAPI
+  const fetchHewanPage = async (
+    tipeHewan: string, 
+    page: number, 
+    group?: string
+  ): Promise<HewanQurban[]> => {
     setLoading(true)
+    console.log(tipeHewan)
     try {
-      // Calculate the actual page based on the group and page
-      let actualPage = page
-      if (group) {
-        const groupIndex = group.charCodeAt(0) - 65 // A=0, B=1, etc.
-        actualPage = groupIndex * 5 + page // 5 pages per group (50 kambing / 10 per page)
-      }
-
-      const res = await fetch(`/api/hewan?type=kambing&page=${actualPage}&pageSize=10`)
-      const data = await res.json()
-      setKambingData(data)
-      setKambingPage(page)
-      if (group) setKambingGroup(group)
-    } catch (error) {
-      console.error("Error fetching kambing data:", error)
-      toast({
-        title: "Error",
-        description: "Failed to fetch kambing data. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSlaughteredChange = async (animalId: number, checked: boolean, type: "sapi" | "kambing") => {
-    try {
-      // Update local state immediately for responsive UI
-      if (type === "sapi") {
-        setSapiData((prev) =>
-          prev.map((item) =>
-            item.animalId === animalId
-              ? { ...item, slaughtered: checked, status: checked ? HewanStatus.DISEMBELIH : HewanStatus.TERDAFTAR }
-              : item,
-          ),
-        )
+      const metaRes = await fetch(`/api/hewan/meta?type=${tipeHewan}`)
+      const metaData = await metaRes.json()
+      
+      let actualTarget = 0
+      let actualTotal = 0
+      
+      if (Array.isArray(metaData)) {
+        const typeData = metaData.find((item: any) => item.typeName === tipeHewan)
+        if (typeData) {
+          actualTarget = typeData.target
+          actualTotal = typeData.total
+        }
       } else {
-        setKambingData((prev) =>
-          prev.map((item) =>
-            item.animalId === animalId
-              ? { ...item, slaughtered: checked, status: checked ? HewanStatus.DISEMBELIH : HewanStatus.TERDAFTAR }
-              : item,
-          ),
-        )
+        actualTarget = metaData.target || 0
+        actualTotal = metaData.total || 0
+      }
+      
+      const { useGroups, pageSize } = calculatePagination(actualTarget, actualTotal)
+      let actualPage = page
+      
+      if (useGroups && group) {
+        const groupIndex = group.charCodeAt(0) - 65
+        const groupOffset = groupIndex * 50
+        actualPage = Math.floor(groupOffset / pageSize) + page
       }
 
+      const res = await fetch(
+        `/api/hewan?type=${tipeHewan}&page=${actualPage}&pageSize=${pageSize}`
+      )
+      const data: HewanQurban[] = await res.json()
+      console.log(data)
+      return data
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Gagal memuat data ${tipeHewan}`,
+        variant: "destructive",
+      })
+      return []
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSlaughteredChange = async (animalId: string, checked: boolean, type: "Sapi" | "Domba") => {
+    try {
+      setData((prev) =>
+        prev.map((item) =>
+          item.animalId === animalId
+            ? { ...item, slaughtered: checked, status: checked ? HewanStatus.DISEMBELIH : HewanStatus.TERDAFTAR }
+            : item
+        )
+      )
+      
       // Send to server
       const status = checked ? HewanStatus.DISEMBELIH : HewanStatus.TERDAFTAR
       await updateHewanStatus(animalId, status, checked)
@@ -157,7 +139,7 @@ export default function ProgressSembelih({
           animalId,
           status,
           slaughtered: checked,
-          tipeId: type === "sapi" ? 1 : 2,
+          tipeId: type === "Sapi" ? 1 : 2,
         })
       }
     } catch (error) {
@@ -169,219 +151,266 @@ export default function ProgressSembelih({
       })
 
       // Revert local state on error
-      if (type === "sapi") {
-        setSapiData((prev) =>
-          prev.map((item) =>
-            item.animalId === animalId
-              ? { ...item, slaughtered: !checked, status: !checked ? HewanStatus.DISEMBELIH : HewanStatus.TERDAFTAR }
-              : item,
-          ),
+      setData((prev) =>
+        prev.map((item) =>
+          item.animalId === animalId
+            ? { ...item, slaughtered: !checked, status: !checked ? HewanStatus.DISEMBELIH : HewanStatus.TERDAFTAR }
+            : item
         )
-      } else {
-        setKambingData((prev) =>
-          prev.map((item) =>
-            item.animalId === animalId
-              ? { ...item, slaughtered: !checked, status: !checked ? HewanStatus.DISEMBELIH : HewanStatus.TERDAFTAR }
-              : item,
-          ),
-        )
-      }
+      )
     }
   }
 
-  const handleReceivedChange = async (animalId: number, checked: boolean, type: "sapi" | "kambing") => {
-    try {
-      // Update local state immediately for responsive UI
-      if (type === "sapi") {
-        setSapiData((prev) =>
-          prev.map((item) => (item.animalId === animalId ? { ...item, receivedByMdhohi: checked } : item)),
-        )
-      } else {
-        setKambingData((prev) =>
-          prev.map((item) => (item.animalId === animalId ? { ...item, receivedByMdhohi: checked } : item)),
-        )
-      }
-
-      // Send to server
-      await updateMudhohiReceived(animalId, checked)
-
-      // Emit socket event
-      if (socket && isConnected) {
-        socket.emit("update-hewan", {
-          animalId,
-          receivedByMdhohi: checked,
-          tipeId: type === "sapi" ? 1 : 2,
-        })
-      }
-    } catch (error) {
-      console.error("Error updating received status:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update received status. Please try again.",
-        variant: "destructive",
-      })
-
-      // Revert local state on error
-      if (type === "sapi") {
-        setSapiData((prev) =>
-          prev.map((item) => (item.animalId === animalId ? { ...item, receivedByMdhohi: !checked } : item)),
-        )
-      } else {
-        setKambingData((prev) =>
-          prev.map((item) => (item.animalId === animalId ? { ...item, receivedByMdhohi: !checked } : item)),
-        )
+  useEffect(() => {
+    const loadMeta = async () => {
+      try {
+        const res = await fetch(`/api/hewan/meta?type=${tipeHewan}`)
+        const metaData = await res.json()
+        console.log(metaData)
+        if (Array.isArray(metaData)) {
+          const typeData = metaData.find((item: any) => item.typeName === tipeHewan)
+          if (typeData) {
+            setMeta({ target: typeData.target, total: typeData.total })
+          }
+        } else {
+          setMeta({ target: metaData.target || 0, total: metaData.total || 0 })
+        }
+      } catch (error) {
+        setMeta({ target: 0, total: 0 })
       }
     }
+    loadMeta()
+  }, [tipeHewan])
+
+  useEffect(() => {
+    if (!socket) return
+
+    const handleUpdateHewan = (data: {
+      animalId: string
+      status: HewanStatus
+      slaughtered: boolean
+      receivedByMdhohi: boolean
+      tipeId: number
+    }) => {
+      setData((prev) =>
+        prev.map((item) =>
+          item.animalId === data.animalId
+            ? { ...item, status: data.status, slaughtered: data.slaughtered, receivedByMdhohi: data.receivedByMdhohi }
+            : item
+        )
+      )
+    }
+
+    socket.on("update-hewan", handleUpdateHewan)
+
+    return () => {
+      socket.off("update-hewan", handleUpdateHewan)
+    }
+  }, [socket])
+
+  useEffect(() => {
+    if (paginationConfig.useGroups && currentGroup !== 'A') {
+      loadData(currentPage, currentGroup)
+    }
+  }, [currentGroup])
+
+  const paginationConfig = calculatePagination(meta.target, meta.total)
+
+  const loadData = async (page: number, group?: string) => {
+    const newData = await fetchHewanPage(tipeHewan, page, group)
+    setData(newData)
   }
 
-  const handleExportSapiToExcel = () => {
-    const data = sapiData.map((s) => ({
-      ID: s.animalId,
-      Status: s.status,
-      "Sudah Disembelih": s.slaughtered ? "Ya" : "Tidak",
-      "Jatah Diambil": s.receivedByMdhohi ? "Ya" : "Tidak",
-    }))
-
-    exportToExcel(data, "progres_sembelih_sapi")
-  }
-
-  const handleExportKambingToExcel = () => {
-    const data = kambingData.map((k) => ({
-      ID: k.animalId,
-      Status: k.status,
-      "Sudah Disembelih": k.slaughtered ? "Ya" : "Tidak",
-      "Jatah Diambil": k.receivedByMdhohi ? "Ya" : "Tidak",
-    }))
-
-    exportToExcel(data, "progres_sembelih_kambing")
-  }
   return (
-    <div className="space-y-8">
-      <div className="flex items-center gap-2">
-        <div className={`h-3 w-3 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`}></div>
-        <span className="text-sm">{isConnected ? "Connected" : "Disconnected"}</span>
-      </div>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Progres Sapi</CardTitle>
-          <div className="flex space-x-2">
-            <Button variant="outline" size="sm" onClick={handleExportSapiToExcel}>
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-            {Array.from({ length: sapiPages }, (_, i) => (
+    <Card>
+      <CardHeader>
+        <CardTitle>Progres {tipeHewan}</CardTitle>
+        
+        {/* Group Selector */}
+        {paginationConfig.useGroups ? (
+          <>
+            <div className="flex gap-2 mb-4">
+              {Array.from({ length: Math.ceil(meta.total / 50) }, (_, i) => {
+                const group = String.fromCharCode(65 + i)
+                return (
+                  <Button
+                    key={group}
+                    variant={currentGroup === group ? "default" : "outline"}
+                    onClick={() => {
+                      setCurrentGroup(group)
+                      setCurrentPage(1)
+                      loadData(1, group)
+                    }}
+                    disabled={loading}
+                  >
+                    {group}
+                  </Button>
+                )
+              })}
+            </div>
+            {/* Page Selection dalam Group */}
+            <div className="flex gap-2">
+              {Array.from(
+                { length: Math.ceil(paginationConfig.itemsPerGroup! / paginationConfig.pageSize) }, 
+                (_, i) => (
+                  <Button
+                    key={i + 1}
+                    variant={currentPage === i + 1 ? "default" : "outline"}
+                    onClick={() => {
+                      setCurrentPage(i + 1)
+                      loadData(i + 1, currentGroup)
+                    }}
+                    disabled={loading}
+                  >
+                    {i * paginationConfig.pageSize + 1} - 
+                    {Math.min((i + 1) * paginationConfig.pageSize, paginationConfig.itemsPerGroup!)}
+                  </Button>
+                )
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="flex gap-2">
+            {Array.from({ length: Math.ceil(meta.total / paginationConfig.pageSize) }, (_, i) => (
               <Button
-                key={i}
-                variant={sapiPage === i + 1 ? "default" : "outline"}
-                size="sm"
-                onClick={() => fetchSapiPage(i + 1)}
+                key={i + 1}
+                variant={currentPage === i + 1 ? "default" : "outline"}
+                onClick={() => {
+                  setCurrentPage(i + 1)
+                  loadData(i + 1)
+                }}
                 disabled={loading}
               >
-                {i * 10 + 1}-{Math.min((i + 1) * 10, sapiPages * 10)}
+                {i * paginationConfig.pageSize + 1} - 
+                {Math.min((i + 1) * paginationConfig.pageSize, meta.total)}
               </Button>
             ))}
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {sapiData.map((sapi) => (
-              <div key={sapi.id} className="flex items-center justify-between p-2 border rounded-md">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">🐮 {sapi.animalId}</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={sapi.slaughtered}
-                      onCheckedChange={(checked) => handleSlaughteredChange(sapi.animalId, checked, "sapi")}
-                    />
-                    <Label>{sapi.slaughtered ? "Sudah" : "Belum"}</Label>
-                  </div>
+        )}
+      </CardHeader>
 
-                  {sapi.slaughtered && (
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={sapi.receivedByMdhohi}
-                        onCheckedChange={(checked) => handleReceivedChange(sapi.animalId, checked, "sapi")}
-                      />
-                      <Label>{sapi.receivedByMdhohi ? "Diambil" : "Belum"}</Label>
-                    </div>
-                  )}
+      <CardContent>
+        {loading ? (
+          <div className="text-center py-4">Loading...</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {data.map((hewan) => (
+              <div key={hewan.id} className="p-4 border rounded-lg flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <span className="font-medium">
+                    {tipeHewan === 'Sapi' ? '🐄' : '🐏'} {hewan.animalId}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <StatusSwitch
+                    label="Disembelih"
+                    checked={hewan.slaughtered}
+                    onCheckedChange={(checked) => 
+                      handleSlaughteredChange(hewan.animalId, checked, tipeHewan)
+                    }
+                  />
                 </div>
               </div>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Progres Kambing</CardTitle>
-          <div className="flex flex-col space-y-2">
-            <div className="flex space-x-2 justify-end">
-              <Button variant="outline" size="sm" onClick={handleExportKambingToExcel}>
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-              {kambingGroups.map((group) => (
-                <Button
-                  key={group}
-                  variant={kambingGroup === group ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => fetchKambingPage(1, group)}
-                  disabled={loading}
-                >
-                  {group}
-                </Button>
-              ))}
-            </div>
-            <div className="flex space-x-2 justify-end">
-              {Array.from({ length: 5 }, (_, i) => (
-                <Button
-                  key={i}
-                  variant={kambingPage === i + 1 ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => fetchKambingPage(i + 1, kambingGroup)}
-                  disabled={loading}
-                >
-                  {i * 10 + 1}-{Math.min((i + 1) * 10, 50)}
-                </Button>
-              ))}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {kambingData.map((kambing) => (
-              <div key={kambing.id} className="flex items-center justify-between p-2 border rounded-md">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">🐐 {kambing.animalId}</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={kambing.slaughtered}
-                      onCheckedChange={(checked) => handleSlaughteredChange(kambing.animalId, checked, "kambing")}
-                    />
-                    <Label>{kambing.slaughtered ? "Sudah" : "Belum"}</Label>
-                  </div>
+export default function ProgressSembelih({
+  initialSapiData,
+  initialDombaData,
+}: ProgressSembelihProps) {
+  const [activeTab, setActiveTab] = useState('Sapi')
+  const [tipeHewanList, setTipeHewanList] = useState<('Sapi' | 'Domba')[]>(['Sapi', 'Domba'])
+  const { socket, isConnected } = useSocket()
 
-                  {kambing.slaughtered && (
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={kambing.receivedByMdhohi}
-                        onCheckedChange={(checked) => handleReceivedChange(kambing.animalId, checked, "kambing")}
-                      />
-                      <Label>{kambing.receivedByMdhohi ? "Diambil" : "Belum"}</Label>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+  useEffect(() => {
+    const loadTipeHewan = async () => {
+      try {
+        const res = await fetch('/api/hewan/meta')
+        
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`)
+        }
+        
+        const data = await res.json()
+        
+        // Validasi response
+        if (!Array.isArray(data)) {
+          throw new Error('Invalid response format')
+        }
+        
+        const validTypes = data
+          .filter((item: any) => item.typeName === 'Sapi' || item.typeName === 'Domba')
+          .map((item: any) => item.typeName as 'Sapi' | 'Domba')
+        
+        if (validTypes.length > 0) {
+          setTipeHewanList(validTypes)
+        }
+      } catch (error) {
+        console.error('Error loading tipe hewan:', error)
+        // Keep default values on error
+      }
+    }
+    loadTipeHewan()
+  }, [])
+
+  return (
+    <div className="space-y-8">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-2">
+          {tipeHewanList.map((tipe) => (
+            <TabsTrigger key={tipe} value={tipe}>
+              {tipe}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        {tipeHewanList.map((tipe) => (
+          <TabsContent key={tipe} value={tipe}>
+            <ProgressTab 
+              tipeHewan={tipe} 
+              socket={socket} 
+              isConnected={isConnected} 
+              initialHewanData={tipe === 'Sapi' ? initialSapiData : initialDombaData} 
+            />
+          </TabsContent>
+        ))}
+      </Tabs>
+
+      <Legend />
     </div>
   )
 }
+
+const StatusSwitch = ({ label, checked, onCheckedChange }: { 
+  label: string
+  checked: boolean
+  onCheckedChange: (checked: boolean) => void
+}) => (
+  <div className="flex items-center gap-2">
+    <Switch checked={checked} onCheckedChange={onCheckedChange} />
+    <Label className="text-sm">{checked ? `Sudah ${label}` : `Belum ${label}`}</Label>
+  </div>
+)
+
+const Legend = () => (
+  <div className="p-4 border rounded-lg bg-muted flex gap-6">
+    <div className="flex items-center gap-2">
+      <div className="w-3 h-3 bg-green-500 rounded-full" />
+      <span className="text-sm">Sudah Disembelih</span>
+    </div>
+    <div className="flex items-center gap-2">
+      <div className="w-3 h-3 bg-blue-500 rounded-full" />
+      <span className="text-sm">Tersedia di Inventori</span>
+    </div>
+    <div className="flex items-center gap-2">
+      <div className="w-3 h-3 bg-purple-500 rounded-full" />
+      <span className="text-sm">Sudah Diambil</span>
+    </div>
+  </div>
+)

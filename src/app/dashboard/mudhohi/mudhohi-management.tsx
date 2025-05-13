@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
@@ -57,7 +57,7 @@ type Mudhohi = {
   } | null
   hewan: {
     id: string
-    animalId: number
+    animalId: string
     tipeId: number
     status: string
     slaughtered: boolean

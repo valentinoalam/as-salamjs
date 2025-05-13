@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "@/hooks/use-toast"
 import { addProductLog, createDistribusi, updateMudhohiReceived, updateErrorLogNote } from "./actions"
 import { Counter, type jenisProduk } from "@prisma/client"
 import { Download } from "lucide-react"
@@ -44,7 +44,7 @@ type Mudhohi = {
   nama_pengqurban: string | null
   nama_peruntukan: string | null
   hewan: {
-    animalId: number
+    animalId: string
     receivedByMdhohi: boolean
   }[]
 }
@@ -280,7 +280,7 @@ export default function CounterInventori({
     }
   }
 
-  const handleMudhohiReceived = async (animalId: number, received: boolean) => {
+  const handleMudhohiReceived = async (animalId: string, received: boolean) => {
     try {
       await updateMudhohiReceived(animalId, received)
 

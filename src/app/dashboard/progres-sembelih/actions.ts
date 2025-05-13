@@ -4,7 +4,7 @@ import { updateHewanStatus as dbUpdateHewanStatus, updateMudhohiReceived as dbUp
 import { revalidatePath } from "next/cache"
 import type { HewanStatus } from "@prisma/client"
 
-export async function updateHewanStatus(animalId: number, status: HewanStatus, slaughtered: boolean) {
+export async function updateHewanStatus(animalId: string, status: HewanStatus, slaughtered: boolean) {
   try {
     await dbUpdateHewanStatus(animalId, status, slaughtered)
     revalidatePath("/progres-sembelih")
@@ -16,7 +16,7 @@ export async function updateHewanStatus(animalId: number, status: HewanStatus, s
   }
 }
 
-export async function updateMudhohiReceived(animalId: number, received: boolean) {
+export async function updateMudhohiReceived(animalId: string, received: boolean) {
   try {
     await dbUpdateMudhohiReceived(animalId, received)
     revalidatePath("/progres-sembelih")
