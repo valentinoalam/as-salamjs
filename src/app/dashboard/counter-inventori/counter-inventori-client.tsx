@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSocket } from "@/lib/socket"
+import { useSocket } from "@/contexts/socket-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -60,7 +60,7 @@ type Penerima = {
   }
 }
 
-type ErrorLog = {
+export type ErrorLog = {
   id: number
   produkId: number
   event: string
@@ -74,6 +74,7 @@ interface CounterInventoriProps {
   distributions: Distribution[]
   initialMudhohi: Mudhohi[]
   initialPenerima: Penerima[]
+  initialErrLogs: ErrorLog[]
 }
 
 export default function CounterInventori({
@@ -81,13 +82,14 @@ export default function CounterInventori({
   distributions,
   initialMudhohi,
   initialPenerima,
+  initialErrLogs
 }: CounterInventoriProps) {
   const [products, setProducts] = useState<ProdukHewan[]>(initialProducts)
   const [mudhohi, setMudhohi] = useState<Mudhohi[]>(initialMudhohi)
   const [penerima, setPenerima] = useState<Penerima[]>(initialPenerima)
   const [mudhohiPage, setMudhohiPage] = useState(1)
   const [penerimaPage, setPenerimaPage] = useState(1)
-  const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([])
+  const [errorLogs, setErrorLogs] = useState<ErrorLog[]>(initialErrLogs)
   const [loading, setLoading] = useState(false)
 
   // Form states

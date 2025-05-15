@@ -312,24 +312,72 @@ enum TransactionType {
   PENGELUARAN
 }
 
-enum TransactionCategory {
-  QURBAN_PAYMENT
-  OPERATIONAL
-  SUPPLIES
-  TRANSPORT
-  SALARY
-  OTHER
+// enum TransactionCategory {
+//   QURBAN_PAYMENT
+//   OPERATIONAL
+//   SUPPLIES
+//   TRANSPORT
+//   SALARY
+//   OTHER
+// }
+
+model TransactionCategory {
+  id            String       @id @default(uuid())
+  name          String
+  type          TransactionType
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  transactions  Transaction[]
+  budgets       Budget[]
+
+  @@map("categories")
 }
 
 model Transaction {
   id          String             @id @default(cuid())
   amount      Int
-  description String
+  description String       @db.Text
+  categoryId  String
   type        TransactionType
-  category    TransactionCategory
+  category    TransactionCategory    @relation(fields: [categoryId], references: [id])
   date        DateTime
-  receiptUrl  String?
+  receiptUrl  Image[]
   createdBy   String             // User ID who created the transaction
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
+}
+
+model Image {
+  id            String       @id @default(uuid())
+  url           String
+  transactionId String
+  transaction   Transaction  @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("images")
+}
+
+
+model Budget {
+  id          String      @id @default(uuid())
+  amount      Float
+  categoryId  String
+  category    TransactionCategory    @relation(fields: [categoryId], references: [id])
+  startDate   DateTime
+  endDate     DateTime
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("budgets")
+}
+
+model Setting {
+  id          String    @id @default(uuid())
+  key         String    @unique
+  value       String    @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("settings")
 }

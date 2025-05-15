@@ -1,5 +1,5 @@
 import React from "react";
-import { useOrder, Order } from "@/contexts/order-context";
+import { useOrder } from "@/contexts/order-context";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,

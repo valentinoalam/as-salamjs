@@ -1,4 +1,4 @@
-import { SchemaFAQ } from "@/types/schema-types"
+import type { SchemaFAQ } from "@/types/schema-types"
 
 export interface FAQItem {
   question: string

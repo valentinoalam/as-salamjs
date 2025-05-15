@@ -11,7 +11,20 @@
 //       },
 //     };
 //   }
-import { SchemaArticle } from '@/types/schema-types';
+// export function generateArticleSchema({ headline, image, datePublished, author }) {
+//     return {
+//       "@context": "https://schema.org",
+//       "@type": "Article",
+//       headline,
+//       image,
+//       datePublished,
+//       author: {
+//         "@type": "Person",
+//         name: author,
+//       },
+//     };
+//   }
+import type { SchemaArticle } from '@/types/schema-types';
 
 export interface ArticleSchemaProps {
   headline: string;

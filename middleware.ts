@@ -40,7 +40,14 @@ export async function middleware(request: NextRequest) {
       }
     }
   }
-
+ // Handle Socket.IO polling requests
+ if (request.nextUrl.pathname.startsWith("/api/socket")) {
+    const response = NextResponse.next();
+    response.headers.set("Access-Control-Allow-Origin", "*");
+    response.headers.set("Access-Control-Allow-Methods", "GET, POST");
+    response.headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return response;
+  }
   return NextResponse.next()
 }
 
@@ -51,5 +58,6 @@ export const config = {
     "/dashboard/progres-sembelih/:path*",
     "/dashboard/panitia/:path*",
     "/dashboard/mudhohi/:path*",
+    "/api/socket/:path*"
   ],
 }

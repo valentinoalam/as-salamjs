@@ -53,14 +53,55 @@ async function main() {
   // Clean up existing data
   console.log("🧹 Cleaning up existing data...")
   await prisma.user.deleteMany({})
-  
+    
+  await prisma.image.deleteMany({});
+  await prisma.transaction.deleteMany({});
+  await prisma.budget.deleteMany({});
+  await prisma.category.deleteMany({});
+  await prisma.setting.deleteMany({});
+
   await prisma.hewanQurban.deleteMany({})
   await prisma.tipeHewan.deleteMany({})
   await prisma.produkHewan.deleteMany({})
   await prisma.penerima.deleteMany({})
   await prisma.distribution.deleteMany({})
-  
 
+  // Default Categories for INCOME
+  const incomeCategories = [
+    { name: 'Donasi Qurban', type: TransactionType.INCOME },
+    { name: 'Sedekah Idul Adha', type: TransactionType.INCOME },
+    { name: 'Penjualan Kulit Hewan', type: TransactionType.INCOME },
+    { name: 'Lain-lain (Pemasukan)', type: TransactionType.INCOME },
+  ];
+   
+  // Default Categories for EXPENSE
+  const expenseCategories = [
+    { name: 'Pembelian Hewan Qurban - Sapi', type: TransactionType.EXPENSE },
+    { name: 'Pembelian Hewan Qurban - Kambing', type: TransactionType.EXPENSE },
+    { name: 'Pembelian Hewan Qurban - Domba', type: TransactionType.EXPENSE },
+    { name: 'Biaya Perawatan Hewan', type: TransactionType.EXPENSE },
+    { name: 'Biaya Pemotongan & Pengulitan', type: TransactionType.EXPENSE },
+    { name: 'Biaya Distribusi Daging', type: TransactionType.EXPENSE },
+    { name: 'Belanja Bumbu & Bahan Masakan', type: TransactionType.EXPENSE },
+    { name: 'Transportasi & Akomodasi', type: TransactionType.EXPENSE },
+    { name: 'Sewa Alat', type: TransactionType.EXPENSE },
+    { name: 'Lain-lain (Pengeluaran)', type: TransactionType.EXPENSE },
+  ];
+  
+  // Create default categories
+  for (const category of [...incomeCategories, ...expenseCategories]) {
+    await prisma.category.create({
+      data: category,
+    });
+  }
+  
+  // Default Settings
+  await prisma.setting.create({
+    data: {
+      key: 'currency',
+      value: 'IDR',
+    },
+  });
 
   // Create Admin User with password
   const adminPassword = await hash("admin123", 10)

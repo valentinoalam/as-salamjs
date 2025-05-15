@@ -11,24 +11,6 @@ interface BreadcrumbItem {
   name: string
   href: string
 }
-function generateBreadcrumbs(pathname: string | null): BreadcrumbItem[] {
-  if (!pathname) return []
-
-  // Split path into segments and filter out empty segments
-  const pathSegments = pathname.split('/').filter(segment => segment !== '')
-
-  // Create cumulative paths for each segment
-  const breadcrumbs = pathSegments.map((segment, index) => {
-    const href = '/' + pathSegments.slice(0, index + 1).join('/')
-    return {
-      name: formatSegmentName(segment),
-      href: href
-    }
-  })
-
-  // Always add home as first item
-  return [{ name: 'Home', href: '/' }, ...breadcrumbs]
-}
 
 function formatSegmentName(segment: string): string {
   return segment

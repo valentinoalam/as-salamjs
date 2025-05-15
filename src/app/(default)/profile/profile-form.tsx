@@ -16,8 +16,7 @@ type User = {
   id: string
   name: string | null
   email: string | null
-  image: string | null
-  urlAvatar: string | null
+  urlAvatar?: string | null
   role: Role
 }
 
@@ -27,7 +26,7 @@ interface ProfileFormProps {
 
 export default function ProfileForm({ user }: ProfileFormProps) {
   const [loading, setLoading] = useState(false)
-  const [avatarUrl, setAvatarUrl] = useState(user.urlAvatar || user.image || "")
+  const [avatarUrl, setAvatarUrl] = useState(user.urlAvatar || "")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
 

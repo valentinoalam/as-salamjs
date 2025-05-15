@@ -10,7 +10,17 @@ const nextConfig: NextConfig = {
   },
   images: {
     unoptimized: true,
-  },
+  }, 
+  // Required for WebSocket upgrade handling
+  headers: async () => [
+    {
+      source: '/api/socket',
+      headers: [
+        { key: 'Access-Control-Allow-Origin', value: '*' },
+        { key: 'Access-Control-Allow-Methods', value: 'GET, POST' }
+      ]
+    }
+  ]
 };
 
 export default nextConfig;

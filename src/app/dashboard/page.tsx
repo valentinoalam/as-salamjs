@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { 
   Users, 
   CircleDollarSign, 
@@ -30,7 +30,28 @@ import {
 import { getHewanQurban, getProdukHewan, getDistribution, getPenerima, getDistribusiLog } from '@/lib/db';
 import { jenisProduk } from '@prisma/client';
 import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
+import { RecentTransactions } from '@/components/dashboard/summaries/recent-transactions';
+import { BudgetProgress } from '@/components/dashboard/summaries/budget-progress';
+import { Overview } from '@/components/dashboard/summaries/overview';
+import { FinancialSummary } from '@/components/dashboard/summaries/financial-summary';
 
+const LegendProgress = () => (
+  <div className="p-4 border rounded-lg bg-muted flex gap-6">
+    <div className="flex items-center gap-2">
+      <div className="w-3 h-3 bg-green-500 rounded-full" />
+      <span className="text-sm">Sudah Disembelih</span>
+    </div>
+    <div className="flex items-center gap-2">
+      <div className="w-3 h-3 bg-blue-500 rounded-full" />
+      <span className="text-sm">Tersedia di Inventori</span>
+    </div>
+    <div className="flex items-center gap-2">
+      <div className="w-3 h-3 bg-purple-500 rounded-full" />
+      <span className="text-sm">Sudah Diambil</span>
+    </div>
+  </div>
+)
 export default async function DashboardPage() {
   const sapiData = await getHewanQurban("Sapi")
   const dombaData = await getHewanQurban("Domba")
@@ -147,7 +168,7 @@ export default async function DashboardPage() {
           </Card>
         </TabsContent>
       </Tabs>
-
+      <LegendProgress />
       <Card>
         <CardHeader>
           <CardTitle>Penerimaan</CardTitle>
@@ -287,6 +308,85 @@ export default async function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Suspense fallback={<Skeleton className="h-[125px] w-full" />}>
+          <FinancialSummary />
+        </Suspense>
+      </div>
+      
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="overview">Ringkasan</TabsTrigger>
+          <TabsTrigger value="recent">Transaksi Terbaru</TabsTrigger>
+          <TabsTrigger value="budgets">Anggaran</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            <Card className="col-span-4">
+              <CardHeader>
+                <CardTitle>Ringkasan</CardTitle>
+                <CardDescription>
+                  Gambaran transaksi bulan ini
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pl-2">
+                <Suspense fallback={<Skeleton className="h-[350px] w-full" />}>
+                  <Overview />
+                </Suspense>
+              </CardContent>
+            </Card>
+            
+            <Card className="col-span-3">
+              <CardHeader>
+                <CardTitle>Distribusi Pengeluaran</CardTitle>
+                <CardDescription>
+                  Berdasarkan kategori bulan ini
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Suspense fallback={<Skeleton className="h-[350px] w-full rounded-full" />}>
+                  <div className="h-[350px] flex items-center justify-center">
+                    <Overview isDistributionChart />
+                  </div>
+                </Suspense>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="recent">
+          <Card>
+            <CardHeader>
+              <CardTitle>Transaksi Terbaru</CardTitle>
+              <CardDescription>
+                Daftar 10 transaksi terakhir yang dicatat
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Suspense fallback={<Skeleton className="h-[400px] w-full" />}>
+                <RecentTransactions />
+              </Suspense>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="budgets">
+          <Card>
+            <CardHeader>
+              <CardTitle>Progress Anggaran</CardTitle>
+              <CardDescription>
+                Monitoring realisasi anggaran berdasarkan kategori
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Suspense fallback={<Skeleton className="h-[400px] w-full" />}>
+                <BudgetProgress />
+              </Suspense>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
       {/* <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

@@ -1,4 +1,4 @@
-import NextAuth, { AuthOptions, NextAuthOptions } from "next-auth"
+import NextAuth, { type AuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/db"
@@ -6,7 +6,7 @@ import { compare } from "bcryptjs"
 import type { Role } from "@prisma/client"
 
 export const authOptions: AuthOptions = {
-  adapter: PrismaAdapter(prisma) as NextAuthOptions['adapter'],
+  adapter: PrismaAdapter(prisma),
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -49,7 +49,7 @@ export const authOptions: AuthOptions = {
             email: user.email,
             name: user.name,
             role: user.role,
-            image: user.urlAvatar,
+            urlAvatar: user.urlAvatar,
           }
         } catch (error) {
           console.error('Authentication error:', error);
@@ -87,7 +87,7 @@ export const authOptions: AuthOptions = {
   },
   session: {
     strategy: "jwt",
-    maxAge: 24 * 60 * 60, // 24 hours
+    maxAge: 24 * 60 * 60 * 30, // 24 hours * 30
   },
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === 'development',

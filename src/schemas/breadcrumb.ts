@@ -1,4 +1,4 @@
-import { SchemaBreadcrumb } from "@/types/schema-types"
+import type { SchemaBreadcrumb } from "@/types/schema-types"
 
 export interface BreadcrumbItem {
   name: string

@@ -1,4 +1,6 @@
+import type { ErrorLog } from "@/app/dashboard/counter-inventori/counter-inventori-client"
 import { PrismaClient, type HewanStatus, jenisProduk, Counter } from "@prisma/client"
+
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient }
 
@@ -8,6 +10,20 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma
 
 export default prisma
 
+// Socket emitter function
+const emitSocketEvent = (eventName: string, data: any) => {
+  try {
+    // Get socket from global context if available
+    // This is a workaround since we can't use hooks in non-React functions
+    if (typeof window !== "undefined" && (window as any).__SOCKET_INSTANCE__) {
+      const socket = (window as any).__SOCKET_INSTANCE__
+      socket.emit(eventName, data)
+    }
+  } catch (error) {
+    console.error(`Socket error in ${eventName}:`, error)
+  }
+}
+
 // Helper functions for database operations
 const calculateOffset = (page: number, pageSize: number, group?: string) => {
   if (group) {
@@ -16,16 +32,175 @@ const calculateOffset = (page: number, pageSize: number, group?: string) => {
   }
   return (page - 1) * pageSize;
 };
+
 export async function getHewanQurban(type: "Sapi" | "Domba", page = 1, pageSize = 10) {
   const tipeId = type === "Sapi" ? 1 : 2
   const skip = (page - 1) * pageSize
 
   return await prisma.hewanQurban.findMany({
     where: { tipeId },
-    orderBy: { animalId: "asc" },
+    orderBy: { createdAt: "asc" },
     skip,
     take: pageSize,
   })
+}
+
+export async function getInventory() {
+  return await prisma.inventory.findMany()
+}
+
+export async function getTimbang() {
+  return await prisma.hasilTimbang.findMany()
+}
+
+export async function getProgresSapi() {
+  return await prisma.progresSapi.findMany({
+    orderBy: { id: "asc" },
+  })
+}
+
+export async function getProgresDomba() {
+  return await prisma.progresDomba.findMany({
+    orderBy: { id: "asc" },
+  })
+}
+
+
+export async function updateSembelih(id: number, sembelih: boolean, type: "Sapi" | "domba") {
+  let result
+
+  if (type === "Sapi") {
+    result = await prisma.progresSapi.update({
+      where: { id },
+      data: { sembelih },
+    })
+
+    // Emit socket event with the updated data
+    const updatedData = await getProgresSapi()
+    emitSocketEvent("progres-sapi-updated", updatedData)
+  } else {
+    result = await prisma.progresDomba.update({
+      where: { id },
+      data: { sembelih },
+    })
+
+    // Emit socket event with the updated data
+    const updatedData = await getProgresDomba()
+    emitSocketEvent("progres-domba-updated", updatedData)
+  }
+
+  return result
+}
+
+export async function insertHistoryTimbang(hasil_timbang_id: number, operation: string, value: number) {
+  // First update the hasil_timbang record
+  const hasilTimbang = await prisma.hasilTimbang.findUnique({
+    where: { id: hasil_timbang_id },
+  })
+
+  if (!hasilTimbang) {
+    throw new Error(`HasilTimbang with id ${hasil_timbang_id} not found`)
+  }
+
+  let newValue = hasilTimbang.hasil
+  if (operation === "add") {
+    newValue += value
+  } else if (operation === "decrease") {
+    newValue = Math.max(0, newValue - value)
+  }
+
+  await prisma.hasilTimbang.update({
+    where: { id: hasil_timbang_id },
+    data: { hasil: newValue },
+  })
+
+  // Then create the history record
+  const result = await prisma.timbangHistory.create({
+    data: {
+      hasil_timbang_id,
+      operation,
+      value,
+    },
+  })
+
+  // Emit socket event with the updated data
+  const updatedData = await getTimbang()
+  emitSocketEvent("hasil-timbang-updated", updatedData)
+
+  return result
+}
+
+export async function insertHistoryInventori(inventory_id: number, operation: string, value: number) {
+  // First update the inventory record
+  const inventory = await prisma.inventory.findUnique({
+    where: { id: inventory_id },
+  })
+
+  if (!inventory) {
+    throw new Error(`Inventory with id ${inventory_id} not found`)
+  }
+
+  let newValue = inventory.hasil
+  if (operation === "add") {
+    newValue += value
+  } else if (operation === "decrease") {
+    newValue = Math.max(0, newValue - value)
+  }
+
+  await prisma.inventory.update({
+    where: { id: inventory_id },
+    data: { hasil: newValue },
+  })
+
+  // Then create the history record
+  const result = await prisma.inventoryHistory.create({
+    data: {
+      inventory_id,
+      operation,
+      value,
+    },
+  })
+
+  // Emit socket event with the updated data
+  const updatedData = await getInventory()
+  emitSocketEvent("inventory-updated", updatedData)
+
+  return result
+}
+
+export async function updateHewanInventoryStatus(animalId: string, onInventory: any) {
+  const result = await prisma.hewanQurban.update({
+    where: { animalId },
+    data: {
+      onInventory,
+    },
+  })
+
+  // Get animal type for emitting the correct event
+  const animal = await prisma.hewanQurban.findUnique({
+    where: { animalId },
+    select: { tipeId: true },
+  })
+
+  if (animal) {
+    try{
+      // Emit socket event for the specific animal
+      emitSocketEvent("hewan-updated", {
+        animalId,
+        onInventory,
+        tipeId: animal.tipeId,
+      })
+
+      // Also emit updated data for the animal type
+      const type = animal.tipeId === 1 ? "Sapi" : "Domba"
+      const updatedData = await getHewanQurban(type)
+      emitSocketEvent(`${type}-data-updated`, updatedData)
+    } catch (error) {
+      console.error("Socket error in updateHewanInventoryStatus:", error)
+    }
+  }
+
+  return result
 }
 
 export async function countHewanQurban(type: "Sapi" | "Domba") {
@@ -113,7 +288,6 @@ export async function getMudhohi(page = 1, pageSize = 10) {
 export async function countMudhohi() {
   return await prisma.mudhohi.count()
 }
-
 export async function updateHewanStatus(animalId: string, status: HewanStatus, slaughtered = false) {
   const hewan = await prisma.hewanQurban.findUnique({
     where: { animalId },
@@ -131,7 +305,7 @@ export async function updateHewanStatus(animalId: string, status: HewanStatus, s
       where: {
         tipeId: hewan.tipeId,
         jenisProduk: {
-          not: jenisProduk.DAGING,
+          not: "DAGING",
         },
       },
     })
@@ -142,7 +316,7 @@ export async function updateHewanStatus(animalId: string, status: HewanStatus, s
         data: {
           produkId: product.id,
           event: "add",
-          place: Counter.PENYEMBELIHAN,
+          place: "PENYEMBELIHAN",
           value: 1,
           note: `Auto-added from slaughter of ${hewan.tipe.nama} #${hewan.animalId}`,
         },
@@ -157,7 +331,7 @@ export async function updateHewanStatus(animalId: string, status: HewanStatus, s
     }
   }
 
-  return await prisma.hewanQurban.update({
+  const result = await prisma.hewanQurban.update({
     where: { animalId },
     data: {
       status,
@@ -165,15 +339,67 @@ export async function updateHewanStatus(animalId: string, status: HewanStatus, s
       slaughteredAt: slaughtered ? new Date() : hewan.slaughteredAt,
     },
   })
+
+  // Emit socket event
+  try {
+    // Emit socket event for the specific animal
+    emitSocketEvent("hewan-updated", {
+      animalId,
+      status,
+      slaughtered,
+      tipeId: hewan.tipeId,
+    })
+      
+    // Also emit updated data for the animal type
+    const type = hewan.tipeId === 1 ? "Sapi" : "Domba"
+    const updatedData = await getHewanQurban(type)
+    emitSocketEvent(`${type}-data-updated`, updatedData)
+    
+    // If products were added, emit product updates
+    if (slaughtered && !hewan.slaughtered) {
+      const products = await getProdukHewan()
+      emitSocketEvent("products-updated", products)
+    }
+  } catch (error) {
+    console.error("Socket error in updateHewanStatus:", error)
+  }
+
+  return result
 }
 
 export async function updateMudhohiReceived(animalId: string, received: boolean) {
-  return await prisma.hewanQurban.update({
+  const hewan = await prisma.hewanQurban.findUnique({
+    where: { animalId },
+    select: { tipeId: true }
+  })
+
+  const result = await prisma.hewanQurban.update({
     where: { animalId },
     data: {
       receivedByMdhohi: received,
     },
   })
+
+  // Emit socket event
+  try {
+    // Emit socket event for the specific animal
+    emitSocketEvent("hewan-updated", {
+      animalId,
+      receivedByMdhohi: received,
+      tipeId: hewan?.tipeId,
+    })
+
+    // Also emit updated data for the animal type
+    if (hewan) {
+      const type = hewan.tipeId === 1 ? "Sapi" : "Domba"
+      const updatedData = await getHewanQurban(type)
+      emitSocketEvent(`${type}-data-updated`, updatedData)
+    }
+  } catch (error) {
+    console.error("Socket error in updateMudhohiReceived:", error)
+  }
+
+  return result
 }
 
 export async function addProductLog(produkId: number, event: string, place: Counter, value: number, note: string) {
@@ -189,9 +415,9 @@ export async function addProductLog(produkId: number, event: string, place: Coun
   const updateData: any = {}
 
   if (event === "add") {
-    if (place === Counter.PENYEMBELIHAN) {
+    if (place === "PENYEMBELIHAN") {
       updateData.pkgOrigin = { increment: value }
-    } else if (place === Counter.INVENTORY) {
+    } else if (place === "INVENTORY") {
       updateData.pkgReceived = { increment: value }
 
       // Check if there's a discrepancy
@@ -206,9 +432,9 @@ export async function addProductLog(produkId: number, event: string, place: Coun
       }
     }
   } else if (event === "decrease") {
-    if (place === Counter.PENYEMBELIHAN) {
+    if (place === "PENYEMBELIHAN") {
       updateData.pkgOrigin = { decrement: Math.min(value, product.pkgOrigin) }
-    } else if (place === Counter.INVENTORY) {
+    } else if (place === "INVENTORY") {
       updateData.pkgReceived = { decrement: Math.min(value, product.pkgReceived) }
     }
   }
@@ -225,10 +451,30 @@ export async function addProductLog(produkId: number, event: string, place: Coun
   })
 
   // Update product
-  return await prisma.produkHewan.update({
+  const updatedProduct = await prisma.produkHewan.update({
     where: { id: produkId },
     data: updateData,
   })
+
+  // Emit socket event
+  try {
+    // Emit product update
+    emitSocketEvent("product-updated", updatedProduct)
+
+    // Emit all products update
+    const products = await getProdukHewan()
+    emitSocketEvent("products-updated", products)
+
+    // If there was a discrepancy, emit error logs update
+    if (event === "add" && place === "INVENTORY" && product.pkgReceived + value > product.pkgOrigin) {
+      const errorLogs = await getErrorLogs()
+      emitSocketEvent("error-logs-updated", errorLogs)
+    }
+  } catch (error) {
+    console.error("Socket error in addProductLog:", error)
+  }
+
+  return updatedProduct
 }
 
 export async function createDistribusi(penerimaId: string, produkIds: number[], numberOfPackages: number) {
@@ -247,7 +493,7 @@ export async function createDistribusi(penerimaId: string, produkIds: number[], 
       penerimaId,
       numberOfPackages,
       produkQurban: {
-        connect: produkIds.map((id) => ({ id })),
+        connect: produkIds.map((id: any) => ({ id })),
       },
     },
   })
@@ -279,6 +525,27 @@ export async function createDistribusi(penerimaId: string, produkIds: number[], 
     },
   })
 
+  // Emit socket events
+  try {
+    // Emit distribusi log update
+    const allDistribusiLogs = await getDistribusiLog()
+    emitSocketEvent("distribusi-logs-updated", allDistribusiLogs)
+
+    // Emit products update
+    const products = await getProdukHewan()
+    emitSocketEvent("products-updated", products)
+
+    // Emit penerima update
+    const allPenerima = await getPenerima()
+    emitSocketEvent("penerima-updated", allPenerima)
+
+    // Emit distribution update
+    const distributions = await getDistribution()
+    emitSocketEvent("distributions-updated", distributions)
+  } catch (error) {
+    console.error("Socket error in createDistribusi:", error)
+  }
+
   return distribusiLog
 }
 
@@ -292,15 +559,30 @@ export async function createPenerima(data: {
   phone?: string
   keterangan?: string
 }) {
-  return await prisma.penerima.create({
+  const newPenerima = await prisma.penerima.create({
     data: {
       ...data,
       isDiterima: false,
     },
   })
+
+  // Emit socket event
+  try {
+   // Emit penerima update
+    const allPenerima = await getPenerima()
+    emitSocketEvent("penerima-updated", allPenerima)
+
+    // Emit distribution update
+    const distributions = await getDistribution()
+    emitSocketEvent("distributions-updated", distributions)
+  } catch (error) {
+    console.error("Socket error in createPenerima:", error)
+  }
+
+  return newPenerima
 }
 
-export async function getErrorLogs() {
+export async function getErrorLogs(): Promise<ErrorLog[]> {
   return await prisma.errorLog.findMany({
     include: {
       produk: true,
@@ -312,106 +594,20 @@ export async function getErrorLogs() {
 }
 
 export async function updateErrorLogNote(id: number, note: string) {
-  return await prisma.errorLog.update({
+  const result = await prisma.errorLog.update({
     where: { id },
     data: { note },
   })
-}
 
-export async function getInventory() {
-  return await prisma.inventory.findMany()
-}
-
-export async function getTimbang() {
-  return await prisma.hasilTimbang.findMany()
-}
-
-export async function getProgresSapi() {
-  return await prisma.progresSapi.findMany({
-    orderBy: { id: "asc" },
-  })
-}
-
-export async function getProgresDomba() {
-  return await prisma.progresDomba.findMany({
-    orderBy: { id: "asc" },
-  })
-}
-
-export async function updateSembelih(id: number, sembelih: boolean, type: "sapi" | "domba") {
-  if (type === "sapi") {
-    return await prisma.progresSapi.update({
-      where: { id },
-      data: { sembelih },
-    })
-  } else {
-    return await prisma.progresDomba.update({
-      where: { id },
-      data: { sembelih },
-    })
-  }
-}
-
-export async function insertHistoryTimbang(hasil_timbang_id: number, operation: string, value: number) {
-  // First update the hasil_timbang record
-  const hasilTimbang = await prisma.hasilTimbang.findUnique({
-    where: { id: hasil_timbang_id },
-  })
-
-  if (!hasilTimbang) {
-    throw new Error(`HasilTimbang with id ${hasil_timbang_id} not found`)
+  // Emit socket event
+  try {
+    // Emit socket event with the updated data
+    const errorLogs = await getErrorLogs()
+    emitSocketEvent("error-logs-updated", errorLogs)
+  } catch (error) {
+    console.error("Socket error in updateErrorLogNote:", error)
   }
 
-  let newValue = hasilTimbang.hasil
-  if (operation === "add") {
-    newValue += value
-  } else if (operation === "decrease") {
-    newValue = Math.max(0, newValue - value)
-  }
-
-  await prisma.hasilTimbang.update({
-    where: { id: hasil_timbang_id },
-    data: { hasil: newValue },
-  })
-
-  // Then create the history record
-  return await prisma.timbangHistory.create({
-    data: {
-      hasil_timbang_id,
-      operation,
-      value,
-    },
-  })
+  return result
 }
 
-export async function insertHistoryInventori(inventory_id: number, operation: string, value: number) {
-  // First update the inventory record
-  const inventory = await prisma.inventory.findUnique({
-    where: { id: inventory_id },
-  })
-
-  if (!inventory) {
-    throw new Error(`Inventory with id ${inventory_id} not found`)
-  }
-
-  let newValue = inventory.hasil
-  if (operation === "add") {
-    newValue += value
-  } else if (operation === "decrease") {
-    newValue = Math.max(0, newValue - value)
-  }
-
-  await prisma.inventory.update({
-    where: { id: inventory_id },
-    data: { hasil: newValue },
-  })
-
-  // Then create the history record
-  return await prisma.inventoryHistory.create({
-    data: {
-      inventory_id,
-      operation,
-      value,
-    },
-  })
-}
