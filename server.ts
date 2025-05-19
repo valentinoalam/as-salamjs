@@ -24,13 +24,6 @@ app.prepare().then(() => {
     });
 
   const io = setupSocketServer(httpServer)
-  // const io = new Server(httpServer, {
-  //   path: '/api/socket',
-  //   cors: {
-  //     origin: '*',
-  //     methods: ['GET', 'POST'],
-  //   },
-  // });
 
   io.on('connection', (socket) => {
     console.log('a user connected:', socket.id);

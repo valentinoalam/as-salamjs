@@ -1,5 +1,6 @@
 import type { ErrorLog } from "@/app/dashboard/counter-inventori/counter-inventori-client"
 import { PrismaClient, type HewanStatus, jenisProduk, Counter } from "@prisma/client"
+import { revalidatePath } from "next/cache"
 
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient }
@@ -12,12 +13,15 @@ export default prisma
 
 // Socket emitter function
 const emitSocketEvent = (eventName: string, data: any) => {
+  console.log("oh")
   try {
     // Get socket from global context if available
     // This is a workaround since we can't use hooks in non-React functions
     if (typeof window !== "undefined" && (window as any).__SOCKET_INSTANCE__) {
       const socket = (window as any).__SOCKET_INSTANCE__
+      console.log(socket)
       socket.emit(eventName, data)
+
     }
   } catch (error) {
     console.error(`Socket error in ${eventName}:`, error)
@@ -33,10 +37,30 @@ const calculateOffset = (page: number, pageSize: number, group?: string) => {
   return (page - 1) * pageSize;
 };
 
-export async function getHewanQurban(type: "Sapi" | "Domba", page = 1, pageSize = 10) {
-  const tipeId = type === "Sapi" ? 1 : 2
+export async function getHewanQurban(
+  type: "sapi" | "domba", 
+  page = 1, 
+  pageSize = 10,
+  group?: string,
+  itemsPerGroup?: number
+) {
+  const tipeId = type === "sapi" ? 1 : 2
   const skip = (page - 1) * pageSize
-
+  console.log(group)
+  if(group) {
+    const prefix = `${type}_${group}-`;
+    return await prisma.hewanQurban.findMany({
+      where: { 
+        tipeId, 
+        hewanId: {
+        startsWith: prefix
+      }
+      },
+      orderBy: { hewanId: "asc" },
+      skip,
+      take: pageSize,
+    })
+  }
   return await prisma.hewanQurban.findMany({
     where: { tipeId },
     orderBy: { createdAt: "asc" },
@@ -45,132 +69,105 @@ export async function getHewanQurban(type: "Sapi" | "Domba", page = 1, pageSize 
   })
 }
 
-export async function getInventory() {
-  return await prisma.inventory.findMany()
-}
+// export async function getInventory() {
+//   return await prisma.inventory.findMany()
+// }
 
-export async function getTimbang() {
-  return await prisma.hasilTimbang.findMany()
-}
+// export async function getTimbang() {
+//   return await prisma.hasilTimbang.findMany()
+// }
 
-export async function getProgresSapi() {
-  return await prisma.progresSapi.findMany({
-    orderBy: { id: "asc" },
-  })
-}
+// export async function getProgresSapi() {
+//   return await prisma.progresSapi.findMany({
+//     orderBy: { id: "asc" },
+//   })
+// }
 
-export async function getProgresDomba() {
-  return await prisma.progresDomba.findMany({
-    orderBy: { id: "asc" },
-  })
-}
+// export async function getProgresDomba() {
+//   return await prisma.progresDomba.findMany({
+//     orderBy: { id: "asc" },
+//   })
+// }
 
+// export async function insertHistoryTimbang(hasil_timbang_id: number, operation: string, value: number) {
+//   // First update the hasil_timbang record
+//   const hasilTimbang = await prisma.hasilTimbang.findUnique({
+//     where: { id: hasil_timbang_id },
+//   })
 
-export async function updateSembelih(id: number, sembelih: boolean, type: "Sapi" | "domba") {
-  let result
+//   if (!hasilTimbang) {
+//     throw new Error(`HasilTimbang with id ${hasil_timbang_id} not found`)
+//   }
 
-  if (type === "Sapi") {
-    result = await prisma.progresSapi.update({
-      where: { id },
-      data: { sembelih },
-    })
+//   let newValue = hasilTimbang.hasil
+//   if (operation === "add") {
+//     newValue += value
+//   } else if (operation === "decrease") {
+//     newValue = Math.max(0, newValue - value)
+//   }
 
-    // Emit socket event with the updated data
-    const updatedData = await getProgresSapi()
-    emitSocketEvent("progres-sapi-updated", updatedData)
-  } else {
-    result = await prisma.progresDomba.update({
-      where: { id },
-      data: { sembelih },
-    })
+//   await prisma.hasilTimbang.update({
+//     where: { id: hasil_timbang_id },
+//     data: { hasil: newValue },
+//   })
 
-    // Emit socket event with the updated data
-    const updatedData = await getProgresDomba()
-    emitSocketEvent("progres-domba-updated", updatedData)
-  }
+//   // Then create the history record
+//   const result = await prisma.timbangHistory.create({
+//     data: {
+//       hasil_timbang_id,
+//       operation,
+//       value,
+//     },
+//   })
 
-  return result
-}
+//   // Emit socket event with the updated data
+//   const updatedData = await getTimbang()
+//   emitSocketEvent("hasil-timbang-updated", updatedData)
 
-export async function insertHistoryTimbang(hasil_timbang_id: number, operation: string, value: number) {
-  // First update the hasil_timbang record
-  const hasilTimbang = await prisma.hasilTimbang.findUnique({
-    where: { id: hasil_timbang_id },
-  })
+//   return result
+// }
 
-  if (!hasilTimbang) {
-    throw new Error(`HasilTimbang with id ${hasil_timbang_id} not found`)
-  }
+// export async function insertHistoryInventori(inventory_id: number, operation: string, value: number) {
+//   // First update the inventory record
+//   const inventory = await prisma.inventory.findUnique({
+//     where: { id: inventory_id },
+//   })
 
-  let newValue = hasilTimbang.hasil
-  if (operation === "add") {
-    newValue += value
-  } else if (operation === "decrease") {
-    newValue = Math.max(0, newValue - value)
-  }
+//   if (!inventory) {
+//     throw new Error(`Inventory with id ${inventory_id} not found`)
+//   }
 
-  await prisma.hasilTimbang.update({
-    where: { id: hasil_timbang_id },
-    data: { hasil: newValue },
-  })
+//   let newValue = inventory.hasil
+//   if (operation === "add") {
+//     newValue += value
+//   } else if (operation === "decrease") {
+//     newValue = Math.max(0, newValue - value)
+//   }
 
-  // Then create the history record
-  const result = await prisma.timbangHistory.create({
-    data: {
-      hasil_timbang_id,
-      operation,
-      value,
-    },
-  })
+//   await prisma.inventory.update({
+//     where: { id: inventory_id },
+//     data: { hasil: newValue },
+//   })
 
-  // Emit socket event with the updated data
-  const updatedData = await getTimbang()
-  emitSocketEvent("hasil-timbang-updated", updatedData)
+//   // Then create the history record
+//   const result = await prisma.inventoryHistory.create({
+//     data: {
+//       inventory_id,
+//       operation,
+//       value,
+//     },
+//   })
 
-  return result
-}
+//   // Emit socket event with the updated data
+//   const updatedData = await getInventory()
+//   emitSocketEvent("inventory-updated", updatedData)
 
-export async function insertHistoryInventori(inventory_id: number, operation: string, value: number) {
-  // First update the inventory record
-  const inventory = await prisma.inventory.findUnique({
-    where: { id: inventory_id },
-  })
+//   return result
+// }
 
-  if (!inventory) {
-    throw new Error(`Inventory with id ${inventory_id} not found`)
-  }
-
-  let newValue = inventory.hasil
-  if (operation === "add") {
-    newValue += value
-  } else if (operation === "decrease") {
-    newValue = Math.max(0, newValue - value)
-  }
-
-  await prisma.inventory.update({
-    where: { id: inventory_id },
-    data: { hasil: newValue },
-  })
-
-  // Then create the history record
-  const result = await prisma.inventoryHistory.create({
-    data: {
-      inventory_id,
-      operation,
-      value,
-    },
-  })
-
-  // Emit socket event with the updated data
-  const updatedData = await getInventory()
-  emitSocketEvent("inventory-updated", updatedData)
-
-  return result
-}
-
-export async function updateHewanInventoryStatus(animalId: string, onInventory: any) {
+export async function updateHewanInventoryStatus(hewanId: string, onInventory: any) {
   const result = await prisma.hewanQurban.update({
-    where: { animalId },
+    where: { hewanId },
     data: {
       onInventory,
     },
@@ -178,7 +175,7 @@ export async function updateHewanInventoryStatus(animalId: string, onInventory: 
 
   // Get animal type for emitting the correct event
   const animal = await prisma.hewanQurban.findUnique({
-    where: { animalId },
+    where: { hewanId },
     select: { tipeId: true },
   })
 
@@ -186,13 +183,13 @@ export async function updateHewanInventoryStatus(animalId: string, onInventory: 
     try{
       // Emit socket event for the specific animal
       emitSocketEvent("hewan-updated", {
-        animalId,
+        hewanId,
         onInventory,
         tipeId: animal.tipeId,
       })
 
       // Also emit updated data for the animal type
-      const type = animal.tipeId === 1 ? "Sapi" : "Domba"
+      const type = animal.tipeId === 1 ? "sapi" : "domba"
       const updatedData = await getHewanQurban(type)
       emitSocketEvent(`${type}-data-updated`, updatedData)
     } catch (error) {
@@ -203,8 +200,8 @@ export async function updateHewanInventoryStatus(animalId: string, onInventory: 
   return result
 }
 
-export async function countHewanQurban(type: "Sapi" | "Domba") {
-  const tipeId = type === "Sapi" ? 1 : 2
+export async function countHewanQurban(type: "sapi" | "domba") {
+  const tipeId = type === "sapi" ? 1 : 2
 
   return await prisma.hewanQurban.count({
     where: { tipeId },
@@ -288,14 +285,14 @@ export async function getMudhohi(page = 1, pageSize = 10) {
 export async function countMudhohi() {
   return await prisma.mudhohi.count()
 }
-export async function updateHewanStatus(animalId: string, status: HewanStatus, slaughtered = false) {
+export async function updateHewanStatus(hewanId: string, status: HewanStatus, slaughtered = false) {
   const hewan = await prisma.hewanQurban.findUnique({
-    where: { animalId },
+    where: { hewanId },
     include: { tipe: true },
   })
 
   if (!hewan) {
-    throw new Error(`Hewan with animalId ${animalId} not found`)
+    throw new Error(`Hewan with hewanId ${hewanId} not found`)
   }
 
   // If animal is being slaughtered, automatically add non-meat products
@@ -318,7 +315,7 @@ export async function updateHewanStatus(animalId: string, status: HewanStatus, s
           event: "add",
           place: "PENYEMBELIHAN",
           value: 1,
-          note: `Auto-added from slaughter of ${hewan.tipe.nama} #${hewan.animalId}`,
+          note: `Auto-added from slaughter of ${hewan.tipe.nama} #${hewan.hewanId}`,
         },
       })
 
@@ -332,7 +329,7 @@ export async function updateHewanStatus(animalId: string, status: HewanStatus, s
   }
 
   const result = await prisma.hewanQurban.update({
-    where: { animalId },
+    where: { hewanId },
     data: {
       status,
       slaughtered,
@@ -341,40 +338,41 @@ export async function updateHewanStatus(animalId: string, status: HewanStatus, s
   })
 
   // Emit socket event
-  try {
-    // Emit socket event for the specific animal
-    emitSocketEvent("hewan-updated", {
-      animalId,
-      status,
-      slaughtered,
-      tipeId: hewan.tipeId,
-    })
+  // try {
+  //   console.log("sock")
+  //   // Emit socket event for the specific animal
+  //   emitSocketEvent("hewan-updated", {
+  //     hewanId,
+  //     status,
+  //     slaughtered,
+  //     tipeId: hewan.tipeId,
+  //   })
       
-    // Also emit updated data for the animal type
-    const type = hewan.tipeId === 1 ? "Sapi" : "Domba"
-    const updatedData = await getHewanQurban(type)
-    emitSocketEvent(`${type}-data-updated`, updatedData)
+  //   // Also emit updated data for the animal type
+  //   const type = hewan.tipeId === 1 ? "sapi" : "domba"
+  //   const updatedData = await getHewanQurban(type)
+  //   emitSocketEvent(`${type}-data-updated`, updatedData)
     
-    // If products were added, emit product updates
-    if (slaughtered && !hewan.slaughtered) {
-      const products = await getProdukHewan()
-      emitSocketEvent("products-updated", products)
-    }
-  } catch (error) {
-    console.error("Socket error in updateHewanStatus:", error)
-  }
+  //   // If products were added, emit product updates
+  //   if (slaughtered && !hewan.slaughtered) {
+  //     const products = await getProdukHewan()
+  //     emitSocketEvent("products-updated", products)
+  //   }
+  // } catch (error) {
+  //   console.error("Socket error in updateHewanStatus:", error)
+  // }
 
   return result
 }
 
-export async function updateMudhohiReceived(animalId: string, received: boolean) {
+export async function updateMudhohiReceived(hewanId: string, received: boolean) {
   const hewan = await prisma.hewanQurban.findUnique({
-    where: { animalId },
+    where: { hewanId },
     select: { tipeId: true }
   })
 
   const result = await prisma.hewanQurban.update({
-    where: { animalId },
+    where: { hewanId },
     data: {
       receivedByMdhohi: received,
     },
@@ -384,14 +382,14 @@ export async function updateMudhohiReceived(animalId: string, received: boolean)
   try {
     // Emit socket event for the specific animal
     emitSocketEvent("hewan-updated", {
-      animalId,
+      hewanId,
       receivedByMdhohi: received,
       tipeId: hewan?.tipeId,
     })
 
     // Also emit updated data for the animal type
     if (hewan) {
-      const type = hewan.tipeId === 1 ? "Sapi" : "Domba"
+      const type = hewan.tipeId === 1 ? "sapi" : "domba"
       const updatedData = await getHewanQurban(type)
       emitSocketEvent(`${type}-data-updated`, updatedData)
     }
@@ -585,7 +583,11 @@ export async function createPenerima(data: {
 export async function getErrorLogs(): Promise<ErrorLog[]> {
   return await prisma.errorLog.findMany({
     include: {
-      produk: true,
+      produk: {
+        include: {
+          tipe_hewan: true
+        }
+      },
     },
     orderBy: {
       timestamp: "desc",

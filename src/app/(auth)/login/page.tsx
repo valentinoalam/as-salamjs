@@ -78,7 +78,7 @@ export default function LoginPage() {
         <CardHeader className="space-y-1 flex flex-col items-center">
           <div className="flex items-center gap-2 mb-2">
             <Sheep className="h-8 w-8 text-primary" />
-            <span className="font-bold text-xl">SisQurban</span>
+            <span className="font-bold text-xl">Petugas Qurban</span>
           </div>
           <CardTitle className="text-2xl font-bold text-center">
             Masuk ke Akun

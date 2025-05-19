@@ -1,561 +1,733 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react"
 import { useSocket } from "@/contexts/socket-context"
 import type {
   HewanQurban,
-  ProdukHewan,
-  Distribution,
-  Penerima,
-  Mudhohi,
-  ErrorLog,
-  ProgresSapi,
-  ProgresDomba,
-  HasilTimbang,
-  Inventory,
   HewanStatus,
+  ProdukHewan,
+  ErrorLog,
 } from "@prisma/client"
+import { 
+  useQuery, 
+  useMutation, 
+  useQueryClient,
+  QueryClientProvider, 
+  type UseQueryResult,
+  type UseQueryOptions,
+} from '@tanstack/react-query'
+import {Counter} from "@prisma/client"
+import { toast } from "@/hooks/use-toast"
+import { queryClient, queryKeys } from "@/lib/tanstack-query"
+import { useUIState } from "./ui-state-context"
 
-// Define extended types with relationships
-type HewanQurbanWithRelations = HewanQurban & {
-  tipe?: {
-    id: number
-    nama: string
-    icon: string | null
+export type TipeHewan = "sapi" | "domba" 
+// Define pagination configuration type
+interface PaginationConfig {
+  useGroups: boolean
+  itemsPerGroup?: number
+  pageSize: number
+}
+export type PaginationData = 
+  PaginationConfig & {
+      currentPage: number
+      totalPages: number
+      currentGroup?: string
+      totalGroups?: number
+    }
+export interface HewanQuery {
+  data: HewanQurban[]
+  isLoading: boolean
+  isError: boolean
+  refetch: (options?: { page?: number, group?: string }) => Promise<any>
+  pagination: PaginationData
+}
+// Custom hook for determining pagination configuration
+export const usePaginationConfig = (target: number, total: number): PaginationConfig => {
+  return useMemo(() => {
+    if (total > 100) {
+      return { 
+        useGroups: true, 
+        itemsPerGroup: 50,
+        pageSize: 10 
+      }
+    }
+    if (target <= 100 && total <= 50) return { 
+      useGroups: false, 
+      pageSize: 10 
+    }
+    if (total > 50 && total <= 60) return { 
+      useGroups: false, 
+      pageSize: 15 
+    }
+    if (total > 60 && total <= 100) return { 
+      useGroups: false, 
+      pageSize: 20 
+    }
+    return { 
+      useGroups: false, 
+      pageSize: 10 
+    }
+  }, [target, total])
+}
+// Define the shape of our context
+interface QurbanContextType {
+   // Data states and loading
+  sapiQuery: HewanQuery 
+  dombaQuery: HewanQuery
+  productsQuery: {
+    data: ProdukHewan[]
+    isLoading: boolean
+    isError: boolean
+    refetch: () => Promise<any>
   }
-}
-
-type ProdukHewanWithRelations = ProdukHewan & {
-  tipe_hewan?: {
-    id: number
-    nama: string
-    icon: string | null
-  } | null
-}
-
-type PenerimaWithRelations = Penerima & {
-  category: {
-    category: string
-  }
-  DistribusiLog?: any[]
-}
-
-type MudhohiWithRelations = Mudhohi & {
-  hewan: HewanQurbanWithRelations[]
-  payment?: any
-}
-
-type ErrorLogWithRelations = ErrorLog & {
-  produk: ProdukHewanWithRelations
-}
-
-// Define the context state type
-interface QurbanContextState {
-  // Animals
-  sapiData: HewanQurbanWithRelations[]
-  dombaData: HewanQurbanWithRelations[]
-
-  // Products
-  produkHewan: ProdukHewanWithRelations[]
-  produkDaging: ProdukHewanWithRelations[]
-
-  // Distribution
-  distributions: Distribution[]
-  penerima: PenerimaWithRelations[]
-
-  // Mudhohi (donors)
-  mudhohi: MudhohiWithRelations[]
-
-  // Progress tracking
-  progresSapi: ProgresSapi[]
-  progresDomba: ProgresDomba[]
-
-  // Weight and inventory
-  hasilTimbang: HasilTimbang[]
-  inventory: Inventory[]
-
-  // Error logs
-  errorLogs: ErrorLogWithRelations[]
-
-  // Loading states
-  loading: {
-    hewan: boolean
-    produk: boolean
-    distribution: boolean
-    mudhohi: boolean
-    progres: boolean
-    timbang: boolean
-    inventory: boolean
-    errorLogs: boolean
+  errorLogsQuery: {
+    data: ErrorLog[]
+    isLoading: boolean
+    isError: boolean
+    refetch: () => Promise<any>
   }
 
   // Pagination metadata
   meta: {
     sapi: { total: number; target: number }
     domba: { total: number; target: number }
-    mudhohi: { total: number; pages: number }
-    penerima: { total: number; pages: number }
   }
 
-  // Refresh functions
-  refreshHewan: (type: "Sapi" | "Domba", page?: number, pageSize?: number) => Promise<void>
-  refreshProduk: () => Promise<void>
-  refreshDistribution: () => Promise<void>
-  refreshMudhohi: (page?: number, pageSize?: number) => Promise<void>
-  refreshPenerima: (distributionId?: string) => Promise<void>
-  refreshProgres: () => Promise<void>
-  refreshTimbang: () => Promise<void>
-  refreshInventory: () => Promise<void>
-  refreshErrorLogs: () => Promise<void>
+  // Connection status
+  isConnected: boolean
+
+  // Methods for updating data
+  updateHewan: (data: {
+    hewanId: string
+    status: HewanStatus
+    slaughtered: boolean
+    receivedByMdhohi?: boolean
+    onInventory?: boolean
+    tipeId: number
+  }) => void
+
+  updateProduct: (data: {
+    productId: number
+    operation: "add" | "decrease"
+    place: Counter
+    value: number
+    note?: string
+  }) => void
 }
 
-// Create the context with default values
-const QurbanContext = createContext<QurbanContextState>({
-  sapiData: [],
-  dombaData: [],
-  produkHewan: [],
-  produkDaging: [],
-  distributions: [],
-  penerima: [],
-  mudhohi: [],
-  progresSapi: [],
-  progresDomba: [],
-  hasilTimbang: [],
-  inventory: [],
-  errorLogs: [],
-  loading: {
-    hewan: false,
-    produk: false,
-    distribution: false,
-    mudhohi: false,
-    progres: false,
-    timbang: false,
-    inventory: false,
-    errorLogs: false,
-  },
-  meta: {
-    sapi: { total: 0, target: 0 },
-    domba: { total: 0, target: 0 },
-    mudhohi: { total: 0, pages: 0 },
-    penerima: { total: 0, pages: 0 },
-  },
-  refreshHewan: async () => {},
-  refreshProduk: async () => {},
-  refreshDistribution: async () => {},
-  refreshMudhohi: async () => {},
-  refreshPenerima: async () => {},
-  refreshProgres: async () => {},
-  refreshTimbang: async () => {},
-  refreshInventory: async () => {},
-  refreshErrorLogs: async () => {},
-})
+type QueryWithToastOptions<TData, TError> = UseQueryOptions<TData, TError> & {
+  errorMessage?: string
+}
+
+export function useQueryWithToast<TData = unknown, TError = Error>(
+  options: QueryWithToastOptions<TData, TError>
+): UseQueryResult<TData, TError> {
+  const queryResult = useQuery(options)
+
+  useEffect(() => {
+    if (queryResult.isError) {
+      toast({
+        title: 'Error',
+        description:
+          options.errorMessage ||
+          (queryResult.error instanceof Error
+            ? queryResult.error.message
+            : 'Something went wrong.'),
+        variant: 'destructive',
+      })
+    }
+  }, [queryResult.isError, queryResult.error, options.errorMessage])
+
+  return queryResult
+}
+
+// Create the context
+const QurbanContext = createContext<QurbanContextType | undefined>(undefined)
+
+// Wrapper component to provide the QueryClient
+export function QurbanProviderWrapper({ children }: { children: ReactNode }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <QurbanProvider>{children}</QurbanProvider>
+    </QueryClientProvider>
+  )
+}
 
 // Provider component
-export const QurbanProvider = ({
+export function QurbanProvider({
   children,
-  initialData,
+
 }: {
   children: ReactNode
-  initialData?: Partial<QurbanContextState>
-}) => {
-  // State for all data
-  const [sapiData, setSapiData] = useState<HewanQurbanWithRelations[]>(initialData?.sapiData || [])
-  const [dombaData, setDombaData] = useState<HewanQurbanWithRelations[]>(initialData?.dombaData || [])
-  const [produkHewan, setProdukHewan] = useState<ProdukHewanWithRelations[]>(initialData?.produkHewan || [])
-  const [produkDaging, setProdukDaging] = useState<ProdukHewanWithRelations[]>(initialData?.produkDaging || [])
-  const [distributions, setDistributions] = useState<Distribution[]>(initialData?.distributions || [])
-  const [penerima, setPenerima] = useState<PenerimaWithRelations[]>(initialData?.penerima || [])
-  const [mudhohi, setMudhohi] = useState<MudhohiWithRelations[]>(initialData?.mudhohi || [])
-  const [progresSapi, setProgresSapi] = useState<ProgresSapi[]>(initialData?.progresSapi || [])
-  const [progresDomba, setProgresDomba] = useState<ProgresDomba[]>(initialData?.progresDomba || [])
-  const [hasilTimbang, setHasilTimbang] = useState<HasilTimbang[]>(initialData?.hasilTimbang || [])
-  const [inventory, setInventory] = useState<Inventory[]>(initialData?.inventory || [])
-  const [errorLogs, setErrorLogs] = useState<ErrorLogWithRelations[]>(initialData?.errorLogs || [])
-
-  // Loading states
-  const [loading, setLoading] = useState({
-    hewan: false,
-    produk: false,
-    distribution: false,
-    mudhohi: false,
-    progres: false,
-    timbang: false,
-    inventory: false,
-    errorLogs: false,
-  })
-
-  // Metadata for pagination
-  const [meta, setMeta] = useState({
-    sapi: { total: 0, target: 0 },
-    domba: { total: 0, target: 0 },
-    mudhohi: { total: 0, pages: 0 },
-    penerima: { total: 0, pages: 0 },
-  })
-
+}) {
+  const queryClient = useQueryClient()
   const { socket, isConnected } = useSocket()
+  const { pagination, setPagination } = useUIState()
 
-  // Socket event handlers
+  // Fetch functions
+  const fetchHewan = async (
+    type: TipeHewan, 
+    params: { 
+      page?: number;
+      pageSize?: number;
+      group?: string;
+      itemsPerGroup?: number;
+      useGroups?: boolean;
+      meta?: {total: number; target: number};
+    } = {}): Promise<{
+      data: HewanQurban[];
+      pagination: {
+        currentPage: number;
+        totalPages: number;
+        currentGroup?: string;
+        totalGroups?: number;
+      };
+    }> => {
+    const {useGroups, itemsPerGroup, group, pageSize = 10, page, meta = {total: 0, target: 0}} = params
+    const totalPages = useGroups 
+      ? Math.ceil((itemsPerGroup || 50) / pageSize)
+      : Math.ceil(meta.total / pageSize);
+    const totalGroups = Math.ceil(meta.total / 50)
+    // Build URL with parameters
+    const searchParams = new URLSearchParams({
+      type,
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+
+    if (useGroups) {
+      searchParams.append("group", group || "1");
+      searchParams.append("itemsPerGroup", String(itemsPerGroup));
+    }
+
+    const url = `/api/hewan?${searchParams.toString()}`;
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data: HewanQurban[] = await response.json();
+
+    return {
+      data,
+      pagination: {
+        currentPage: page || 1,
+        totalPages,
+        currentGroup: useGroups ? group : undefined,
+        totalGroups: useGroups ? totalGroups : undefined
+      }
+    };
+  }
+
+  const fetchProducts = async (params: any = {}): Promise<ProdukHewan[]> => {
+    const url = `/api/products${params.jenis ? `?jenis=${params.jenis}` : ""}`
+    const response = await fetch(url)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    return response.json()
+  }
+
+  const fetchErrorLogs = async (): Promise<ErrorLog[]> => {
+    const response = await fetch('/api/error-logs')
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    return response.json()
+  }
+
+  const fetchMeta = async (type: string): Promise<any> => {
+    const response = await fetch(`/api/hewan/meta?type=${type}`)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    return response.json()
+  }
+
+  // Query for metadata
+  const metaQuery = useQueryWithToast({
+    queryKey: queryKeys.meta,
+    queryFn: async () => {
+      const sapiMeta = await fetchMeta('sapi')
+      const dombaMeta = await fetchMeta('domba')
+      return {
+        sapi: { total: sapiMeta[0].total || 0, target: sapiMeta[0].target || 0 },
+        domba: { total: dombaMeta[0].total || 0, target: dombaMeta[0].target || 0 },
+      }
+    },
+    errorMessage: "Failed to fetch metadata. Please try again.",
+  })
+
+  // Get pagination configs based on meta data
+  const sapiPaginationConfig = usePaginationConfig(
+    metaQuery.data?.sapi.target || 0,
+    metaQuery.data?.sapi.total || 0
+  )
+    
+  const dombaPaginationConfig = usePaginationConfig(
+    metaQuery.data?.domba.target || 0,
+    metaQuery.data?.domba.total || 0
+  )
+
+  // Set up queries
+  const sapiQuery = useQueryWithToast({
+    queryKey: [...queryKeys.sapi, pagination.sapiPage, pagination.sapiGroup, sapiPaginationConfig],
+    queryFn: async () => await fetchHewan('sapi', { 
+      page: pagination.sapiPage, 
+      pageSize: sapiPaginationConfig.pageSize,
+      group: sapiPaginationConfig.useGroups ? pagination.sapiGroup : undefined,
+      itemsPerGroup: sapiPaginationConfig.itemsPerGroup,
+      useGroups: sapiPaginationConfig.useGroups,
+      meta: metaQuery.data?.sapi
+    }),
+    errorMessage: 'Failed to fetch sapi data. Please try again.',
+  })
+  const dombaQuery = useQueryWithToast({
+    queryKey: [...queryKeys.domba, pagination.dombaPage, pagination.dombaGroup, dombaPaginationConfig],
+    queryFn: async () => await fetchHewan('domba', { 
+      page: pagination.dombaPage, 
+      pageSize: dombaPaginationConfig.pageSize,
+        group: dombaPaginationConfig.useGroups ? pagination.dombaGroup : undefined,
+        itemsPerGroup: dombaPaginationConfig.itemsPerGroup,
+        useGroups: dombaPaginationConfig.useGroups,
+        meta: metaQuery.data?.domba
+    }),
+    errorMessage: 'Failed to fetch domba data. Please try again.',
+  })
+
+  const productsQuery = useQueryWithToast({
+    queryKey: queryKeys.products,
+    queryFn: () => fetchProducts(),
+    errorMessage: 'Failed to fetch product data. Please try again.',
+  })
+
+  const errorLogsQuery = useQueryWithToast({
+    queryKey: queryKeys.errorLogs,
+    queryFn: fetchErrorLogs,
+    errorMessage: 'Failed to fetch error logs. Please try again.',
+  })
+
+  // Mutations
+  const updateHewanMutation = useMutation({
+    mutationFn: async (data: {
+      hewanId: string
+      status: HewanStatus
+      slaughtered?: boolean
+      receivedByMdhohi?: boolean
+      onInventory?: boolean
+      tipeId: number
+    }) => {
+      if (!data.hewanId || !data.status || !data.tipeId) {
+        throw new Error("Missing required fields: hewanId, status, or tipeId");
+      }
+      // Send to backend first
+      const response = await fetch("/api/hewan/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to update status");
+      }
+
+      await response.json();
+
+      // Emit to socket after success
+      if (!socket || !isConnected) {
+        throw new Error("Not connected to server");
+      }
+
+      return await new Promise((resolve, reject) => {
+        // Add timeout handling
+        const timeout = setTimeout(() => {
+          reject(new Error("Server response timeout"));
+        }, 3000); // 3-second timeout
+
+        // Make sure server acknowledges with callback
+        socket.emit("update-hewan", data, (response: any) => {
+          clearTimeout(timeout);
+          console.log("Server response:", response); // Add logging
+          
+          // Server must return SOME response
+          if (response?.error) {
+            reject(response.error);
+          } else {
+            // Resolve with explicit value
+            resolve({ success: true, ...response });
+          }
+        })
+      });
+    },
+    onMutate: async (newHewanData) => {
+      const queryKey = newHewanData.tipeId === 1 
+        ? [...queryKeys.sapi, pagination.sapiPage, pagination.sapiGroup, sapiPaginationConfig]
+        : [...queryKeys.domba, pagination.dombaPage, pagination.dombaGroup, dombaPaginationConfig];
+        
+      await queryClient.cancelQueries({ queryKey });
+      const previousData = queryClient.getQueryData(queryKey);
+
+      queryClient.setQueryData(queryKey, (old: any) => {
+        if (!old || !old.data) return old;
+        
+        return {
+          ...old,
+          data: old.data.map((item: HewanQurban) =>
+            item.hewanId === newHewanData.hewanId
+              ? {
+                  ...item,
+                  status: newHewanData.status,
+                  ...(newHewanData.slaughtered !== undefined && { slaughtered: newHewanData.slaughtered }),
+                  ...(newHewanData.receivedByMdhohi !== undefined && { receivedByMdhohi: newHewanData.receivedByMdhohi }),
+                  ...(newHewanData.onInventory !== undefined && { onInventory: newHewanData.onInventory }),
+                }
+              : item
+          )
+        };
+      });
+
+      return { previousData, queryKey };
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success!",
+        description: "Hewan updated successfully",
+        variant: "default",
+      });
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(context.queryKey, context.previousData);
+      }
+
+      toast({
+        title: "Error",
+        description: err.message, //"Failed to update hewan data. Please try again.",
+        variant: "destructive",
+      });
+    },
+
+    onSettled: (data, error, variables) => {
+      const { tipeId } = variables;
+      const queryKey = tipeId === 1 ? queryKeys.sapi : queryKeys.domba;
+      queryClient.invalidateQueries({ queryKey });
+    },
+  })
+
+  const updateProductMutation = useMutation({
+    mutationFn: (data: {
+      productId: number
+      operation: "add" | "decrease"
+      place: Counter
+      value: number
+      note?: string
+    }) => {
+      if (!socket || !isConnected) {
+        throw new Error("Not connected to server")
+      }
+      
+      return new Promise((resolve, reject) => {
+        socket.emit("update-product", data, (response: any) => {
+          if (response?.error) {
+            reject(response.error)
+          } else {
+            resolve(response)
+          }
+        })
+      })
+    },
+    onMutate: async (newProductData) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: queryKeys.products })
+
+      // Snapshot the previous value
+      const previousProductData = queryClient.getQueryData(queryKeys.products)
+
+      // Optimistically update the cache
+      queryClient.setQueryData(queryKeys.products, (old: ProdukHewan[] | []) => {
+        if (!old) return []
+        return old.map((product) => {
+          if (product.id === newProductData.productId) {
+            const updatedProduct = { ...product }
+
+            if (newProductData.operation === "add") {
+              if (newProductData.place === Counter.PENYEMBELIHAN) {
+                updatedProduct.pkgOrigin += newProductData.value
+              } else if (newProductData.place === Counter.INVENTORY) {
+                updatedProduct.pkgReceived += newProductData.value
+              }
+            } else if (newProductData.operation === "decrease") {
+              if (newProductData.place === Counter.PENYEMBELIHAN) {
+                updatedProduct.pkgOrigin = Math.max(0, updatedProduct.pkgOrigin - newProductData.value)
+              } else if (newProductData.place === Counter.INVENTORY) {
+                updatedProduct.pkgReceived = Math.max(0, updatedProduct.pkgReceived - newProductData.value)
+              }
+            }
+
+            return updatedProduct
+          }
+          return product
+        })
+      })
+
+      // Return the snapshot
+      return { previousProductData }
+    },
+    onError: (err, newProduct, context) => {
+      // Roll back to the previous state
+      if (context?.previousProductData) {
+        queryClient.setQueryData(queryKeys.products, context.previousProductData)
+      }
+      
+      toast({
+        title: "Error",
+        description: "Failed to update product data. Please try again.",
+        variant: "destructive",
+      })
+    },
+    // We don't need onSettled since the WebSocket will handle the update
+  })
+ 
+  useEffect(() => {
+    if (pagination.sapiPage !== undefined) sapiQuery.refetch();
+    if (pagination.dombaPage !== undefined) dombaQuery.refetch();
+  }, [pagination.sapiPage, pagination.dombaPage]);
+  // Set up socket listeners to update the query cache
   useEffect(() => {
     if (!socket) return
 
-    // Hewan (animal) updates
-    const handleSapiDataUpdated = (data: HewanQurbanWithRelations[]) => {
-      setSapiData(data)
-    }
-
-    const handleDombaDataUpdated = (data: HewanQurbanWithRelations[]) => {
-      setDombaData(data)
-    }
-
-    const handleHewanUpdated = (data: {
-      animalId: string
+    // Handle hewan updates from WebSocket
+    const handleHewanUpdate = (data: {
+      hewanId: string
       status?: HewanStatus
       slaughtered?: boolean
-      onInventory?: boolean
       receivedByMdhohi?: boolean
-      tipeId: number
+      onInventory?: boolean
+      tipeId?: number
     }) => {
-      // Update the appropriate list based on animal type
-      if (data.tipeId === 1) {
-        // Sapi
-        setSapiData((prev) =>
-          prev.map((item) =>
-            item.animalId === data.animalId
-              ? {
-                  ...item,
-                  status: data.status !== undefined ? data.status : item.status,
-                  slaughtered: data.slaughtered !== undefined ? data.slaughtered : item.slaughtered,
-                  onInventory: data.onInventory !== undefined ? data.onInventory : item.onInventory,
-                  receivedByMdhohi: data.receivedByMdhohi !== undefined ? data.receivedByMdhohi : item.receivedByMdhohi,
-                }
-              : item,
-          ),
-        )
-      } else if (data.tipeId === 2) {
-        // Domba
-        setDombaData((prev) =>
-          prev.map((item) =>
-            item.animalId === data.animalId
-              ? {
-                  ...item,
-                  status: data.status !== undefined ? data.status : item.status,
-                  slaughtered: data.slaughtered !== undefined ? data.slaughtered : item.slaughtered,
-                  onInventory: data.onInventory !== undefined ? data.onInventory : item.onInventory,
-                  receivedByMdhohi: data.receivedByMdhohi !== undefined ? data.receivedByMdhohi : item.receivedByMdhohi,
-                }
-              : item,
-          ),
-        )
+      if (data.tipeId === 1 || !data.tipeId) {
+        const sapiQueryKey = [...queryKeys.sapi, pagination.sapiPage, pagination.sapiGroup, sapiPaginationConfig];
+        queryClient.setQueryData(sapiQueryKey, (old: any) => {
+          if (!old || !old.data) {
+            console.log("No existing sapi data to update");
+            return old;
+          }
+          
+          console.log("Updating sapi data for animal:", data.hewanId);
+          return {
+            ...old,
+            data: old.data.map((item: HewanQurban) =>
+              item.hewanId === data.hewanId
+                ? {
+                    ...item,
+                    ...(data.status && { status: data.status }),
+                    ...(data.slaughtered !== undefined && { slaughtered: data.slaughtered }),
+                    ...(data.receivedByMdhohi !== undefined && { receivedByMdhohi: data.receivedByMdhohi }),
+                    ...(data.onInventory !== undefined && { onInventory: data.onInventory }),
+                  }
+                : item
+            )
+          }
+        })
+      }
+
+      if (data.tipeId === 2 || !data.tipeId) {
+        const dombaQueryKey = [...queryKeys.domba, pagination.dombaPage, pagination.dombaGroup, dombaPaginationConfig];
+        queryClient.setQueryData(dombaQueryKey, (old: any) => {
+          if (!old || !old.data) {
+            console.log("No existing domba data to update");
+            return old;
+          }
+          
+          console.log("Updating domba data for animal:", data.hewanId);
+          return {
+            ...old,
+            data: old.data.map((item: HewanQurban) =>
+              item.hewanId === data.hewanId
+                ? {
+                    ...item,
+                    ...(data.status && { status: data.status }),
+                    ...(data.slaughtered !== undefined && { slaughtered: data.slaughtered }),
+                    ...(data.receivedByMdhohi !== undefined && { receivedByMdhohi: data.receivedByMdhohi }),
+                    ...(data.onInventory !== undefined && { onInventory: data.onInventory }),
+                  }
+                : item
+            )
+          }
+        })
       }
     }
 
-    // Product updates
-    const handleProductsUpdated = (data: ProdukHewanWithRelations[]) => {
-      setProdukHewan(data)
-      setProdukDaging(data.filter((p) => p.jenisProduk === "DAGING"))
-    }
-
-    const handleProductUpdated = (data: ProdukHewanWithRelations) => {
-      setProdukHewan((prev) => prev.map((item) => (item.id === data.id ? data : item)))
-      setProdukDaging((prev) => {
-        if (data.jenisProduk === "DAGING") {
-          return prev.map((item) => (item.id === data.id ? data : item))
+    // Handle bulk data updates
+    const handleSapiDataUpdate = (data: HewanQurban[]) => {
+      // queryClient.setQueryData(queryKeys.sapi, data)
+      const sapiQueryKey = [...queryKeys.sapi, pagination.sapiPage, pagination.sapiGroup, sapiPaginationConfig];
+      console.log("Received bulk sapi data update:", data.length, "items");
+      queryClient.setQueryData(sapiQueryKey, (old: any) => {
+        return {
+          data: Array.isArray(data) ? data : [],
+          pagination: old?.pagination || {
+            currentPage: pagination.sapiPage,
+            totalPages: Math.ceil((data?.length || 0) / sapiPaginationConfig.pageSize)
+          }
         }
-        return prev
-      })
+      });
+      
+      // Also invalidate to ensure UI updates
+      queryClient.invalidateQueries({ queryKey: sapiQueryKey });
     }
 
-    // Distribution updates
-    const handleDistributionsUpdated = (data: Distribution[]) => {
-      setDistributions(data)
+    const handleDombaDataUpdate = (data: HewanQurban[]) => {
+      // queryClient.setQueryData(queryKeys.domba, data)
+      const dombaQueryKey = [...queryKeys.domba, pagination.dombaPage, pagination.dombaGroup, dombaPaginationConfig];
+      console.log("Received bulk domba data update:", data.length, "items");
+      queryClient.setQueryData(dombaQueryKey, (old: any) => {
+        return {
+          data: Array.isArray(data) ? data : [],
+          pagination: old?.pagination || {
+            currentPage: pagination.dombaPage,
+            totalPages: Math.ceil((data?.length || 0) / dombaPaginationConfig.pageSize)
+          }
+        }
+      });
+      
+      // Also invalidate to ensure UI updates
+      queryClient.invalidateQueries({ queryKey: dombaQueryKey });
     }
 
-    const handlePenerimaUpdated = (data: PenerimaWithRelations[]) => {
-      setPenerima(data)
+    // Handle product updates
+    const handleProductUpdate = (data: { products: ProdukHewan[] }) => {
+      queryClient.setQueryData(queryKeys.products, data.products)
     }
 
-    // Mudhohi updates
-    const handleMudhohiUpdated = (data: MudhohiWithRelations[]) => {
-      setMudhohi(data)
+    // Handle error log updates
+    const handleErrorLogsUpdate = (data: { errorLogs: ErrorLog[] }) => {
+      queryClient.setQueryData(queryKeys.errorLogs, data.errorLogs)
     }
 
-    // Progress updates
-    const handleProgresSapiUpdated = (data: ProgresSapi[]) => {
-      setProgresSapi(data)
-    }
+    // Register socket listeners
+    socket.on("update-hewan", handleHewanUpdate)
+    socket.on("update-product", handleProductUpdate)
+    socket.on("error-logs", handleErrorLogsUpdate)
+    socket.on("sapi-data-updated", handleSapiDataUpdate)
+    socket.on("domba-data-updated", handleDombaDataUpdate)
 
-    const handleProgresDombaUpdated = (data: ProgresDomba[]) => {
-      setProgresDomba(data)
-    }
-
-    // Weight and inventory updates
-    const handleHasilTimbangUpdated = (data: HasilTimbang[]) => {
-      setHasilTimbang(data)
-    }
-
-    const handleInventoryUpdated = (data: Inventory[]) => {
-      setInventory(data)
-    }
-
-    // Error logs updates
-    const handleErrorLogsUpdated = (data: ErrorLogWithRelations[]) => {
-      setErrorLogs(data)
-    }
-
-    // Register socket event listeners
-    socket.on("Sapi-data-updated", handleSapiDataUpdated)
-    socket.on("Domba-data-updated", handleDombaDataUpdated)
-    socket.on("hewan-updated", handleHewanUpdated)
-    socket.on("products-updated", handleProductsUpdated)
-    socket.on("product-updated", handleProductUpdated)
-    socket.on("distributions-updated", handleDistributionsUpdated)
-    socket.on("penerima-updated", handlePenerimaUpdated)
-    socket.on("mudhohi-updated", handleMudhohiUpdated)
-    socket.on("progres-sapi-updated", handleProgresSapiUpdated)
-    socket.on("progres-domba-updated", handleProgresDombaUpdated)
-    socket.on("hasil-timbang-updated", handleHasilTimbangUpdated)
-    socket.on("inventory-updated", handleInventoryUpdated)
-    socket.on("error-logs-updated", handleErrorLogsUpdated)
-
-    // Clean up event listeners on unmount
+    // Clean up on unmount
     return () => {
-      socket.off("Sapi-data-updated", handleSapiDataUpdated)
-      socket.off("Domba-data-updated", handleDombaDataUpdated)
-      socket.off("hewan-updated", handleHewanUpdated)
-      socket.off("products-updated", handleProductsUpdated)
-      socket.off("product-updated", handleProductUpdated)
-      socket.off("distributions-updated", handleDistributionsUpdated)
-      socket.off("penerima-updated", handlePenerimaUpdated)
-      socket.off("mudhohi-updated", handleMudhohiUpdated)
-      socket.off("progres-sapi-updated", handleProgresSapiUpdated)
-      socket.off("progres-domba-updated", handleProgresDombaUpdated)
-      socket.off("hasil-timbang-updated", handleHasilTimbangUpdated)
-      socket.off("inventory-updated", handleInventoryUpdated)
-      socket.off("error-logs-updated", handleErrorLogsUpdated)
+      socket.off("update-hewan", handleHewanUpdate)
+      socket.off("update-product", handleProductUpdate)
+      socket.off("error-logs", handleErrorLogsUpdate)
+      socket.off("sapi-data-updated", handleSapiDataUpdate)
+      socket.off("domba-data-updated", handleDombaDataUpdate)
     }
-  }, [socket])
+  }, [socket, queryClient])
 
-  // Refresh functions
-  const refreshHewan = async (type: "Sapi" | "Domba", page = 1, pageSize = 10) => {
-    setLoading((prev) => ({ ...prev, hewan: true }))
-    try {
-      // Fetch metadata
-      const metaRes = await fetch(`/api/hewan/meta?type=${type}`)
-      const metaData = await metaRes.json()
+  // Expose methods using the mutations
+  const updateHewan =  (data: {
+    hewanId: string
+    status: HewanStatus
+    slaughtered?: boolean
+    receivedByMdhohi?: boolean
+    onInventory?: boolean
+    tipeId: number
+  }) => {
+    updateHewanMutation.mutate(data);
+  }
 
-      if (Array.isArray(metaData)) {
-        const typeData = metaData.find((item: any) => item.typeName === type)
-        if (typeData) {
-          setMeta((prev) => ({
-            ...prev,
-            [type.toLowerCase()]: { total: typeData.total, target: typeData.target },
-          }))
+  const updateProduct = (data: {
+    productId: number
+    operation: "add" | "decrease"
+    place: Counter
+    value: number
+    note?: string
+  }) => {
+    updateProductMutation.mutate(data)
+  }
+
+  // Create context value
+  const contextValue: QurbanContextType = {
+    sapiQuery: {
+      data: sapiQuery.data?.data || [],
+      isLoading: sapiQuery.isLoading,
+      isError: sapiQuery.isError,
+      refetch: async (options?: { page?: number, group?: string }) => {
+        if (options?.page) {
+          setPagination("sapiPage",  options.page || 1)
         }
-      } else {
-        setMeta((prev) => ({
-          ...prev,
-          [type.toLowerCase()]: { total: metaData.total || 0, target: metaData.target || 0 },
-        }))
+        if (options?.group && sapiPaginationConfig.useGroups) {
+          setPagination("sapiGroup",  options.group || "A")
+        }
+        return sapiQuery.refetch()
+      },
+      pagination: {
+        ...sapiPaginationConfig,
+        currentPage: pagination.sapiPage,
+        totalPages: sapiQuery.data?.pagination?.totalPages || 
+          Math.ceil((metaQuery.data?.sapi.total || 0) / sapiPaginationConfig.pageSize),
+        currentGroup: sapiPaginationConfig.useGroups ? pagination.sapiGroup : undefined,
+        totalGroups: sapiPaginationConfig.useGroups ? 
+          Math.ceil((metaQuery.data?.sapi.total || 0) / (sapiPaginationConfig.itemsPerGroup || 50)) : 
+          undefined
       }
-
-      // Fetch hewan data
-      const res = await fetch(`/api/hewan?type=${type}&page=${page}&pageSize=${pageSize}`)
-      const data = await res.json()
-
-      if (type === "Sapi") {
-        setSapiData(data)
-      } else {
-        setDombaData(data)
+    },
+    dombaQuery: {
+      data: dombaQuery.data?.data || [],
+      isLoading: dombaQuery.isLoading,
+      isError: dombaQuery.isError,
+      refetch: async (options?: { page?: number, group?: string }) => {
+        if (options?.page) {
+          setPagination("dombaPage",  options.page || 1)
+        }
+        if (options?.group && dombaPaginationConfig.useGroups) {
+          setPagination("dombaGroup",  options.group || "A")
+        }
+        return dombaQuery.refetch()
+      },
+      pagination: {
+        ...dombaPaginationConfig,
+        currentPage: pagination.dombaPage,
+        totalPages: dombaQuery.data?.pagination?.totalPages || dombaPaginationConfig.useGroups ? 
+          Math.ceil((dombaPaginationConfig.itemsPerGroup || 50) / dombaPaginationConfig.pageSize) :
+          Math.ceil((metaQuery.data?.domba.total || 0) / dombaPaginationConfig.pageSize),
+        currentGroup: dombaPaginationConfig.useGroups ? pagination.dombaGroup : undefined,
+        totalGroups: dombaPaginationConfig.useGroups ? 
+          Math.ceil((metaQuery.data?.domba.total || 0) / (dombaPaginationConfig.itemsPerGroup || 50)) : 
+          undefined
       }
-    } catch (error) {
-      console.error(`Error fetching ${type} data:`, error)
-    } finally {
-      setLoading((prev) => ({ ...prev, hewan: false }))
-    }
+    },
+    productsQuery: {
+      data: productsQuery.data || [],
+      isLoading: productsQuery.isLoading,
+      isError: productsQuery.isError,
+      refetch: productsQuery.refetch,
+    },
+    errorLogsQuery: {
+      data: errorLogsQuery.data || [],
+      isLoading: errorLogsQuery.isLoading,
+      isError: errorLogsQuery.isError,
+      refetch: errorLogsQuery.refetch,
+    },
+    meta: metaQuery.data || {
+      sapi: { total: 0, target: 0 },
+      domba: { total: 0, target: 0 },
+    },
+    isConnected,
+    updateHewan,
+    updateProduct,
   }
-
-  const refreshProduk = async () => {
-    setLoading((prev) => ({ ...prev, produk: true }))
-    try {
-      const res = await fetch("/api/products")
-      const data = await res.json()
-      setProdukHewan(data)
-      setProdukDaging(data.filter((p: ProdukHewanWithRelations) => p.jenisProduk === "DAGING"))
-    } catch (error) {
-      console.error("Error fetching products:", error)
-    } finally {
-      setLoading((prev) => ({ ...prev, produk: false }))
-    }
-  }
-
-  const refreshDistribution = async () => {
-    setLoading((prev) => ({ ...prev, distribution: true }))
-    try {
-      const res = await fetch("/api/distributions")
-      const data = await res.json()
-      setDistributions(data)
-    } catch (error) {
-      console.error("Error fetching distributions:", error)
-    } finally {
-      setLoading((prev) => ({ ...prev, distribution: false }))
-    }
-  }
-
-  const refreshMudhohi = async (page = 1, pageSize = 10) => {
-    setLoading((prev) => ({ ...prev, mudhohi: true }))
-    try {
-      // Fetch metadata
-      const metaRes = await fetch("/api/mudhohi/count")
-      const metaData = await metaRes.json()
-      setMeta((prev) => ({
-        ...prev,
-        mudhohi: {
-          total: metaData.count || 0,
-          pages: Math.ceil((metaData.count || 0) / pageSize),
-        },
-      }))
-
-      // Fetch mudhohi data
-      const res = await fetch(`/api/mudhohi?page=${page}&pageSize=${pageSize}`)
-      const data = await res.json()
-      setMudhohi(data)
-    } catch (error) {
-      console.error("Error fetching mudhohi:", error)
-    } finally {
-      setLoading((prev) => ({ ...prev, mudhohi: false }))
-    }
-  }
-
-  const refreshPenerima = async (distributionId?: string) => {
-    setLoading((prev) => ({ ...prev, distribution: true }))
-    try {
-      const url = distributionId ? `/api/penerima?distributionId=${distributionId}` : "/api/penerima"
-
-      const res = await fetch(url)
-      const data = await res.json()
-      setPenerima(data)
-
-      // Update metadata
-      setMeta((prev) => ({
-        ...prev,
-        penerima: {
-          total: data.length,
-          pages: Math.ceil(data.length / 10),
-        },
-      }))
-    } catch (error) {
-      console.error("Error fetching penerima:", error)
-    } finally {
-      setLoading((prev) => ({ ...prev, distribution: false }))
-    }
-  }
-
-  const refreshProgres = async () => {
-    setLoading((prev) => ({ ...prev, progres: true }))
-    try {
-      const sapiRes = await fetch("/api/progres/sapi")
-      const sapiData = await sapiRes.json()
-      setProgresSapi(sapiData)
-
-      const dombaRes = await fetch("/api/progres/domba")
-      const dombaData = await dombaRes.json()
-      setProgresDomba(dombaData)
-    } catch (error) {
-      console.error("Error fetching progres:", error)
-    } finally {
-      setLoading((prev) => ({ ...prev, progres: false }))
-    }
-  }
-
-  const refreshTimbang = async () => {
-    setLoading((prev) => ({ ...prev, timbang: true }))
-    try {
-      const res = await fetch("/api/timbang")
-      const data = await res.json()
-      setHasilTimbang(data)
-    } catch (error) {
-      console.error("Error fetching hasil timbang:", error)
-    } finally {
-      setLoading((prev) => ({ ...prev, timbang: false }))
-    }
-  }
-
-  const refreshInventory = async () => {
-    setLoading((prev) => ({ ...prev, inventory: true }))
-    try {
-      const res = await fetch("/api/inventory")
-      const data = await res.json()
-      setInventory(data)
-    } catch (error) {
-      console.error("Error fetching inventory:", error)
-    } finally {
-      setLoading((prev) => ({ ...prev, inventory: false }))
-    }
-  }
-
-  const refreshErrorLogs = async () => {
-    setLoading((prev) => ({ ...prev, errorLogs: true }))
-    try {
-      const res = await fetch("/api/error-logs")
-      const data = await res.json()
-      setErrorLogs(data)
-    } catch (error) {
-      console.error("Error fetching error logs:", error)
-    } finally {
-      setLoading((prev) => ({ ...prev, errorLogs: false }))
-    }
-  }
-
-  // Initial data loading
-  useEffect(() => {
-    const loadInitialData = async () => {
-      if (!initialData) {
-        await Promise.all([
-          refreshHewan("Sapi"),
-          refreshHewan("Domba"),
-          refreshProduk(),
-          refreshDistribution(),
-          refreshMudhohi(),
-          refreshPenerima(),
-          refreshProgres(),
-          refreshTimbang(),
-          refreshInventory(),
-          refreshErrorLogs(),
-        ])
-      }
-    }
-
-    loadInitialData()
-  }, [])
-
-  const contextValue: QurbanContextState = {
-    sapiData,
-    dombaData,
-    produkHewan,
-    produkDaging,
-    distributions,
-    penerima,
-    mudhohi,
-    progresSapi,
-    progresDomba,
-    hasilTimbang,
-    inventory,
-    errorLogs,
-    loading,
-    meta,
-    refreshHewan,
-    refreshProduk,
-    refreshDistribution,
-    refreshMudhohi,
-    refreshPenerima,
-    refreshProgres,
-    refreshTimbang,
-    refreshInventory,
-    refreshErrorLogs,
-  }
-
   return <QurbanContext.Provider value={contextValue}>{children}</QurbanContext.Provider>
 }
 
 // Custom hook to use the context
-export const useQurban = () => useContext(QurbanContext)
+export function useQurban() {
+  const context = useContext(QurbanContext)
+
+  if (context === undefined) {
+    throw new Error("useQurban must be used within a QurbanProvider")
+  }
+
+  return context
+}

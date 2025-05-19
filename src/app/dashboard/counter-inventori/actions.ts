@@ -33,9 +33,9 @@ export async function createDistribusi(penerimaId: string, produkIds: number[], 
   }
 }
 
-export async function updateMudhohiReceived(animalId: string, received: boolean) {
+export async function updateMudhohiReceived(hewanId: string, received: boolean) {
   try {
-    await dbUpdateMudhohiReceived(animalId, received)
+    await dbUpdateMudhohiReceived(hewanId, received)
     revalidatePath("/counter-inventori")
     revalidatePath("/progres-sembelih")
     revalidatePath("/")

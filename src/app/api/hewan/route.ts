@@ -3,12 +3,22 @@ import { getHewanQurban } from "@/lib/db"
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
-  const type = (searchParams.get("type") as "Sapi" | "Domba") || "Sapi"
+  const typeParam = searchParams.get("type") || "sapi"
+  const type = (typeParam.toLowerCase() as "sapi" | "domba")
   const page = Number.parseInt(searchParams.get("page") || "1")
   const pageSize = Number.parseInt(searchParams.get("pageSize") || "10")
+  // Parse group parameters
+  const group = searchParams.get("group")
+  const itemsPerGroup = Number(searchParams.get("itemsPerGroup")) || 50
 
+  
+  if (!type || (type !== "sapi" && type !== "domba")) {
+    return NextResponse.json({ error: "Invalid type parameter. Must be 'sapi' or 'domba'." }, { status: 400 })
+  }
   try {
-    const data = await getHewanQurban(type, page, pageSize)
+    const data = group? 
+    await getHewanQurban(type, page, pageSize, group, itemsPerGroup) 
+    : await getHewanQurban(type, page, pageSize)
     return NextResponse.json(data)
   } catch (error) {
     console.error("Error fetching hewan data:", error)

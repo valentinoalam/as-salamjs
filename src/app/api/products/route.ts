@@ -1,10 +1,14 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { getProdukHewan } from "@/lib/db"
+import type { jenisProduk } from "@prisma/client"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const products = await getProdukHewan()
-    return NextResponse.json(products)
+    const searchParams = request.nextUrl.searchParams
+    const jenis = searchParams.get("jenis") as jenisProduk | null
+
+    const data = await getProdukHewan(jenis || undefined)
+    return NextResponse.json(data)
   } catch (error) {
     console.error("Error fetching products:", error)
     return NextResponse.json({ error: "Failed to fetch products" }, { status: 500 })

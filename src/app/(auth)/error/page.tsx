@@ -44,7 +44,7 @@ export default function AuthErrorPage() {
         </CardContent>
         <CardFooter className="flex justify-center">
           <Button asChild>
-            <Link href="/auth/login">Return to Login</Link>
+            <Link href="/login">Return to Login</Link>
           </Button>
         </CardFooter>
       </Card>

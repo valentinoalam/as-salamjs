@@ -53,8 +53,8 @@ const LegendProgress = () => (
   </div>
 )
 export default async function DashboardPage() {
-  const sapiData = await getHewanQurban("Sapi")
-  const dombaData = await getHewanQurban("Domba")
+  const sapiData = await getHewanQurban("sapi")
+  const dombaData = await getHewanQurban("domba")
   const produkDaging = await getProdukHewan(jenisProduk.DAGING)
   const produkLainnya = await getProdukHewan()
   const distribution = await getDistribution()
@@ -98,7 +98,7 @@ export default async function DashboardPage() {
   ];
 
   const pieChartData = [
-    { name: 'Domba', value: 45 },
+    { name: 'domba', value: 45 },
     { name: 'Sapi Patungan', value: 30 },
     { name: 'Sapi Utuh', value: 10 },
   ];
@@ -132,7 +132,7 @@ export default async function DashboardPage() {
               <div className="grid grid-cols-5 gap-2">
                 {sapiData.map((sapi) => (
                   <div key={sapi.id} className="flex flex-col items-center justify-center p-2 border rounded-md">
-                    <span className="text-lg">🐮{sapi.animalId}</span>
+                    <span className="text-lg">🐮{sapi.hewanId}</span>
                     <div className="flex flex-col items-center">
                       <span className="text-2xl">{sapi.slaughtered ? "✅" : "⬜️"}</span>
                       {sapi.slaughtered && (
@@ -154,7 +154,7 @@ export default async function DashboardPage() {
               <div className="grid grid-cols-5 gap-2">
                 {dombaData.map((domba) => (
                   <div key={domba.id} className="flex flex-col items-center justify-center p-2 border rounded-md">
-                    <span className="text-lg">🐐{domba.animalId}</span>
+                    <span className="text-lg">🐐{domba.hewanId}</span>
                     <div className="flex flex-col items-center">
                       <span className="text-2xl">{domba.slaughtered ? "✅" : "⬜️"}</span>
                       {domba.slaughtered && (

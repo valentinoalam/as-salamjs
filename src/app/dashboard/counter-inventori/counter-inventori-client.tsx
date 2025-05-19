@@ -44,7 +44,7 @@ type Mudhohi = {
   nama_pengqurban: string | null
   nama_peruntukan: string | null
   hewan: {
-    animalId: string
+    hewanId: string
     receivedByMdhohi: boolean
   }[]
 }
@@ -282,15 +282,15 @@ export default function CounterInventori({
     }
   }
 
-  const handleMudhohiReceived = async (animalId: string, received: boolean) => {
+  const handleMudhohiReceived = async (hewanId: string, received: boolean) => {
     try {
-      await updateMudhohiReceived(animalId, received)
+      await updateMudhohiReceived(hewanId, received)
 
       // Update local state
       setMudhohi((prev) =>
         prev.map((m) => ({
           ...m,
-          hewan: m.hewan.map((h) => (h.animalId === animalId ? { ...h, receivedByMdhohi: received } : h)),
+          hewan: m.hewan.map((h) => (h.hewanId === hewanId ? { ...h, receivedByMdhohi: received } : h)),
         })),
       )
 
@@ -379,7 +379,7 @@ export default function CounterInventori({
       ID: m.id,
       "Nama Pengqurban": m.nama_pengqurban || "-",
       "Nama Peruntukan": m.nama_peruntukan || "-",
-      Hewan: m.hewan.map((h) => `${h.animalId}`).join(", "),
+      Hewan: m.hewan.map((h) => `${h.hewanId}`).join(", "),
       "Jatah Diambil": m.hewan.map((h) => (h.receivedByMdhohi ? "Ya" : "Tidak")).join(", "),
     }))
 
@@ -589,12 +589,12 @@ export default function CounterInventori({
                       </div>
                       <div className="space-y-2">
                         {m.hewan.map((h) => (
-                          <div key={h.animalId} className="flex items-center gap-2">
-                            <span>Hewan #{h.animalId}</span>
+                          <div key={h.hewanId} className="flex items-center gap-2">
+                            <span>Hewan #{h.hewanId}</span>
                             <Button
                               size="sm"
                               variant={h.receivedByMdhohi ? "default" : "outline"}
-                              onClick={() => handleMudhohiReceived(h.animalId, !h.receivedByMdhohi)}
+                              onClick={() => handleMudhohiReceived(h.hewanId, !h.receivedByMdhohi)}
                             >
                               {h.receivedByMdhohi ? "Sudah Diambil" : "Belum Diambil"}
                             </Button>

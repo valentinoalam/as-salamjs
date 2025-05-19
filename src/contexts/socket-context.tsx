@@ -3,26 +3,28 @@
 import type React from "react"
 import { createContext, useContext, useEffect, useRef, useState } from "react"
 import { io, type Socket } from "socket.io-client"
-import * as http from 'http';
+import { toast } from "@/hooks/use-toast"
 
-type SocketContextType = {
+interface SocketContextType {
   socket: Socket | null
   isConnected: boolean
   transportType: string
   error: Error | null
-  retryCount: number
+  reconnectAttempts: number
+  latency: number | null
 }
-
 const SocketContext = createContext<SocketContextType>({
   socket: null,
   isConnected: false,
   transportType: "not connected",
   error: null,
-  retryCount: 0,
+  reconnectAttempts: 0,
+  latency: null,
 })
 
 const SOCKET_OPTIONS = {
   path: "/api/socket",
+  addTrailingSlash: false,
   forceNew: true, 
   withCredentials: true,
   // Explicitly prefer WebSocket transport
@@ -32,6 +34,7 @@ const SOCKET_OPTIONS = {
   reconnectionAttempts: 5,
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
+  timeout: 20000,
   // Enable auto connect
   autoConnect: true,
   // agent: new http.Agent({
@@ -51,7 +54,8 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [isConnected, setIsConnected] = useState(false)
   const [transportType, setTransportType] = useState<string>("not connected")
   const [error, setError] = useState<Error | null>(null);
-  const [retryCount, setRetryCount] = useState<number>(0);
+  const [reconnectAttempts, setReconnectAttempts] = useState<number>(0);
+  const [latency, setLatency] = useState<number | null>(null)
   const socketRef = useRef<Socket | null>(null);
   
   
@@ -88,11 +92,6 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         }
       }
     
-      // 8. Debugging with purpose
-      if (process.env.NODE_ENV === "development") {
-        console.log("Socket instance:", socketRef.current);
-      }
-    
       return socketRef.current;
     };
     // Only initialize socket on client side
@@ -116,14 +115,48 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       console.log("Socket connected with ID:", socketInstance.id)
       console.log("Connected via", socketInstance.io.engine.transport.name)
       setIsConnected(true)
-      setError(null);
+
       setTransportType(socketInstance.io.engine.transport.name)
+      setReconnectAttempts(0)
+      setError(null)
+
+      // Measure latency
+      measureLatency(socketInstance)
+
+      // Set up periodic latency measurement
+      const latencyInterval = setInterval(() => {
+        measureLatency(socketInstance)
+      }, 30000)
+
+      return () => {
+        clearInterval(latencyInterval)
+      }
+    }
+    
+    // Function to measure latency
+    const measureLatency = (socketInstance: Socket) => {
+      const start = Date.now()
+
+      socketInstance.emit("ping", (response: any) => {
+        const duration = Date.now() - start
+        setLatency(duration)
+      })
     }
 
-    const onDisconnect = () => {
-      console.log("Socket disconnected")
+    const onDisconnect = (reason: string) => {
+      console.log("Socket disconnected", reason)
       setIsConnected(false)
       setTransportType("not connected")
+      setLatency(null)
+
+      if (reason === "io server disconnect") {
+        // The server has forcefully disconnected the socket
+        toast({
+          title: "Disconnected",
+          description: "Server has disconnected the socket. Attempting to reconnect...",
+        })
+        socketInstance.connect()
+      }
     }
 
     const onTransportChange = () => {
@@ -139,7 +172,14 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       setIsConnected(false)
       setTransportType("not connected");
       setError(err);
-      setRetryCount(retryCount+1)
+      setReconnectAttempts((prev) => prev + 1)
+      if (reconnectAttempts >= 5) {
+        toast({
+          title: "Connection Error",
+          description: "Failed to connect to server after multiple attempts. Please refresh the page.",
+          variant: "destructive",
+        })
+      }
     }
 
     socketInstance.on("connect", onConnect)
@@ -178,7 +218,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   }, [])
 
   return (
-    <SocketContext.Provider value={{ socket, isConnected, transportType, error, retryCount }}>
+    <SocketContext.Provider value={{ socket, isConnected, transportType, error, reconnectAttempts, latency }}>
       {children}
     </SocketContext.Provider>
   )

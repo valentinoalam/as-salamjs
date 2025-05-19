@@ -4,11 +4,11 @@ import { updateHewanStatus as dbUpdateHewanStatus, updateMudhohiReceived as dbUp
 import { revalidatePath } from "next/cache"
 import type { HewanStatus } from "@prisma/client"
 
-export async function updateHewanStatus(animalId: string, status: HewanStatus, slaughtered: boolean) {
+export async function updateHewanStatus(hewanId: string, status: HewanStatus, slaughtered: boolean) {
   try {
-    await dbUpdateHewanStatus(animalId, status, slaughtered)
-    revalidatePath("/progres-sembelih")
-    revalidatePath("/")
+    await dbUpdateHewanStatus(hewanId, status, slaughtered)
+    revalidatePath("/dashboard/progres-sembelih")
+    revalidatePath("/dashboard")
     return { success: true }
   } catch (error) {
     console.error("Error updating hewan status:", error)
@@ -16,11 +16,11 @@ export async function updateHewanStatus(animalId: string, status: HewanStatus, s
   }
 }
 
-export async function updateMudhohiReceived(animalId: string, received: boolean) {
+export async function updateMudhohiReceived(hewanId: string, received: boolean) {
   try {
-    await dbUpdateMudhohiReceived(animalId, received)
-    revalidatePath("/progres-sembelih")
-    revalidatePath("/")
+    await dbUpdateMudhohiReceived(hewanId, received)
+    revalidatePath("/dashboard/progres-sembelih")
+    revalidatePath("/dashboard")
     return { success: true }
   } catch (error) {
     console.error("Error updating mudhohi received status:", error)

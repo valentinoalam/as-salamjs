@@ -124,7 +124,7 @@ model Mudhohi {
 model HewanQurban {
   id                String       @id @default(cuid())
   tipeId            Int       
-  animalId          String          @unique // External ID for the animal
+  hewanId          String          @unique // External ID for the animal
   // Animal slaughter progress
   status            HewanStatus  @default(TERDAFTAR)
   slaughtered       Boolean      @default(false)
@@ -133,7 +133,9 @@ model HewanQurban {
   onInventory       Boolean      @default(false)
   receivedByMdhohi  Boolean      @default(false)
   isKolektif        Boolean      @default(false)
+  isCustom          Boolean      @default(false)
   slotTersisa       Int?          // Jika Kolektif
+
   // ... relationships
   mudhohi           Mudhohi[]
   tipe              TipeHewan    @relation(fields: [tipeId], references: [id])
@@ -151,10 +153,9 @@ enum JenisHewan {
 
 model TipeHewan {
   id              Int          @id @default(autoincrement())
-  nama            String       @unique // Type of animal (e.g., "Sapi", "Domba")
+  nama            String       @unique // Type of animal (e.g., "sapi", "domba")
   icon            String?
   target          Int    
-  jmlKantong      Int?
   harga           Int
   note            String
 
@@ -180,6 +181,7 @@ model ProdukHewan {
   nama            String       @unique // daging sapi 5 kg
   tipeId          Int?
   berat           Float?
+  avgProdPerHewan Int         @default(1)
   // Product tracking
   targetPaket     Int              @default(0)
   pkgOrigin       Int              @default(0)  //from slaughter counter
@@ -259,67 +261,11 @@ model Penerima {
   DistribusiLog    DistribusiLog[]
 }
 
-model ProgresSapi {
-  id       Int     @id @default(autoincrement())
-  sembelih Boolean @default(false)
-}
-
-model ProgresDomba {
-  id       Int     @id @default(autoincrement())
-  sembelih Boolean @default(false)
-}
-
-// Weight tracking
-model HasilTimbang {
-  id           Int              @id @default(autoincrement())
-  name         String           @unique
-  hasil        Int              @default(0)
-  target_value Int              @default(0)
-  history      TimbangHistory[]
-}
-
-model TimbangHistory {
-  id              Int         @id @default(autoincrement())
-  hasil_timbang   HasilTimbang @relation(fields: [hasil_timbang_id], references: [id])
-  hasil_timbang_id Int
-  operation       String      // "add" or "decrease"
-  value           Int
-  timestamp       DateTime    @default(now())
-}
-
-// Inventory tracking
-model Inventory {
-  id           Int                @id @default(autoincrement())
-  name         String             @unique
-  hasil        Int                @default(0)
-  target_value Int                @default(0)
-  history      InventoryHistory[]
-}
-
-model InventoryHistory {
-  id           Int       @id @default(autoincrement())
-  inventory    Inventory @relation(fields: [inventory_id], references: [id])
-  inventory_id Int
-  operation    String    // "add" or "decrease"
-  value        Int
-  timestamp    DateTime  @default(now())
-}
-
-
 // Financial tracking
 enum TransactionType {
   PEMASUKAN
   PENGELUARAN
 }
-
-// enum TransactionCategory {
-//   QURBAN_PAYMENT
-//   OPERATIONAL
-//   SUPPLIES
-//   TRANSPORT
-//   SALARY
-//   OTHER
-// }
 
 model TransactionCategory {
   id            String       @id @default(uuid())

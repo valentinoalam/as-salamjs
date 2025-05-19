@@ -47,7 +47,7 @@ CREATE TABLE `Mudhohi` (
 CREATE TABLE `HewanQurban` (
     `id` VARCHAR(191) NOT NULL,
     `tipeId` INTEGER NOT NULL,
-    `animalId` INTEGER NOT NULL AUTO_INCREMENT,
+    `hewanId` INTEGER NOT NULL AUTO_INCREMENT,
     `status` ENUM('TERDAFTAR', 'SIAP_SEMBELIH', 'DISEMBELIH', 'DITIMBANG', 'DIINVENTORI', 'DIDISTRIBUSI') NOT NULL DEFAULT 'TERDAFTAR',
     `slaughtered` BOOLEAN NOT NULL DEFAULT false,
     `slaughteredAt` DATETIME(3) NULL,
@@ -59,7 +59,7 @@ CREATE TABLE `HewanQurban` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    UNIQUE INDEX `HewanQurban_animalId_key`(`animalId`),
+    UNIQUE INDEX `HewanQurban_hewanId_key`(`hewanId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 

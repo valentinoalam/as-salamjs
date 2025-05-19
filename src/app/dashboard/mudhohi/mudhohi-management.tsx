@@ -57,7 +57,7 @@ type Mudhohi = {
   } | null
   hewan: {
     id: string
-    animalId: string
+    hewanId: string
     tipeId: number
     status: string
     slaughtered: boolean
@@ -348,7 +348,7 @@ export default function MudhohiManagement({ initialStats, initialMudhohi }: Mudh
       "Status Pembayaran": m.payment ? getStatusLabel(m.payment.paymentStatus) : "-",
       "Metode Pembayaran": m.payment ? (m.payment.cara_bayar === CaraBayar.TRANSFER ? "Transfer" : "Tunai") : "-",
       "Jumlah Dibayarkan": m.payment ? m.payment.dibayarkan : 0,
-      Hewan: m.hewan.map((h) => `${h.tipe.nama} #${h.animalId}`).join(", "),
+      Hewan: m.hewan.map((h) => `${h.tipe.nama} #${h.hewanId}`).join(", "),
       "Ambil Daging": m.mengambilDaging ? "Ya" : "Tidak",
       "Saksikan Penyembelihan": m.potong_sendiri ? "Ya" : "Tidak",
       "Tanggal Daftar": new Date(m.createdAt).toLocaleDateString(),
@@ -628,7 +628,7 @@ export default function MudhohiManagement({ initialStats, initialMudhohi }: Mudh
                       <div className="flex flex-wrap gap-2 mt-2">
                         {m.hewan.map((h) => (
                           <Badge key={h.id} variant="secondary">
-                            {h.tipe.icon} {h.tipe.nama} #{h.animalId}
+                            {h.tipe.icon} {h.tipe.nama} #{h.hewanId}
                           </Badge>
                         ))}
                       </div>

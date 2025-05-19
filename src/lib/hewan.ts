@@ -1,9 +1,9 @@
-// src/lib/animalId.ts
+// src/lib/hewanId.ts
 import { PrismaClient, JenisHewan } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export async function generateAnimalId(tipeId: number): Promise<string> {
+export async function generateHewanId(tipeId: number): Promise<string> {
   // 1. Ambil data TipeHewan
   const tipeHewan = await prisma.tipeHewan.findUnique({
     where: { id: tipeId },

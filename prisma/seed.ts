@@ -1,8 +1,8 @@
-import { PrismaClient, jenisProduk, HewanStatus, CaraBayar, PaymentStatus, Role, Prisma, JenisHewan } from "@prisma/client"
+import { PrismaClient, jenisProduk, HewanStatus, CaraBayar, PaymentStatus, Role, Prisma, JenisHewan, TransactionType } from "@prisma/client"
 import { hash } from "bcryptjs"
 const prisma = new PrismaClient()
 
-export async function generateAnimalId(tipeId: number): Promise<string> {
+export async function generateHewanId(tipeId: number): Promise<string> {
   // 1. Ambil data TipeHewan
   const tipeHewan = await prisma.tipeHewan.findUnique({
     where: { id: tipeId },
@@ -57,7 +57,7 @@ async function main() {
   await prisma.image.deleteMany({});
   await prisma.transaction.deleteMany({});
   await prisma.budget.deleteMany({});
-  await prisma.category.deleteMany({});
+  await prisma.transactionCategory.deleteMany({});
   await prisma.setting.deleteMany({});
 
   await prisma.hewanQurban.deleteMany({})
@@ -68,29 +68,34 @@ async function main() {
 
   // Default Categories for INCOME
   const incomeCategories = [
-    { name: 'Donasi Qurban', type: TransactionType.INCOME },
-    { name: 'Sedekah Idul Adha', type: TransactionType.INCOME },
-    { name: 'Penjualan Kulit Hewan', type: TransactionType.INCOME },
-    { name: 'Lain-lain (Pemasukan)', type: TransactionType.INCOME },
+    { name: 'Donasi Qurban', type: TransactionType.PEMASUKAN },
+    { name: 'Sedekah Idul Adha', type: TransactionType.PEMASUKAN },
+    { name: 'Penjualan Kulit Hewan', type: TransactionType.PEMASUKAN },
+    { name: 'Lain-lain (Pemasukan)', type: TransactionType.PEMASUKAN },
   ];
-   
-  // Default Categories for EXPENSE
+  //   QURBAN_PAYMENT
+  //   OPERATIONAL
+  //   SUPPLIES
+  //   TRANSPORT
+  //   SALARY
+  //   OTHER
+  // Default Categories for PENGELUARAN
   const expenseCategories = [
-    { name: 'Pembelian Hewan Qurban - Sapi', type: TransactionType.EXPENSE },
-    { name: 'Pembelian Hewan Qurban - Kambing', type: TransactionType.EXPENSE },
-    { name: 'Pembelian Hewan Qurban - Domba', type: TransactionType.EXPENSE },
-    { name: 'Biaya Perawatan Hewan', type: TransactionType.EXPENSE },
-    { name: 'Biaya Pemotongan & Pengulitan', type: TransactionType.EXPENSE },
-    { name: 'Biaya Distribusi Daging', type: TransactionType.EXPENSE },
-    { name: 'Belanja Bumbu & Bahan Masakan', type: TransactionType.EXPENSE },
-    { name: 'Transportasi & Akomodasi', type: TransactionType.EXPENSE },
-    { name: 'Sewa Alat', type: TransactionType.EXPENSE },
-    { name: 'Lain-lain (Pengeluaran)', type: TransactionType.EXPENSE },
+    { name: 'Pembelian Hewan Qurban - Sapi', type: TransactionType.PENGELUARAN },
+    { name: 'Pembelian Hewan Qurban - Kambing', type: TransactionType.PENGELUARAN },
+    { name: 'Pembelian Hewan Qurban - Domba', type: TransactionType.PENGELUARAN },
+    { name: 'Biaya Perawatan Hewan', type: TransactionType.PENGELUARAN },
+    { name: 'Biaya Pemotongan & Pengulitan', type: TransactionType.PENGELUARAN },
+    { name: 'Biaya Distribusi Daging', type: TransactionType.PENGELUARAN },
+    { name: 'Belanja Bumbu & Bahan Masakan', type: TransactionType.PENGELUARAN },
+    { name: 'Transportasi & Akomodasi', type: TransactionType.PENGELUARAN },
+    { name: 'Sewa Alat', type: TransactionType.PENGELUARAN },
+    { name: 'Lain-lain (Pengeluaran)', type: TransactionType.PENGELUARAN },
   ];
   
   // Create default categories
   for (const category of [...incomeCategories, ...expenseCategories]) {
-    await prisma.category.create({
+    await prisma.transactionCategory.create({
       data: category,
     });
   }
@@ -170,7 +175,7 @@ async function main() {
     },
     create: {
       id: 1,
-      nama: "Sapi",
+      nama: "sapi",
       target: 60,
       jenis: "SAPI",
       icon: "🐮",
@@ -183,13 +188,13 @@ async function main() {
   const domba = await prisma.tipeHewan.upsert({
     where: { id: 2 },
     update: {
-      nama: "Domba",
+      nama: "domba",
       harga: 2700000,
       note: "Domba (berat 23-26 kg)",
     },
     create: {
       id: 2,
-      nama: "Domba",
+      nama: "domba",
       target: 350,
       jenis: "DOMBA",
       icon: "🐐",
@@ -283,7 +288,7 @@ async function main() {
       create: category,
     })
   }
-  async function generateMudhohi(i:number, animalId: string) {
+  async function generateMudhohi(i:number, hewanId: string) {
     const mudhohi = await prisma.mudhohi.create({
       data: {
         userId: admin.id,
@@ -295,7 +300,7 @@ async function main() {
         mengambilDaging: i % 2 === 0,
         dash_code: `DASH-${i}`,
         hewan: {
-          connect: [{ animalId }],
+          connect: [{ hewanId }],
         },
       },
     })
@@ -319,12 +324,12 @@ async function main() {
     // Create HewanQurban (50 sapi)
     for (let i = 1; i <= 50; i++) {
       const tipeId = 1
-      const animalId = await generateAnimalId(tipeId)
+      const hewanId = await generateHewanId(tipeId)
       try {
         await prisma.hewanQurban.create({
           data: {
             tipeId, // Sapi
-            animalId,
+            hewanId,
             status: HewanStatus.TERDAFTAR,
             slaughtered: false,
             meatPackageCount: 0,
@@ -335,18 +340,18 @@ async function main() {
         })
       } catch (e) {
         if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-          console.error('ID hewan sudah ada:', animalId);
+          console.error('ID hewan sudah ada:', hewanId);
         }
       }
-      generateMudhohi(i, animalId)
+      generateMudhohi(i, hewanId)
     }
   // Create HewanQurban (350 domba)
   for (let i = 51; i <= 400; i++) {
     const tipeId = 2
-    const animalId = await generateAnimalId(tipeId)
+    const hewanId = await generateHewanId(tipeId)
     await prisma.hewanQurban.create({
       data: {
-        animalId,
+        hewanId,
         tipeId, // Domba
         status: HewanStatus.TERDAFTAR,
         slaughtered: false,
@@ -356,7 +361,7 @@ async function main() {
         isKolektif: false,
       },
     })
-    generateMudhohi(i, animalId)
+    generateMudhohi(i, hewanId)
   }
 
 

@@ -1,6 +1,6 @@
 import type { Server as HTTPServer } from "http"
 import { Server as SocketIOServer } from "socket.io"
-import { getProdukHewan, getErrorLogs } from "@/lib/db"
+// import { getProdukHewan, getErrorLogs, updateHewanStatus } from "@/lib/db"
 
 export function setupSocketServer(httpServer: HTTPServer) {
   const io = new SocketIOServer(httpServer, {
@@ -45,47 +45,50 @@ export function setupSocketServer(httpServer: HTTPServer) {
     })
 
     // Send initial data to the client
-    try {
-      const products = await getProdukHewan()
-      const errorLogs = await getErrorLogs()
+    // try {
+    //   const products = await getProdukHewan()
+    //   const errorLogs = await getErrorLogs()
 
-      socket.emit("update-product", { products })
-      socket.emit("error-logs", { errorLogs })
-    } catch (error) {
-      console.error("Error fetching initial data:", error)
-      socket.emit("server-error", { message: "Failed to fetch initial data" })
-    }
+    //   socket.emit("update-product", { products })
+    //   socket.emit("error-logs", { errorLogs })
+    // } catch (error) {
+    //   console.error("Error fetching initial data:", error)
+    //   socket.emit("server-error", { message: "Failed to fetch initial data" })
+    // }
 
     // Handle update-hewan event
-    socket.on("update-hewan", (data) => {
+    socket.on("update-hewan", async (data, callback) => {
       console.log("update-hewan:", data)
-      socket.broadcast.emit("update-hewan", data)
+      // const { hewanId, status, slaughtered} = data
+      // await updateHewanStatus(hewanId, status, slaughtered)
+      io.emit("update-hewan", data)
+      callback({ success: true, message: "Updated" });
     })
 
-    // Handle update-product event
-    socket.on("update-product", async (data) => {
-      console.log("update-product:", data)
-      try {
-        // Broadcast updated data to all clients
-        const products = await getProdukHewan()
-        console.log("update-product:", products)
-        io.emit("update-product", { products })
+    // // Handle update-product event
+    // socket.on("update-product", async (data) => {
+    //   console.log("update-product:", data)
+    //   try {
+    //     // Broadcast updated data to all clients
+    //     const products = await getProdukHewan()
+    //     console.log("update-product:", products)
+    //     io.emit("update-product", { products })
 
-        // Check for errors and broadcast them
-        const errorLogs = await getErrorLogs()
-        io.emit("error-logs", { errorLogs })
-      } catch (error) {
-        console.error("Error updating products:", error)
-        socket.emit("server-error", { message: "Failed to update products" })
-      }
-    })
+    //     // Check for errors and broadcast them
+    //     const errorLogs = await getErrorLogs()
+    //     io.emit("error-logs", { errorLogs })
+    //   } catch (error) {
+    //     console.error("Error updating products:", error)
+    //     socket.emit("server-error", { message: "Failed to update products" })
+    //   }
+    // })
 
     // Handle ping event for connection testing
     socket.on("ping", (callback: (arg0: { status: string; time: number; }) => void) => {
       if (typeof callback === "function") {
         callback({ status: "ok", time: Date.now() })
       } else {
-        socket.emit("pong", { status: "ok", time: Date.now() })
+        io.emit("pong", { status: "ok", time: Date.now() })
       }
     })
 

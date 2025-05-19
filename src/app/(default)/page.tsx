@@ -4,8 +4,8 @@ import {
   Instagram, 
   Youtube, 
 } from "lucide-react";
-import Logo from '@/components/logo';
-import FloatingSocialMedia from "@/components/floating-socmed";
+import Logo from '@/components/layout/logo';
+import FloatingSocialMedia from "@/components/layout/floating-socmed";
 
 // Other features array
 const otherFeatures = [

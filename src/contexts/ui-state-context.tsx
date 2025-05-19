@@ -48,7 +48,7 @@ interface UIStateContextType {
 // Default values
 const defaultTabs: TabState = {
   counterInventori: "distribusi",
-  progressSembelih: "Sapi",
+  progressSembelih: "sapi",
 }
 
 const defaultPagination: PaginationState = {
