@@ -56,6 +56,10 @@ const data = {
         },
       ],
     },
+    {
+      title: "Pengaturan",
+      url: "/dashboard/pengaturan",
+    },
   ],
 }
 
@@ -77,7 +81,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         />
       </SidebarHeader>
       <SidebarContent>
-        {data.navMain.map((item) => (
+        {data.navMain.map((item) => item.items ? ( 
           <SidebarGroup key={item.title}>
             <SidebarGroupLabel>{item.title}</SidebarGroupLabel>
             <SidebarGroupContent>
@@ -91,8 +95,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 ))}
               </SidebarMenu>
             </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+          </SidebarGroup> ):( 
+            <SidebarMenu key={item.title}>
+              <SidebarMenuButton asChild isActive={pathname === item.url}>
+                <a href={item.url}>{item.title}</a>
+              </SidebarMenuButton>
+            </SidebarMenu>)
+        )}
       </SidebarContent>
       <SidebarRail />
       <FooterSidebar />

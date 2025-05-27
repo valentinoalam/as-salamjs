@@ -1,10 +1,10 @@
 "use server"
 
-import { prisma } from "@/lib/db"
+import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { type CaraBayar, PaymentStatus } from "@prisma/client"
 import { randomUUID } from "crypto"
-import { generateHewanId } from "@/lib/hewan"
+import { generateHewanId } from "@/services/qurban"
 
 export async function getTipeHewan() {
   return await prisma.tipeHewan.findMany({

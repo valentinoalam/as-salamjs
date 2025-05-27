@@ -5,11 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-
-import { toast } from "@/hooks/use-toast"
 import { HewanStatus, type HewanQurban } from "@prisma/client"
 import { Loader2 } from "lucide-react"
-import { usePaginationConfig, useQurban, type HewanQuery, type TipeHewan } from "@/contexts/qurban-context"
+import { useQurban, type HewanQuery, type TipeHewan } from "@/contexts/qurban-context"
 
 interface ProgressProps {
   tipeHewan: TipeHewan

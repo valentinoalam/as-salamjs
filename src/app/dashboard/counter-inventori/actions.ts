@@ -5,14 +5,34 @@ import {
   createDistribusi as dbCreateDistribusi,
   updateMudhohiReceived as dbUpdateMudhohiReceived,
   updateErrorLogNote as dbUpdateErrorLogNote,
-} from "@/lib/db"
+  receiveShipment as dbReceiveShipment,
+} from "@/services/qurban"
 import { revalidatePath } from "next/cache"
 import type { Counter } from "@prisma/client"
+
+export async function receiveShipment(shipmentId: number, products: { produkId: number; jumlah: number }[]) {
+  try {
+    const result = await dbReceiveShipment(shipmentId, products)
+    revalidatePath("/dashboard/counter-inventori")
+    revalidatePath("/dashboard/counter-timbang")
+    revalidatePath("/dashboard")
+    return result
+  } catch (error) {
+    console.error("Error receiving shipment:", error)
+    return {
+      success: false,
+      error: "Failed to receive shipment",
+      discrepancies: [],
+    }
+  }
+}
+
 
 export async function addProductLog(produkId: number, event: string, place: Counter, value: number, note: string) {
   try {
     await dbAddProductLog(produkId, event, place, value, note)
     revalidatePath("/counter-inventori")
+    revalidatePath("/counter-timbang")
     revalidatePath("/")
     return { success: true }
   } catch (error) {

@@ -5,8 +5,7 @@ import "@/styles/globals.css"
 import { ThemeProvider } from "@/components/providers/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { NextAuthProvider } from "@/components/providers/auth-provider"
-import { Head } from "next/document"
-import { JsonLd } from "@/schemas"
+import { JsonLd } from "@/schemas_org"
 import { generateMetaData } from "@/lib/metadata"
 
 const inter = Inter({ subsets: ["latin"] })

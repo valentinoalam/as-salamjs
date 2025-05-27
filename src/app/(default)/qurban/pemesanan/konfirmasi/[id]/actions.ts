@@ -1,6 +1,6 @@
 "use server"
 
-import { prisma } from "@/lib/db"
+import prisma from "@/lib/prisma"
 
 export async function getMudhohiById(id: string) {
   return await prisma.mudhohi.findUnique({

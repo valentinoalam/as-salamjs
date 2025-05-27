@@ -42,7 +42,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowUp, ArrowDown, Eye, MoreHorizontal, Pencil, Trash2, ImageIcon } from "lucide-react";
+import { ArrowUp, ArrowDown, Eye, MoreHorizontal, Pencil, Trash2, ImageIcon, Plus } from "lucide-react";
 
 interface Transaction {
   id: string;
@@ -62,7 +62,7 @@ interface Transaction {
 }
 
 interface TransactionsListProps {
-  type: 'ALL' | 'INCOME' | 'EXPENSE';
+  type: 'ALL' | 'PEMASUKAN' | 'PENGELUARAN';
 }
 
 export function TransactionsList({ type }: TransactionsListProps) {
@@ -103,7 +103,7 @@ export function TransactionsList({ type }: TransactionsListProps) {
           {
             id: '1',
             amount: 9000000,
-            type: TransactionType.EXPENSE,
+            type: TransactionType.PENGELUARAN,
             date: new Date().toISOString(),
             description: 'Pembelian sapi qurban dari peternak',
             categoryId: '1',
@@ -121,7 +121,7 @@ export function TransactionsList({ type }: TransactionsListProps) {
           {
             id: '2',
             amount: 1500000,
-            type: TransactionType.EXPENSE,
+            type: TransactionType.PENGELUARAN,
             date: new Date().toISOString(),
             description: 'Biaya transportasi dan distribusi daging qurban',
             categoryId: '2',
@@ -139,7 +139,7 @@ export function TransactionsList({ type }: TransactionsListProps) {
           {
             id: '3',
             amount: 15000000,
-            type: TransactionType.INCOME,
+            type: TransactionType.PEMASUKAN,
             date: new Date().toISOString(),
             description: 'Sumbangan untuk qurban masjid',
             categoryId: '3',
@@ -157,7 +157,7 @@ export function TransactionsList({ type }: TransactionsListProps) {
           {
             id: '4',
             amount: 1250000,
-            type: TransactionType.EXPENSE,
+            type: TransactionType.PENGELUARAN,
             date: new Date().toISOString(),
             description: 'Bayar jasa pemotongan qurban',
             categoryId: '4',
@@ -170,7 +170,7 @@ export function TransactionsList({ type }: TransactionsListProps) {
           {
             id: '5',
             amount: 750000,
-            type: TransactionType.EXPENSE,
+            type: TransactionType.PENGELUARAN,
             date: new Date().toISOString(),
             description: 'Belanja bumbu dan bahan masakan',
             categoryId: '5',
@@ -188,10 +188,10 @@ export function TransactionsList({ type }: TransactionsListProps) {
         ];
         
         // Filter based on type
-        if (type === 'INCOME') {
-          setTransactions(mockTransactions.filter(t => t.type === TransactionType.INCOME));
-        } else if (type === 'EXPENSE') {
-          setTransactions(mockTransactions.filter(t => t.type === TransactionType.EXPENSE));
+        if (type === 'PEMASUKAN') {
+          setTransactions(mockTransactions.filter(t => t.type === TransactionType.PEMASUKAN));
+        } else if (type === 'PENGELUARAN') {
+          setTransactions(mockTransactions.filter(t => t.type === TransactionType.PENGELUARAN));
         } else {
           setTransactions(mockTransactions);
         }
@@ -288,9 +288,9 @@ export function TransactionsList({ type }: TransactionsListProps) {
                 </TableCell>
                 <TableCell className={cn(
                   "text-right font-medium",
-                  transaction.type === TransactionType.INCOME ? "text-green-600" : "text-red-600"
+                  transaction.type === TransactionType.PEMASUKAN ? "text-green-600" : "text-red-600"
                 )}>
-                  {transaction.type === TransactionType.INCOME ? "+" : "-"}
+                  {transaction.type === TransactionType.PEMASUKAN ? "+" : "-"}
                   {formatCurrency(transaction.amount)}
                 </TableCell>
                 <TableCell>
@@ -340,8 +340,8 @@ export function TransactionsList({ type }: TransactionsListProps) {
               <div>
                 <h3 className="text-lg font-medium mb-2">{viewTransaction.description}</h3>
                 <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                  <Badge variant={viewTransaction.type === TransactionType.INCOME ? "success" : "destructive"}>
-                    {viewTransaction.type === TransactionType.INCOME ? "Pemasukan" : "Pengeluaran"}
+                  <Badge variant={viewTransaction.type === TransactionType.PEMASUKAN ? "default" : "destructive"}>
+                    {viewTransaction.type === TransactionType.PEMASUKAN ? "Pemasukan" : "Pengeluaran"}
                   </Badge>
                   <Badge variant="outline">{viewTransaction.category.name}</Badge>
                   <span>{format(new Date(viewTransaction.date), "dd MMMM yyyy", { locale: id })}</span>
@@ -349,8 +349,8 @@ export function TransactionsList({ type }: TransactionsListProps) {
               </div>
               
               <div className="text-3xl font-bold text-center p-4 rounded-md bg-muted/50">
-                <span className={viewTransaction.type === TransactionType.INCOME ? "text-green-600" : "text-red-600"}>
-                  {viewTransaction.type === TransactionType.INCOME ? "+" : "-"}
+                <span className={viewTransaction.type === TransactionType.PEMASUKAN ? "text-green-600" : "text-red-600"}>
+                  {viewTransaction.type === TransactionType.PEMASUKAN ? "+" : "-"}
                   {formatCurrency(viewTransaction.amount)}
                 </span>
               </div>

@@ -1,4 +1,4 @@
-import { getProdukHewan, getDistribution, getMudhohi, getPenerima, getErrorLogs } from "@/lib/db"
+import { getProdukHewan, getDistribution, getMudhohi, getPenerima, getErrorLogs } from "@/services/qurban"
 import CounterInventori, { type ErrorLog } from "./counter-inventori-client"
 
 export default async function CounterInventoriPage() {
@@ -15,6 +15,7 @@ export default async function CounterInventoriPage() {
         distributions={distributions}
         initialMudhohi={mudhohi}
         initialPenerima={penerima}
+        initialShipments={[]}
         initialErrLogs={errorLogs}
       />
     </div>

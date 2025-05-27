@@ -1,5 +1,5 @@
 /**
- * Formats a number as currency (IDR by default)
+ * Formats a number as currency.  IDR(Indonesian Rupiah) by default
  */
 export const formatCurrency = (amount: number, currency = 'IDR'): string => {
   return new Intl.NumberFormat('id-ID', {
@@ -13,15 +13,23 @@ export const formatCurrency = (amount: number, currency = 'IDR'): string => {
 /**
  * Formats a date as localized string
  */
-export const formatDate = (date: Date | string): string => {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleDateString('id-ID', {
+export function formatDate(date: Date | string): string {
+  return new Intl.DateTimeFormat('id-ID', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
-  });
-};
+  }).format(new Date(date));
+}
 
+export function formatDateTime(date: Date | string): string {
+  return new Intl.DateTimeFormat('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(date));
+}
 /**
  * Truncates a string to a specified length and adds an ellipsis
  */

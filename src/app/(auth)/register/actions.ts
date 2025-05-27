@@ -1,6 +1,6 @@
 "use server"
 
-import { prisma } from "@/lib/db"
+import prisma from "@/lib/prisma"
 import { hash } from "bcryptjs"
 import { Role } from "@prisma/client"
 

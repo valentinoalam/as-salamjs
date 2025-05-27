@@ -1,4 +1,4 @@
-import { getAllUsers } from "./actions"
+import { getAllUsers } from "@/services/panitia"
 import UserManagement from "./user-management"
 
 export default async function PanitiaPage() {

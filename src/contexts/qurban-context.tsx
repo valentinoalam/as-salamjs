@@ -5,8 +5,9 @@ import { useSocket } from "@/contexts/socket-context"
 import type {
   HewanQurban,
   HewanStatus,
-  ProdukHewan,
-  ErrorLog,
+  JenisHewan,
+  JenisProduk,
+  ProductLog
 } from "@prisma/client"
 import { 
   useQuery, 
@@ -15,11 +16,63 @@ import {
   QueryClientProvider, 
   type UseQueryResult,
   type UseQueryOptions,
-} from '@tanstack/react-query'
-import {Counter} from "@prisma/client"
+} from "@tanstack/react-query"
+import { Counter } from "@prisma/client"
 import { toast } from "@/hooks/use-toast"
-import { queryClient, queryKeys } from "@/lib/tanstack-query"
+import { queryClient, queryKeys } from "@/lib/tanstack-query/qurban"
 import { useUIState } from "./ui-state-context"
+
+export type ProdukHewan = {
+  id: number
+  nama: string
+  tipeId: number | null
+  berat: number | null
+  avgProdPerHewan: number
+  kumulatif: number
+  targetPaket: number
+  diTimbang: number
+  diInventori: number
+  sdhDiserahkan: number
+  JenisProduk: JenisProduk
+  tipe_hewan?: {
+    id: number
+    nama: string
+    icon: string | null
+    jenis: JenisHewan
+  } | null
+}
+
+// Add ProductLog type
+export type ProductLogWithProduct = ProductLog & {
+  produk: {
+    id: number
+    nama: string
+  }
+}
+// Add shipment types
+export interface ShipmentProduct {
+  produkId: number
+  jumlah: number
+}
+
+export interface Shipment {
+  id: number
+  products: ShipmentProduct[]
+  note?: string
+  createdAt: string
+  status: "pending" | "completed"
+}
+type ErrorLog = {
+  id: number
+  produkId: number
+  event: string
+  note: string
+  timestamp: Date
+  produk: {
+    id: number
+    nama: string
+  }
+}
 
 export type TipeHewan = "sapi" | "domba" 
 // Define pagination configuration type
@@ -49,24 +102,24 @@ export const usePaginationConfig = (target: number, total: number): PaginationCo
       return { 
         useGroups: true, 
         itemsPerGroup: 50,
-        pageSize: 10 
+        pageSize: 10, 
       }
     }
     if (target <= 100 && total <= 50) return { 
       useGroups: false, 
-      pageSize: 10 
+      pageSize: 10,
     }
     if (total > 50 && total <= 60) return { 
       useGroups: false, 
-      pageSize: 15 
+      pageSize: 15, 
     }
     if (total > 60 && total <= 100) return { 
       useGroups: false, 
-      pageSize: 20 
+      pageSize: 20,
     }
     return { 
       useGroups: false, 
-      pageSize: 10 
+      pageSize: 10,
     }
   }, [target, total])
 }
@@ -87,11 +140,23 @@ interface QurbanContextType {
     isError: boolean
     refetch: () => Promise<any>
   }
-
+  // Product logs query
+  productLogsQuery: {
+    data: ProductLogWithProduct[]
+    isLoading: boolean
+    isError: boolean
+    refetch: (options?: { produkId?: number; place?: Counter }) => Promise<any>
+  }
+  shipmentsQuery: {
+    data: Shipment[]
+    isLoading: boolean
+    isError: boolean
+    refetch: () => Promise<any>
+  }
   // Pagination metadata
   meta: {
-    sapi: { total: number; target: number }
-    domba: { total: number; target: number }
+    sapi: { total: number; target: number; slaughtered: number }
+    domba: { total: number; target: number; slaughtered: number }
   }
 
   // Connection status
@@ -114,6 +179,15 @@ interface QurbanContextType {
     value: number
     note?: string
   }) => void
+
+  // Shipment methods
+  createShipment: (products: ShipmentProduct[], note?: string) => Promise<any | void>
+  
+  // Utility methods
+  getProductById: (id: number) => ProdukHewan | undefined
+  getProductsByType: (type: "daging" | "all") => ProdukHewan[]
+  getProductLogsByPlace: (place: Counter) => ProductLogWithProduct[]
+  getProductLogsByProduct: (produkId: number) => ProductLogWithProduct[]
 }
 
 type QueryWithToastOptions<TData, TError> = UseQueryOptions<TData, TError> & {
@@ -128,13 +202,13 @@ export function useQueryWithToast<TData = unknown, TError = Error>(
   useEffect(() => {
     if (queryResult.isError) {
       toast({
-        title: 'Error',
+        title: "Error",
         description:
           options.errorMessage ||
           (queryResult.error instanceof Error
             ? queryResult.error.message
-            : 'Something went wrong.'),
-        variant: 'destructive',
+            : "Something went wrong."),
+        variant: "destructive",
       })
     }
   }, [queryResult.isError, queryResult.error, options.errorMessage])
@@ -169,19 +243,19 @@ export function QurbanProvider({
   const fetchHewan = async (
     type: TipeHewan, 
     params: { 
-      page?: number;
-      pageSize?: number;
-      group?: string;
-      itemsPerGroup?: number;
-      useGroups?: boolean;
-      meta?: {total: number; target: number};
+      page?: number
+      pageSize?: number
+      group?: string
+      itemsPerGroup?: number
+      useGroups?: boolean
+      meta?: {total: number; target: number}
     } = {}): Promise<{
       data: HewanQurban[];
       pagination: {
-        currentPage: number;
-        totalPages: number;
-        currentGroup?: string;
-        totalGroups?: number;
+        currentPage: number
+        totalPages: number
+        currentGroup?: string
+        totalGroups?: number
       };
     }> => {
     const {useGroups, itemsPerGroup, group, pageSize = 10, page, meta = {total: 0, target: 0}} = params
@@ -230,16 +304,47 @@ export function QurbanProvider({
     return response.json()
   }
 
+  const fetchProductLogs = async (
+    params: { produkId?: number; place?: Counter } = {},
+  ): Promise<ProductLogWithProduct[]> => {
+    const searchParams = new URLSearchParams()
+
+    if (params.produkId) {
+      searchParams.append("produkId", params.produkId.toString())
+    }
+
+    if (params.place) {
+      searchParams.append("place", params.place)
+    }
+
+    const url = `/api/product-logs?${searchParams.toString()}`
+    const response = await fetch(url)
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    return response.json()
+  }
+  
   const fetchErrorLogs = async (): Promise<ErrorLog[]> => {
-    const response = await fetch('/api/error-logs')
+    const response = await fetch("/api/error-logs")
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
     return response.json()
   }
 
-  const fetchMeta = async (type: string): Promise<any> => {
-    const response = await fetch(`/api/hewan/meta?type=${type}`)
+  const fetchShipments = async (): Promise<Shipment[]> => {
+    const response = await fetch("/api/shipments")
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    return response.json()
+  }
+
+  const fetchMeta = async (type?: string): Promise<any> => {
+    const response = await fetch(`/api/hewan/meta?jenis=${type}`)
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
@@ -250,13 +355,14 @@ export function QurbanProvider({
   const metaQuery = useQueryWithToast({
     queryKey: queryKeys.meta,
     queryFn: async () => {
-      const sapiMeta = await fetchMeta('sapi')
-      const dombaMeta = await fetchMeta('domba')
+      const metaData = await fetchMeta()
+      console.log(metaData)
       return {
-        sapi: { total: sapiMeta[0].total || 0, target: sapiMeta[0].target || 0 },
-        domba: { total: dombaMeta[0].total || 0, target: dombaMeta[0].target || 0 },
+        sapi: { total: metaData.sapi.total || 0, target: metaData.sapi.target || 0, slaughtered: metaData.sapi.slaughtered || 0 },
+        domba: { total: metaData.domba.total || 0, target: metaData.domba.target || 0, slaughtered: metaData.domba.slaughtered || 0 },
       }
     },
+    staleTime: isConnected ? Infinity : 60,
     errorMessage: "Failed to fetch metadata. Please try again.",
   })
 
@@ -274,7 +380,7 @@ export function QurbanProvider({
   // Set up queries
   const sapiQuery = useQueryWithToast({
     queryKey: [...queryKeys.sapi, pagination.sapiPage, pagination.sapiGroup, sapiPaginationConfig],
-    queryFn: async () => await fetchHewan('sapi', { 
+    queryFn: async () => await fetchHewan("sapi", { 
       page: pagination.sapiPage, 
       pageSize: sapiPaginationConfig.pageSize,
       group: sapiPaginationConfig.useGroups ? pagination.sapiGroup : undefined,
@@ -282,11 +388,12 @@ export function QurbanProvider({
       useGroups: sapiPaginationConfig.useGroups,
       meta: metaQuery.data?.sapi
     }),
-    errorMessage: 'Failed to fetch sapi data. Please try again.',
+    staleTime: isConnected ? Infinity : 60,
+    errorMessage: "Failed to fetch sapi data. Please try again.",
   })
   const dombaQuery = useQueryWithToast({
     queryKey: [...queryKeys.domba, pagination.dombaPage, pagination.dombaGroup, dombaPaginationConfig],
-    queryFn: async () => await fetchHewan('domba', { 
+    queryFn: async () => await fetchHewan("domba", { 
       page: pagination.dombaPage, 
       pageSize: dombaPaginationConfig.pageSize,
         group: dombaPaginationConfig.useGroups ? pagination.dombaGroup : undefined,
@@ -294,19 +401,37 @@ export function QurbanProvider({
         useGroups: dombaPaginationConfig.useGroups,
         meta: metaQuery.data?.domba
     }),
-    errorMessage: 'Failed to fetch domba data. Please try again.',
+    staleTime: isConnected ? Infinity : 60,
+    errorMessage: "Failed to fetch domba data. Please try again.",
   })
 
   const productsQuery = useQueryWithToast({
     queryKey: queryKeys.products,
     queryFn: () => fetchProducts(),
-    errorMessage: 'Failed to fetch product data. Please try again.',
+    staleTime: isConnected ? Infinity : 60,
+    errorMessage: "Failed to fetch product data. Please try again.",
+  })
+
+  // Add product logs query
+  const productLogsQuery = useQueryWithToast({
+    queryKey: queryKeys.productLogs || ["productLogs"],
+    queryFn: () => fetchProductLogs(),
+    staleTime: isConnected ? Number.POSITIVE_INFINITY : 60,
+    errorMessage: "Failed to fetch product logs. Please try again.",
   })
 
   const errorLogsQuery = useQueryWithToast({
     queryKey: queryKeys.errorLogs,
     queryFn: fetchErrorLogs,
-    errorMessage: 'Failed to fetch error logs. Please try again.',
+    staleTime: isConnected ? Infinity : 60,
+    errorMessage: "Failed to fetch error logs. Please try again.",
+  })
+
+  const shipmentsQuery = useQueryWithToast({
+    queryKey: queryKeys.shipments || ["shipments"],
+    queryFn: fetchShipments,
+    staleTime: isConnected ? Infinity : 60,
+    errorMessage: "Failed to fetch shipments. Please try again.",
   })
 
   // Mutations
@@ -334,7 +459,12 @@ export function QurbanProvider({
         throw new Error(error.message || "Failed to update status");
       }
 
-      await response.json();
+      await response.json()
+
+      // If slaughtered status changed, update meta
+      if (data.slaughtered !== undefined) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.meta })
+      }
 
       // Emit to socket after success
       if (!socket || !isConnected) {
@@ -418,13 +548,32 @@ export function QurbanProvider({
   })
 
   const updateProductMutation = useMutation({
-    mutationFn: (data: {
+    mutationFn: async (data: {
       productId: number
       operation: "add" | "decrease"
       place: Counter
       value: number
       note?: string
     }) => {
+      if (!data.productId || !data.operation || !data.value) {
+        throw new Error("Missing required fields: productId, operation, or value");
+      }
+      // Send to backend first
+      const response = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to update status");
+      }
+
+      await response.json();
+      // Invalidate product logs query after updating a product
+      queryClient.invalidateQueries({ queryKey: queryKeys.productLogs || ["productLogs"] })
+
       if (!socket || !isConnected) {
         throw new Error("Not connected to server")
       }
@@ -455,15 +604,15 @@ export function QurbanProvider({
 
             if (newProductData.operation === "add") {
               if (newProductData.place === Counter.PENYEMBELIHAN) {
-                updatedProduct.pkgOrigin += newProductData.value
+                updatedProduct.diTimbang += newProductData.value
               } else if (newProductData.place === Counter.INVENTORY) {
-                updatedProduct.pkgReceived += newProductData.value
+                updatedProduct.diInventori += newProductData.value
               }
             } else if (newProductData.operation === "decrease") {
               if (newProductData.place === Counter.PENYEMBELIHAN) {
-                updatedProduct.pkgOrigin = Math.max(0, updatedProduct.pkgOrigin - newProductData.value)
+                updatedProduct.diTimbang = Math.max(0, updatedProduct.diTimbang - newProductData.value)
               } else if (newProductData.place === Counter.INVENTORY) {
-                updatedProduct.pkgReceived = Math.max(0, updatedProduct.pkgReceived - newProductData.value)
+                updatedProduct.diInventori = Math.max(0, updatedProduct.diInventori - newProductData.value)
               }
             }
 
@@ -488,9 +637,61 @@ export function QurbanProvider({
         variant: "destructive",
       })
     },
-    // We don't need onSettled since the WebSocket will handle the update
+    onSettled: () => {
+      // Invalidate product logs query after updating a product
+      queryClient.invalidateQueries({ queryKey: queryKeys.productLogs || ["productLogs"] })
+    },
   })
- 
+
+  const createShipmentMutation = useMutation({
+    mutationFn: async (data: { products: ShipmentProduct[]; note?: string }) => {
+      const response = await fetch("/api/shipments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to create shipment");
+      }
+
+      const result = await response.json();
+
+      if (!socket || !isConnected) {
+        throw new Error("Not connected to server")
+      }
+      
+      return new Promise((resolve, reject) => {
+        socket.emit("new-shipment", { products: data.products, note: data.note }, (response: any) => {
+          if (response?.error) {
+            reject(response.error)
+          } else {
+            resolve({ ...result, ...response })
+          }
+        })
+      })
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success!",
+        description: "Shipment created successfully",
+        variant: "default",
+      });
+      
+      // Refresh related queries
+      queryClient.invalidateQueries({ queryKey: queryKeys.products });
+      queryClient.invalidateQueries({ queryKey: queryKeys.shipments || ["shipments"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.productLogs || ["productLogs"] })
+    },
+    onError: (err) => {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to create shipment. Please try again.",
+        variant: "destructive",
+      })
+    },
+  })
   useEffect(() => {
     if (pagination.sapiPage !== undefined) sapiQuery.refetch();
     if (pagination.dombaPage !== undefined) dombaQuery.refetch();
@@ -508,6 +709,10 @@ export function QurbanProvider({
       onInventory?: boolean
       tipeId?: number
     }) => {
+      // If slaughtered status changed, invalidate meta to refresh counts
+      if (data.slaughtered !== undefined) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.meta })
+      }
       if (data.tipeId === 1 || !data.tipeId) {
         const sapiQueryKey = [...queryKeys.sapi, pagination.sapiPage, pagination.sapiGroup, sapiPaginationConfig];
         queryClient.setQueryData(sapiQueryKey, (old: any) => {
@@ -578,6 +783,7 @@ export function QurbanProvider({
       
       // Also invalidate to ensure UI updates
       queryClient.invalidateQueries({ queryKey: sapiQueryKey });
+      queryClient.invalidateQueries({ queryKey: queryKeys.meta })
     }
 
     const handleDombaDataUpdate = (data: HewanQurban[]) => {
@@ -596,11 +802,14 @@ export function QurbanProvider({
       
       // Also invalidate to ensure UI updates
       queryClient.invalidateQueries({ queryKey: dombaQueryKey });
+      queryClient.invalidateQueries({ queryKey: queryKeys.meta })
     }
 
     // Handle product updates
     const handleProductUpdate = (data: { products: ProdukHewan[] }) => {
       queryClient.setQueryData(queryKeys.products, data.products)
+      // Also invalidate product logs when products are updated
+      queryClient.invalidateQueries({ queryKey: queryKeys.productLogs || ["productLogs"] })
     }
 
     // Handle error log updates
@@ -608,25 +817,58 @@ export function QurbanProvider({
       queryClient.setQueryData(queryKeys.errorLogs, data.errorLogs)
     }
 
+    // Handle shipment updates
+    const handleShipmentUpdate = (data: { shipments: Shipment[] }) => {
+      queryClient.setQueryData(queryKeys.shipments || ["shipments"], data.shipments)
+    }    
+    
+    // Handle product logs updates
+    const handleProductLogsUpdate = (data: { productLogs: ProductLogWithProduct[] }) => {
+      queryClient.setQueryData(queryKeys.productLogs || ["productLogs"], data.productLogs)
+    }
     // Register socket listeners
     socket.on("update-hewan", handleHewanUpdate)
     socket.on("update-product", handleProductUpdate)
     socket.on("error-logs", handleErrorLogsUpdate)
+    socket.on("shipment-update", handleShipmentUpdate)
     socket.on("sapi-data-updated", handleSapiDataUpdate)
     socket.on("domba-data-updated", handleDombaDataUpdate)
-
+    socket.on("product-logs-updated", handleProductLogsUpdate)
     // Clean up on unmount
     return () => {
       socket.off("update-hewan", handleHewanUpdate)
       socket.off("update-product", handleProductUpdate)
       socket.off("error-logs", handleErrorLogsUpdate)
+      socket.off("shipment-update", handleShipmentUpdate)
       socket.off("sapi-data-updated", handleSapiDataUpdate)
       socket.off("domba-data-updated", handleDombaDataUpdate)
+      socket.off("product-logs-updated", handleProductLogsUpdate)
     }
   }, [socket, queryClient])
 
+  // Utility functions
+  const getProductById = (id: number): ProdukHewan | undefined => {
+    return productsQuery.data?.find((product) => product.id === id)
+  }
+
+  const getProductsByType = (type: "daging" | "all"): ProdukHewan[] => {
+    if (type === "all") return productsQuery.data || []
+    
+    return productsQuery.data?.filter(product => 
+      product.JenisProduk?.toLowerCase().includes("daging")
+    ) || []
+  }
+
+  // Add utility functions for product logs
+  const getProductLogsByPlace = (place: Counter): ProductLogWithProduct[] => {
+    return productLogsQuery.data?.filter((log) => log.place === place) || []
+  }
+
+  const getProductLogsByProduct = (produkId: number): ProductLogWithProduct[] => {
+    return productLogsQuery.data?.filter((log) => log.produkId === produkId) || []
+  }
   // Expose methods using the mutations
-  const updateHewan =  (data: {
+  const updateHewan = (data: {
     hewanId: string
     status: HewanStatus
     slaughtered?: boolean
@@ -647,6 +889,9 @@ export function QurbanProvider({
     updateProductMutation.mutate(data)
   }
 
+  const createShipment = async (products: ShipmentProduct[], note?: string) => {
+    return createShipmentMutation.mutateAsync({ products, note })
+  }
   // Create context value
   const contextValue: QurbanContextType = {
     sapiQuery: {
@@ -655,10 +900,10 @@ export function QurbanProvider({
       isError: sapiQuery.isError,
       refetch: async (options?: { page?: number, group?: string }) => {
         if (options?.page) {
-          setPagination("sapiPage",  options.page || 1)
+          setPagination("sapiPage", options.page || 1)
         }
         if (options?.group && sapiPaginationConfig.useGroups) {
-          setPagination("sapiGroup",  options.group || "A")
+          setPagination("sapiGroup", options.group || "A")
         }
         return sapiQuery.refetch()
       },
@@ -704,19 +949,46 @@ export function QurbanProvider({
       isError: productsQuery.isError,
       refetch: productsQuery.refetch,
     },
+    productLogsQuery: {
+      data: productLogsQuery.data || [],
+      isLoading: productLogsQuery.isLoading,
+      isError: productLogsQuery.isError,
+      refetch: async (filters?: { produkId?: number; place?: Counter }) => {
+        // Maintain stable query key when no filters
+        const queryKey = filters 
+          ? [queryKeys.productLogs, filters]  // Creates ['productLogs', {produkId,place}]
+          : queryKeys.productLogs
+
+        return queryClient.refetchQueries({
+          queryKey,
+          exact: true,
+        })
+      },
+    },
     errorLogsQuery: {
       data: errorLogsQuery.data || [],
       isLoading: errorLogsQuery.isLoading,
       isError: errorLogsQuery.isError,
       refetch: errorLogsQuery.refetch,
     },
+    shipmentsQuery: {
+      data: shipmentsQuery.data || [],
+      isLoading: shipmentsQuery.isLoading,
+      isError: shipmentsQuery.isError,
+      refetch: shipmentsQuery.refetch,
+    },
     meta: metaQuery.data || {
-      sapi: { total: 0, target: 0 },
-      domba: { total: 0, target: 0 },
+      sapi: { total: 0, target: 0, slaughtered: 0 },
+      domba: { total: 0, target: 0, slaughtered: 0 },
     },
     isConnected,
     updateHewan,
     updateProduct,
+    createShipment,
+    getProductById,
+    getProductsByType,
+    getProductLogsByPlace,
+    getProductLogsByProduct,
   }
   return <QurbanContext.Provider value={contextValue}>{children}</QurbanContext.Provider>
 }

@@ -4,39 +4,36 @@
     "lib": [
       "dom",
       "dom.iterable",
-      "ES2022"
+      "ES2022" // ES2022 is usually implied by target: ES2022, but harmless.
     ],
-    "module": "esnext",
-    "moduleResolution": "node",
+    "module": "esnext", // 'esnext' is suitable for modern module systems
+    "moduleResolution": "bundler", // Prefer 'bundler' for Next.js/modern setups for better tree-shaking
     "types": [
       "next",
       "node"
     ],
-    "skipLibCheck": true,
-    "strict": true,
+    "skipLibCheck": true, // Often enabled for speed in large projects, but consider disabling for stricter checks.
+    "strict": true, // Essential for strong type safety
     "forceConsistentCasingInFileNames": true,
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "allowImportingTsExtensions": true,
+    "allowSyntheticDefaultImports": true, // Often enabled with esModuleInterop
+    "allowImportingTsExtensions": true, // Useful for explicit .ts imports, if needed (Node.js ESM)
     "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
-    "noEmit": true,
-    "outDir": "./dist",
-    "rootDir": ".",
+    "isolatedModules": true, // Crucial for Babel/SWC and Next.js
+    "jsx": "preserve", // Essential for Next.js to handle JSX
+    "incremental": true, // For faster incremental builds
+    "noEmit": true, // Next.js handles compilation, so TypeScript doesn't emit JS directly
+    // "outDir": "./dist", // Redundant with noEmit: true for Next.js
+    // "rootDir": ".", // Redundant if baseUrl is '.' and paths are used
     "baseUrl": ".",
     "paths": {
       "@/*": [
         "./src/*"
-      ],
-      "@/lib/*": [
-        "./src/lib/*"
       ]
     },
-    "allowJs": true,
-    "noEmitOnError": true,
-    "verbatimModuleSyntax": true,
+    "allowJs": true, // Allow JavaScript files in your project
+    "noEmitOnError": true, // Prevents emission of JS if there are TS errors. Good for CI/CD.
+    "verbatimModuleSyntax": true, // Recommended for modern ESM and Next.js
     "plugins": [
       {
         "name": "next"
@@ -44,19 +41,20 @@
     ]
   },
   "include": [
-    "./*.ts", // Include all .ts files in the root
+    "next-env.d.ts", // Essential for Next.js environment types
     "**/*.ts",
     "**/*.tsx",
-    "next-env.d.ts",
-    ".next/types/**/*.ts",
-    "./src/**/*",
-    "server/socket-server.ts",
-    "server.ts"  ],
+    "**/*.js", // Include JS files if allowJs is true
+    "**/*.jsx", // Include JSX files if allowJs is true
+    ".next/types/**/*.ts", // For Next.js generated types
+    "server/socket-server.ts", // Explicitly include server-side TS files
+    "server.ts" // Explicitly include server.ts
+  ],
   "exclude": [
     "node_modules",
     ".next",
     "dist",
-    "next.config.js",
-    "next-env.d.ts"
+    "next.config.js"
+    // "next-env.d.ts" // Don't exclude, it's needed for 'include'
   ]
 }

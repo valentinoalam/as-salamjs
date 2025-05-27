@@ -1,137 +1,122 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingDown, TrendingUp, Wallet, PiggyBank } from "lucide-react";
-import { useEffect, useState } from "react";
+import { TrendingDown, TrendingUp, Wallet, Loader2 } from "lucide-react";
 import { formatCurrency } from "@/lib/formatters";
+import { useKeuangan } from "@/contexts/keuangan-context";
 
 export function FinancialSummary() {
-  const [summary, setSummary] = useState({
-    totalIncome: 0,
-    totalExpense: 0,
-    balance: 0,
-    savings: 0,
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchSummary = async () => {
-      try {
-        const response = await fetch('/api/summary');
-        if (response.ok) {
-          const data = await response.json();
-          setSummary(data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch summary:', error);
-        // Set demo data
-        setSummary({
-          totalIncome: 15000000,
-          totalExpense: 12750000,
-          balance: 2250000,
-          savings: 2250000,
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSummary();
-  }, []);
-
-  if (loading) {
+  const { statsQuery } = useKeuangan();
+  const { data: stats, isLoading, error} = statsQuery
+  // Loading state
+  if (isLoading) {
     return (
-      <>
-        <Card className="animate-pulse">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pemasukan</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="h-4 w-3/4 bg-muted rounded"></div>
-          </CardContent>
-        </Card>
-        <Card className="animate-pulse">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pengeluaran</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="h-4 w-3/4 bg-muted rounded"></div>
-          </CardContent>
-        </Card>
-        <Card className="animate-pulse">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saldo</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="h-4 w-3/4 bg-muted rounded"></div>
-          </CardContent>
-        </Card>
-        <Card className="animate-pulse">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tabungan</CardTitle>
-            <PiggyBank className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="h-4 w-3/4 bg-muted rounded"></div>
-          </CardContent>
-        </Card>
-      </>
+      <div className="grid gap-4 md:grid-cols-3">
+        {[1, 2, 3].map((i) => (
+          <Card key={i} className="animate-pulse">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                <div className="h-4 bg-gray-200 rounded w-20"></div>
+              </CardTitle>
+              <div className="h-4 w-4 bg-gray-200 rounded"></div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-8 bg-gray-200 rounded w-24 mb-2"></div>
+              <div className="h-3 bg-gray-200 rounded w-16"></div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     );
   }
 
+  // Error state
+  if (error) {
+    return (
+      <Card className="border-red-200 bg-red-50">
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-2 text-red-600">
+            <TrendingDown className="h-4 w-4" />
+            <span className="text-sm">Failed to load financial summary</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // No data state
+  if (!stats) {
+    return (
+      <div className="grid gap-4 md:grid-cols-3">
+        {[
+          { title: "Pemasukan", value: 0, description: "Total pemasukan", icon: TrendingUp },
+          { title: "Pengeluaran", value: 0, description: "Total pengeluaran", icon: TrendingDown },
+          { title: "Saldo", value: 0, description: "Saldo saat ini", icon: Wallet }
+        ].map((item, index) => (
+          <Card key={index}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
+              <item.icon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(item.value)}</div>
+              <p className="text-xs text-muted-foreground">{item.description}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  const { totalIncome, totalExpense, balance } = stats;
+
+  // Determine balance trend
+  const balanceColor = balance >= 0 ? "text-green-600" : "text-red-600";
+  const BalanceIcon = balance >= 0 ? TrendingUp : TrendingDown;
+
   return (
-    <>
-      <Card className="card-hover">
+    <div className="grid gap-4 md:grid-cols-3">
+      {/* Income Card */}
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Pemasukan</CardTitle>
-          <TrendingUp className="h-4 w-4 text-green-500" />
+          <TrendingUp className="h-4 w-4 text-green-600" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{formatCurrency(summary.totalIncome)}</div>
-          <p className="text-xs text-muted-foreground">
-            Total pemasukan
-          </p>
+          <div className="text-2xl font-bold text-green-600">
+            {formatCurrency(totalIncome)}
+          </div>
+          <p className="text-xs text-muted-foreground">Total pemasukan</p>
         </CardContent>
       </Card>
-      <Card className="card-hover">
+
+      {/* Expense Card */}
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Pengeluaran</CardTitle>
-          <TrendingDown className="h-4 w-4 text-red-500" />
+          <TrendingDown className="h-4 w-4 text-red-600" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{formatCurrency(summary.totalExpense)}</div>
-          <p className="text-xs text-muted-foreground">
-            Total pengeluaran
-          </p>
+          <div className="text-2xl font-bold text-red-600">
+            {formatCurrency(totalExpense)}
+          </div>
+          <p className="text-xs text-muted-foreground">Total pengeluaran</p>
         </CardContent>
       </Card>
-      <Card className="card-hover">
+
+      {/* Balance Card */}
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Saldo</CardTitle>
-          <Wallet className="h-4 w-4 text-blue-500" />
+          <BalanceIcon className={`h-4 w-4 ${balanceColor}`} />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{formatCurrency(summary.balance)}</div>
-          <p className="text-xs text-muted-foreground">
-            Saldo saat ini
-          </p>
+          <div className={`text-2xl font-bold ${balanceColor}`}>
+            {formatCurrency(balance)}
+          </div>
+          <p className="text-xs text-muted-foreground">Saldo saat ini</p>
         </CardContent>
       </Card>
-      <Card className="card-hover">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Tabungan</CardTitle>
-          <PiggyBank className="h-4 w-4 text-yellow-500" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{formatCurrency(summary.savings)}</div>
-          <p className="text-xs text-muted-foreground">
-            Total tabungan
-          </p>
-        </CardContent>
-      </Card>
-    </>
+    </div>
   );
 }

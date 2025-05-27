@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getPenerima, createPenerima } from "@/lib/db"
-import { prisma } from "@/lib/db"
+import { getPenerima, createPenerima } from "@/services/qurban"
+import prisma from "@/lib/prisma"
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams

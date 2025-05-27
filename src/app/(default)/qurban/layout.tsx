@@ -6,7 +6,6 @@ import Header from "@/components/layout/header"
 export const metadata: Metadata = {
   title: "Qurban Management System",
   description: "A system to manage Qurban distribution and tracking",
-    generator: 'v0.dev'
 }
 
 export default function RootLayout({

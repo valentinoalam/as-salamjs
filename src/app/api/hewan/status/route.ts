@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { updateHewanStatus } from "@/lib/db"
+import { updateHewanStatus } from "@/services/qurban"
 
 export async function POST(req: Request) {
   try {

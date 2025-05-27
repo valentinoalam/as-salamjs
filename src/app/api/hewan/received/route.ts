@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { updateMudhohiReceived } from "@/lib/db"
+import { updateMudhohiReceived } from "@/services/qurban"
 
 export async function POST(req: Request) {
   try {

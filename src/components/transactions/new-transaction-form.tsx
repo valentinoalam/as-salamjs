@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { ImageUploader } from "@/components/transactions/image-uploader";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { ArrowUpDown, Calendar as CalendarIcon } from "lucide-react";
 
 interface Category {
@@ -47,7 +47,7 @@ interface Category {
 }
 
 const formSchema = z.object({
-  type: z.enum([TransactionType.INCOME, TransactionType.EXPENSE]),
+  type: z.enum([TransactionType.PEMASUKAN, TransactionType.PENGELUARAN]),
   amount: z.coerce.number().positive("Jumlah harus lebih dari 0"),
   date: z.date(),
   description: z.string().min(3, "Deskripsi minimal 3 karakter"),
@@ -65,7 +65,7 @@ export function NewTransactionForm() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      type: TransactionType.EXPENSE,
+      type: TransactionType.PENGELUARAN,
       amount: 0,
       date: new Date(),
       description: "",
@@ -159,9 +159,9 @@ export function NewTransactionForm() {
                         variant="outline"
                         className={cn(
                           "rounded-r-none flex-1 border-r-0",
-                          field.value === TransactionType.INCOME && "bg-green-100 dark:bg-green-900 border-green-200 dark:border-green-800"
+                          field.value === TransactionType.PEMASUKAN && "bg-green-100 dark:bg-green-900 border-green-200 dark:border-green-800"
                         )}
-                        onClick={() => field.onChange(TransactionType.INCOME)}
+                        onClick={() => field.onChange(TransactionType.PENGELUARAN)}
                       >
                         <ArrowUpDown className="h-4 w-4 mr-2 text-green-500" />
                         Pemasukan
@@ -171,9 +171,9 @@ export function NewTransactionForm() {
                         variant="outline"
                         className={cn(
                           "rounded-l-none flex-1",
-                          field.value === TransactionType.EXPENSE && "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800"
+                          field.value === TransactionType.PENGELUARAN && "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800"
                         )}
-                        onClick={() => field.onChange(TransactionType.EXPENSE)}
+                        onClick={() => field.onChange(TransactionType.PENGELUARAN)}
                       >
                         <ArrowUpDown className="h-4 w-4 mr-2 text-red-500" />
                         Pengeluaran

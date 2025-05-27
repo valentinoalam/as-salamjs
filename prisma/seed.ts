@@ -1,51 +1,6 @@
-import { PrismaClient, jenisProduk, HewanStatus, CaraBayar, PaymentStatus, Role, Prisma, JenisHewan, TransactionType } from "@prisma/client"
+import prisma from "@/lib/prisma"
+import { JenisProduk, Role, TransactionType } from "@prisma/client"
 import { hash } from "bcryptjs"
-const prisma = new PrismaClient()
-
-export async function generateHewanId(tipeId: number): Promise<string> {
-  // 1. Ambil data TipeHewan
-  const tipeHewan = await prisma.tipeHewan.findUnique({
-    where: { id: tipeId },
-    select: {
-      nama: true,
-      jenis: true,
-      target: true
-    }
-  });
-
-  if (!tipeHewan) {
-    throw new Error('TipeHewan tidak ditemukan');
-  }
-
-  // 2. Hitung total hewan dengan tipe ini
-  const totalHewan = await prisma.hewanQurban.count({
-    where: { tipeId }
-  });
-
-  // 3. Tentukan apakah perlu grup khusus
-  type SingleQurban = 'KAMBING' | 'DOMBA';
-  const isSingleQurban = (jenis: JenisHewan): jenis is SingleQurban => {
-    return jenis === JenisHewan.KAMBING || jenis === JenisHewan.DOMBA;
-  };
-  
-  // Kemudian di dalam fungsi:
-  const inLargeQuota =  isSingleQurban(tipeHewan.jenis) || tipeHewan.target > 100;
-
-  // 4. Generate ID sesuai logika
-  if (inLargeQuota) {
-    const groupIndex = Math.floor(totalHewan / 50);
-    const remainder = totalHewan % 50;
-    const currentNumber = remainder + 1;
-    
-    const groupChar = String.fromCharCode(65 + groupIndex);
-    const formattedNumber = currentNumber.toString().padStart(2, '0');
-    
-    return `${tipeHewan.nama}_${groupChar}-${formattedNumber}`;
-  }
-  
-  // Untuk kasus normal (non-kambing/domba dan target ≤ 100)
-  return `${tipeHewan.nama}_${totalHewan + 1}`;
-}
 
 async function main() {
   console.log("🌱 Starting seeding...")
@@ -68,7 +23,7 @@ async function main() {
 
   // Default Categories for INCOME
   const incomeCategories = [
-    { name: 'Donasi Qurban', type: TransactionType.PEMASUKAN },
+    { name: 'Infaq Qurban', type: TransactionType.PEMASUKAN },
     { name: 'Sedekah Idul Adha', type: TransactionType.PEMASUKAN },
     { name: 'Penjualan Kulit Hewan', type: TransactionType.PEMASUKAN },
     { name: 'Lain-lain (Pemasukan)', type: TransactionType.PEMASUKAN },
@@ -81,15 +36,12 @@ async function main() {
   //   OTHER
   // Default Categories for PENGELUARAN
   const expenseCategories = [
-    { name: 'Pembelian Hewan Qurban - Sapi', type: TransactionType.PENGELUARAN },
-    { name: 'Pembelian Hewan Qurban - Kambing', type: TransactionType.PENGELUARAN },
-    { name: 'Pembelian Hewan Qurban - Domba', type: TransactionType.PENGELUARAN },
-    { name: 'Biaya Perawatan Hewan', type: TransactionType.PENGELUARAN },
-    { name: 'Biaya Pemotongan & Pengulitan', type: TransactionType.PENGELUARAN },
-    { name: 'Biaya Distribusi Daging', type: TransactionType.PENGELUARAN },
-    { name: 'Belanja Bumbu & Bahan Masakan', type: TransactionType.PENGELUARAN },
-    { name: 'Transportasi & Akomodasi', type: TransactionType.PENGELUARAN },
+    { name: 'Pembayaran Hewan Qurban', type: TransactionType.PENGELUARAN },
+    { name: 'Jasa Pemotongan & Pengulitan', type: TransactionType.PENGELUARAN },
     { name: 'Sewa Alat', type: TransactionType.PENGELUARAN },
+    { name: 'Biaya Operational', type: TransactionType.PENGELUARAN },
+    { name: 'Belanja Kebutuhan Acara', type: TransactionType.PENGELUARAN },
+    { name: 'Transportasi & Akomodasi', type: TransactionType.PENGELUARAN },
     { name: 'Lain-lain (Pengeluaran)', type: TransactionType.PENGELUARAN },
   ];
   
@@ -179,8 +131,8 @@ async function main() {
       target: 60,
       jenis: "SAPI",
       icon: "🐮",
-      jmlKantong: 7,
       harga: 24150000,
+      hargaKolektif: 3450000,
       note: "Sapi (berat ±300 kg)",
     },
   })
@@ -198,7 +150,6 @@ async function main() {
       target: 350,
       jenis: "DOMBA",
       icon: "🐐",
-      jmlKantong: 2,
       harga: 2700000,
       note: "Domba (berat 23-26 kg)",
     },
@@ -212,52 +163,52 @@ async function main() {
       tipeId: 1,
       berat: 1.0,
       targetPaket: 300,
-      jenisProduk: jenisProduk.DAGING,
+      JenisProduk: JenisProduk.DAGING,
     },
     {
-      nama: "Daging Sapi 3kg",
+      nama: "Daging Sapi 5kg",
       tipeId: 1,
-      berat: 3.0,
-      targetPaket: 100,
-      jenisProduk: jenisProduk.DAGING,
+      berat: 5.0,
+      targetPaket: 1454,
+      JenisProduk: JenisProduk.DAGING,
     },
     {
       nama: "Kepala Sapi",
       tipeId: 1,
-      jenisProduk: jenisProduk.KEPALA,
+      JenisProduk: JenisProduk.KEPALA,
     },
     {
       nama: "Kulit Sapi",
       tipeId: 1,
-      jenisProduk: jenisProduk.KULIT,
+      JenisProduk: JenisProduk.KULIT,
     },
     {
       nama: "Kaki Sapi",
       tipeId: 1,
-      jenisProduk: jenisProduk.KAKI,
+      JenisProduk: JenisProduk.KAKI,
     },
     // Domba products
     {
-      nama: "Daging Domba 0.5kg",
+      nama: "Daging Domba 5kg",
       tipeId: 2,
-      berat: 0.5,
-      targetPaket: 150,
-      jenisProduk: jenisProduk.DAGING,
+      berat: 5.0,
+      targetPaket: 1476,
+      JenisProduk: JenisProduk.DAGING,
     },
     {
       nama: "Kepala Domba",
       tipeId: 2,
-      jenisProduk: jenisProduk.KEPALA,
+      JenisProduk: JenisProduk.KEPALA,
     },
     {
       nama: "Kulit Domba",
       tipeId: 2,
-      jenisProduk: jenisProduk.KULIT,
+      JenisProduk: JenisProduk.KULIT,
     },
     {
       nama: "Kaki Domba",
       tipeId: 2,
-      jenisProduk: jenisProduk.KAKI,
+      JenisProduk: JenisProduk.KAKI,
     },
   ]
 
@@ -288,103 +239,103 @@ async function main() {
       create: category,
     })
   }
-  async function generateMudhohi(i:number, hewanId: string) {
-    const mudhohi = await prisma.mudhohi.create({
-      data: {
-        userId: admin.id,
-        paymentId: `pay-${i}`,
-        nama_pengqurban: `Pengqurban ${i}`,
-        nama_peruntukan: `Peruntukan ${i}`,
-        potong_sendiri: i % 3 === 0,
-        ambil_daging: i % 2 === 0,
-        mengambilDaging: i % 2 === 0,
-        dash_code: `DASH-${i}`,
-        hewan: {
-          connect: [{ hewanId }],
-        },
-      },
-    })
+//   async function generateMudhohi(i:number, hewanId: string) {
+//     const mudhohi = await prisma.mudhohi.create({
+//       data: {
+//         userId: admin.id,
+//         paymentId: `pay-${i}`,
+//         nama_pengqurban: `Pengqurban ${i}`,
+//         nama_peruntukan: `Peruntukan ${i}`,
+//         potong_sendiri: i % 3 === 0,
+//         ambil_daging: i % 2 === 0,
+//         mengambilDaging: i % 2 === 0,
+//         dash_code: `DASH-${i}`,
+//         hewan: {
+//           connect: [{ hewanId }],
+//         },
+//       },
+//     })
 
-    await prisma.pembayaran.create({
-      data: {
-        mudhohiId: mudhohi.id,
-        cara_bayar: i % 2 === 0 ? CaraBayar.TUNAI : CaraBayar.TRANSFER,
-        paymentStatus: PaymentStatus.LUNAS,
-        dibayarkan: i % 2 === 0 ? 24150000 : 2700000,
-      },
-    })
-  } 
+//     await prisma.pembayaran.create({
+//       data: {
+//         mudhohiId: mudhohi.id,
+//         cara_bayar: i % 2 === 0 ? CaraBayar.TUNAI : CaraBayar.TRANSFER,
+//         paymentStatus: PaymentStatus.LUNAS,
+//         dibayarkan: i % 2 === 0 ? 24150000 : 2700000,
+//       },
+//     })
+//   } 
 
-  const totalSapi = await prisma.hewanQurban.count({
-    where: {
-      tipeId: 1
-    }
-  });
-  if(totalSapi< 51)
-    // Create HewanQurban (50 sapi)
-    for (let i = 1; i <= 50; i++) {
-      const tipeId = 1
-      const hewanId = await generateHewanId(tipeId)
-      try {
-        await prisma.hewanQurban.create({
-          data: {
-            tipeId, // Sapi
-            hewanId,
-            status: HewanStatus.TERDAFTAR,
-            slaughtered: false,
-            meatPackageCount: 0,
-            onInventory: false,
-            receivedByMdhohi: false,
-            isKolektif: false,
-          },
-        })
-      } catch (e) {
-        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-          console.error('ID hewan sudah ada:', hewanId);
-        }
-      }
-      generateMudhohi(i, hewanId)
-    }
-  // Create HewanQurban (350 domba)
-  for (let i = 51; i <= 400; i++) {
-    const tipeId = 2
-    const hewanId = await generateHewanId(tipeId)
-    await prisma.hewanQurban.create({
-      data: {
-        hewanId,
-        tipeId, // Domba
-        status: HewanStatus.TERDAFTAR,
-        slaughtered: false,
-        meatPackageCount: 0,
-        onInventory: false,
-        receivedByMdhohi: false,
-        isKolektif: false,
-      },
-    })
-    generateMudhohi(i, hewanId)
-  }
+//   const totalSapi = await prisma.hewanQurban.count({
+//     where: {
+//       tipeId: 1
+//     }
+//   });
+//   if(totalSapi< 51)
+//     // Create HewanQurban (50 sapi)
+//     for (let i = 1; i <= 50; i++) {
+//       const tipeId = 1
+//       const hewanId = await generateHewanId(tipeId)
+//       try {
+//         await prisma.hewanQurban.create({
+//           data: {
+//             tipeId, // Sapi
+//             hewanId,
+//             status: HewanStatus.TERDAFTAR,
+//             slaughtered: false,
+//             meatPackageCount: 0,
+//             onInventory: false,
+//             receivedByMdhohi: false,
+//             isKolektif: false,
+//           },
+//         })
+//       } catch (e) {
+//         if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+//           console.error('ID hewan sudah ada:', hewanId);
+//         }
+//       }
+//       generateMudhohi(i, hewanId)
+//     }
+//   // Create HewanQurban (350 domba)
+//   for (let i = 51; i <= 400; i++) {
+//     const tipeId = 2
+//     const hewanId = await generateHewanId(tipeId)
+//     await prisma.hewanQurban.create({
+//       data: {
+//         hewanId,
+//         tipeId, // Domba
+//         status: HewanStatus.TERDAFTAR,
+//         slaughtered: false,
+//         meatPackageCount: 0,
+//         onInventory: false,
+//         receivedByMdhohi: false,
+//         isKolektif: false,
+//       },
+//     })
+//     generateMudhohi(i, hewanId)
+//   }
 
 
 
-  // Create some Penerima
-  for (let i = 1; i <= 50; i++) {
-    const distributionId = distributionCategories[i % 5].id
-    await prisma.penerima.create({
-      data: {
-        distributionId,
-        noKupon: `KP-${i}`,
-        receivedBy: `Penerima ${i}`,
-        institusi: i % 3 === 0 ? `Institusi ${i}` : null,
-        noKk: `KK-${i}`,
-        alamat: `Alamat ${i}`,
-        phone: `08123456${i.toString().padStart(4, "0")}`,
-        isDiterima: i % 4 !== 0, // 75% have received
-        receivedAt: i % 4 !== 0 ? new Date() : null,
-      },
-    })
-  }
+//   // Create some Penerima
+//   for (let i = 1; i <= 50; i++) {
+//     const distributionId = distributionCategories[i % 5].id
+//     await prisma.penerima.create({
+//       data: {
+//         distributionId,
+//         noKupon: `KP-${i}`,
+//         receivedBy: `Penerima ${i}`,
+//         institusi: i % 3 === 0 ? `Institusi ${i}` : null,
+//         noKk: `KK-${i}`,
+//         alamat: `Alamat ${i}`,
+//         phone: `08123456${i.toString().padStart(4, "0")}`,
+//         isDiterima: i % 4 !== 0, // 75% have received
+//         receivedAt: i % 4 !== 0 ? new Date() : null,
+//       },
+//     })
+//   }
 
-  console.log("Database has been seeded with authentication data!")
+//   console.log("Database has been seeded with authentication data!")
 }
 
 main()

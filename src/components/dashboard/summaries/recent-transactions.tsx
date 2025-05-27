@@ -17,19 +17,20 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { getLatestTransactions } from "@/services/keuangan";
 
 interface Transaction {
   id: string;
   amount: number;
   type: TransactionType;
-  date: string;
+  date: Date;
   description: string;
-  categoryId: string;
+  categoryId: number;
   category: {
-    id: string;
+    id: number;
     name: string;
   };
-  images: {
+  receiptUrl: {
     id: string;
     url: string;
   }[];
@@ -43,101 +44,11 @@ export function RecentTransactions() {
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
-        const response = await fetch('/api/transactions?limit=10');
-        if (response.ok) {
-          const data = await response.json();
-          setTransactions(data);
-        }
+        const data = await getLatestTransactions();
+        setTransactions(data);
+        
       } catch (error) {
         console.error('Failed to fetch transactions:', error);
-        // Mock data for display purposes
-        setTransactions([
-          {
-            id: '1',
-            amount: 9000000,
-            type: TransactionType.EXPENSE,
-            date: new Date().toISOString(),
-            description: 'Pembelian sapi qurban dari peternak',
-            categoryId: '1',
-            category: {
-              id: '1',
-              name: 'Pembelian Hewan Qurban - Sapi'
-            },
-            images: [
-              {
-                id: '1',
-                url: 'https://images.pexels.com/photos/422218/pexels-photo-422218.jpeg'
-              }
-            ]
-          },
-          {
-            id: '2',
-            amount: 1500000,
-            type: TransactionType.EXPENSE,
-            date: new Date().toISOString(),
-            description: 'Biaya transportasi dan distribusi daging qurban',
-            categoryId: '2',
-            category: {
-              id: '2',
-              name: 'Biaya Distribusi Daging'
-            },
-            images: [
-              {
-                id: '2',
-                url: 'https://images.pexels.com/photos/4473398/pexels-photo-4473398.jpeg'
-              }
-            ]
-          },
-          {
-            id: '3',
-            amount: 15000000,
-            type: TransactionType.INCOME,
-            date: new Date().toISOString(),
-            description: 'Sumbangan untuk qurban masjid',
-            categoryId: '3',
-            category: {
-              id: '3',
-              name: 'Donasi Qurban'
-            },
-            images: [
-              {
-                id: '3',
-                url: 'https://images.pexels.com/photos/7638274/pexels-photo-7638274.jpeg'
-              }
-            ]
-          },
-          {
-            id: '4',
-            amount: 1250000,
-            type: TransactionType.EXPENSE,
-            date: new Date().toISOString(),
-            description: 'Bayar jasa pemotongan qurban',
-            categoryId: '4',
-            category: {
-              id: '4',
-              name: 'Biaya Pemotongan & Pengulitan'
-            },
-            images: []
-          },
-          {
-            id: '5',
-            amount: 750000,
-            type: TransactionType.EXPENSE,
-            date: new Date().toISOString(),
-            description: 'Belanja bumbu dan bahan masakan',
-            categoryId: '5',
-            category: {
-              id: '5',
-              name: 'Belanja Bumbu & Bahan Masakan'
-            },
-            images: [
-              {
-                id: '5',
-                url: 'https://images.pexels.com/photos/2802527/pexels-photo-2802527.jpeg'
-              }
-            ]
-          },
-        ]);
       } finally {
         setLoading(false);
       }
@@ -170,9 +81,9 @@ export function RecentTransactions() {
             className="flex items-center justify-between p-4 bg-card rounded-lg shadow-sm hover:shadow-md transition-all animate-in"
           >
             <div className="flex items-center gap-4">
-              <Avatar className={transaction.type === TransactionType.INCOME ? "bg-green-100" : "bg-red-100"}>
-                <AvatarFallback className={transaction.type === TransactionType.INCOME ? "text-green-500" : "text-red-500"}>
-                  {transaction.type === TransactionType.INCOME ? (
+              <Avatar className={transaction.type === TransactionType.PEMASUKAN ? "bg-green-100" : "bg-red-100"}>
+                <AvatarFallback className={transaction.type === TransactionType.PEMASUKAN ? "text-green-500" : "text-red-500"}>
+                  {transaction.type === TransactionType.PEMASUKAN ? (
                     <ArrowUp className="h-4 w-4" />
                   ) : (
                     <ArrowDown className="h-4 w-4" />
@@ -188,8 +99,8 @@ export function RecentTransactions() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <span className={transaction.type === TransactionType.INCOME ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
-                {transaction.type === TransactionType.INCOME ? "+" : "-"}
+              <span className={transaction.type === TransactionType.PEMASUKAN ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                {transaction.type === TransactionType.PEMASUKAN ? "+" : "-"}
                 {formatCurrency(transaction.amount)}
               </span>
               <Button
@@ -215,8 +126,8 @@ export function RecentTransactions() {
               <div>
                 <h3 className="text-lg font-medium mb-2">{viewTransaction.description}</h3>
                 <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                  <Badge variant={viewTransaction.type === TransactionType.INCOME ? "success" : "destructive"}>
-                    {viewTransaction.type === TransactionType.INCOME ? "Pemasukan" : "Pengeluaran"}
+                  <Badge variant={viewTransaction.type === TransactionType.PEMASUKAN ? "default" : "destructive"}>
+                    {viewTransaction.type === TransactionType.PEMASUKAN ? "Pemasukan" : "Pengeluaran"}
                   </Badge>
                   <Badge variant="outline">{viewTransaction.category.name}</Badge>
                   <span>{format(new Date(viewTransaction.date), "dd MMMM yyyy")}</span>
@@ -224,18 +135,18 @@ export function RecentTransactions() {
               </div>
               
               <div className="text-3xl font-bold text-center p-4 rounded-md bg-muted/50">
-                <span className={viewTransaction.type === TransactionType.INCOME ? "text-green-600" : "text-red-600"}>
-                  {viewTransaction.type === TransactionType.INCOME ? "+" : "-"}
+                <span className={viewTransaction.type === TransactionType.PEMASUKAN ? "text-green-600" : "text-red-600"}>
+                  {viewTransaction.type === TransactionType.PEMASUKAN ? "+" : "-"}
                   {formatCurrency(viewTransaction.amount)}
                 </span>
               </div>
               
-              {viewTransaction.images.length > 0 ? (
+              {viewTransaction.receiptUrl.length > 0 ? (
                 <div>
                   <h4 className="text-sm font-medium mb-2">Foto Bukti:</h4>
                   <ScrollArea className="h-72 rounded-md border">
                     <div className="p-4 space-y-2">
-                      {viewTransaction.images.map((image) => (
+                      {viewTransaction.receiptUrl.map((image) => (
                         <div key={image.id} className="relative rounded-md overflow-hidden h-64 w-full">
                           <Image
                             src={image.url}

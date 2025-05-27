@@ -1,6 +1,6 @@
 import type { Server as HTTPServer } from "http"
 import { Server as SocketIOServer } from "socket.io"
-// import { getProdukHewan, getErrorLogs, updateHewanStatus } from "@/lib/db"
+// import { getProdukHewan, getErrorLogs } from "@/services/qurban"
 
 export function setupSocketServer(httpServer: HTTPServer) {
   const io = new SocketIOServer(httpServer, {
@@ -59,8 +59,6 @@ export function setupSocketServer(httpServer: HTTPServer) {
     // Handle update-hewan event
     socket.on("update-hewan", async (data, callback) => {
       console.log("update-hewan:", data)
-      // const { hewanId, status, slaughtered} = data
-      // await updateHewanStatus(hewanId, status, slaughtered)
       io.emit("update-hewan", data)
       callback({ success: true, message: "Updated" });
     })

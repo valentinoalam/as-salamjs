@@ -97,6 +97,7 @@ model Pembayaran {
   paymentStatus    PaymentStatus
   dibayarkan       Int
   urlTandaBukti    String?
+  kodeResi         String?
   createdAt        DateTime  @default(now()) @map("date_created")
   mudhohi          Mudhohi  @relation(fields: [mudhohiId], references: [id], onDelete: Cascade)
 }
@@ -107,7 +108,7 @@ model Mudhohi {
   paymentId        String
   nama_pengqurban  String?   @db.VarChar(200)
   nama_peruntukan  String?   @db.VarChar(200)
-  
+  alamat           String?
   pesan_khusus     String?   @db.VarChar(500)
   keterangan       String?   @db.VarChar(500)
   potong_sendiri   Boolean
@@ -155,9 +156,10 @@ model TipeHewan {
   id              Int          @id @default(autoincrement())
   nama            String       @unique // Type of animal (e.g., "sapi", "domba")
   icon            String?
-  target          Int    
-  harga           Int
-  note            String
+  target          Int          @default(0)
+  harga           Int          @default(0)
+  hargaKolektif   Int?
+  note            String?
 
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -166,13 +168,15 @@ model TipeHewan {
   paketQurban     ProdukHewan[]
 }
 
-enum jenisProduk {
+enum JenisProduk {
   KEPALA
   BADAN
   KULIT
+  TULANG
   TORPEDO
   KAKI
   DAGING
+  LAINNYA
 }
 
 // Weight tracking
@@ -181,20 +185,20 @@ model ProdukHewan {
   nama            String       @unique // daging sapi 5 kg
   tipeId          Int?
   berat           Float?
-  avgProdPerHewan Int         @default(1)
+  avgProdPerHewan Int              @default(1)
   // Product tracking
   targetPaket     Int              @default(0)
-  pkgOrigin       Int              @default(0)  //from slaughter counter
-  pkgReceived     Int              @default(0)  //arrive at inventory counter
-  pkgDelivered    Int              @default(0)  //transfered to mustahik
+  kumulatif       Int              @default(0)
+  diTimbang       Int              @default(0)
+  diInventori     Int              @default(0)  //arrive at inventory counter
+  sdhDiserahkan   Int              @default(0)  //transfered to mustahik
 
-  jenisProduk     jenisProduk
+  JenisProduk     JenisProduk
   tipe_hewan      TipeHewan?    @relation(fields: [tipeId], references: [id])
   history         ProductLog[]
-
-  DistribusiLog DistribusiLog[]
-
-  ErrorLog ErrorLog[]
+  distribusiLog   DistribusiLog[]
+  errorLog        ErrorLog[]
+  ProdukDikirim   ProdukDikirim[]
 }
 
 enum Counter {
@@ -202,6 +206,28 @@ enum Counter {
   PENYEMBELIHAN
 }
 
+enum PengirimanStatus {
+  PENDING
+  DIKIRIM
+  DITERIMA
+}
+model ProdukDikirim {
+  id          String     @id @default(cuid())
+  putaranId   Int
+  produkId    Int
+  jumlah      Int
+  produk      ProdukHewan   @relation(fields: [produkId], references: [id])
+  LogPutaranPickup LogPutaranPickup @relation(fields: [putaranId], references: [id])
+}
+
+model LogPutaranPickup {
+  id                Int          @id @default(autoincrement())
+  catatan           String?
+  statusPengiriman  PengirimanStatus @default(PENDING)
+  daftarProdukHewan ProdukDikirim[] // Menyimpan array objek daftar produk hewan
+  waktuPengiriman   DateTime    @default(now())
+  waktuDiterima     DateTime?
+}
 model ProductLog {
   id                Int         @id @default(autoincrement())
   produk            ProdukHewan @relation(fields: [produkId], references: [id])
@@ -226,8 +252,8 @@ model ErrorLog {
 model Distribution {
   id          String     @id @default(cuid())
   category    String  // "Pengqurban Sapi", "Pengqurban Domba", "Panitia", "RT RW", "Lembaga"
-  target      Int     @default(0)
-  realized    Int     @default(0)
+  target      Int     @default(0)   //jumlah kupon yg hendak dibagikan
+  realized    Int     @default(0)   //
 
   Penerima Penerima[]
 }
@@ -268,7 +294,7 @@ enum TransactionType {
 }
 
 model TransactionCategory {
-  id            String       @id @default(uuid())
+  id            Int       @id @default(autoincrement())
   name          String
   type          TransactionType
   createdAt     DateTime     @default(now())
@@ -283,7 +309,7 @@ model Transaction {
   id          String             @id @default(cuid())
   amount      Int
   description String       @db.Text
-  categoryId  String
+  categoryId  Int
   type        TransactionType
   category    TransactionCategory    @relation(fields: [categoryId], references: [id])
   date        DateTime
@@ -304,11 +330,10 @@ model Image {
   @@map("images")
 }
 
-
 model Budget {
   id          String      @id @default(uuid())
   amount      Float
-  categoryId  String
+  categoryId  Int
   category    TransactionCategory    @relation(fields: [categoryId], references: [id])
   startDate   DateTime
   endDate     DateTime

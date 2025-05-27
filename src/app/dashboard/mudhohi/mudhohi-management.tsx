@@ -18,14 +18,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Textarea } from "@/components/ui/textarea"
 import { PaymentStatus, CaraBayar } from "@prisma/client"
-import { getMudhohiList, updatePaymentStatus, createMudhohi } from "./actions"
+import { getMudhohiList, updatePaymentStatus, createMudhohi } from "../../../services/mudhohi"
 import { exportToExcel } from "@/lib/excel"
 import { CheckCircle, XCircle, Clock, AlertCircle, Search, Plus, RefreshCw, Download } from "lucide-react"
+import QurbanForm from "@/components/qurban/form-pemesanan-qurban"
+import { Label } from "@/components/ui/label"
+import type { TipeHewan } from "@/types/qurban"
+
 type MudhohiStats = {
   totalMudhohi: number
   totalHewan: number
@@ -54,6 +54,7 @@ type Mudhohi = {
     paymentStatus: PaymentStatus
     dibayarkan: number
     urlTandaBukti: string | null
+    kodeResi: string | null
   } | null
   hewan: {
     id: string
@@ -72,41 +73,96 @@ type Mudhohi = {
   }
 }
 
-type TipeHewan = {
-  id: number
-  nama: string
-  icon: string | null
-  harga: number
-  note: string
-}
-
 interface MudhohiManagementProps {
   initialStats: MudhohiStats
   initialMudhohi: Mudhohi[]
+  tipeHewan: TipeHewan[]
 }
 
-export default function MudhohiManagement({ initialStats, initialMudhohi }: MudhohiManagementProps) {
+export default function MudhohiManagement({ 
+  initialStats, 
+  initialMudhohi, 
+  tipeHewan 
+}: MudhohiManagementProps) {
   const [stats, setStats] = useState<MudhohiStats>(initialStats)
   const [mudhohi, setMudhohi] = useState<Mudhohi[]>(initialMudhohi)
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | "ALL">("ALL")
   const [addDialogOpen, setAddDialogOpen] = useState(false)
-  const [formData, setFormData] = useState({
-    nama_pengqurban: "",
-    nama_peruntukan: "",
-    email: "",
-    phone: "",
-    pesan_khusus: "",
-    keterangan: "",
-    potong_sendiri: false,
-    mengambilDaging: false,
-    tipeHewanId: "1", // Default to Sapi
-    cara_bayar: CaraBayar.TRANSFER,
-    paymentStatus: PaymentStatus.BELUM_BAYAR,
-    dibayarkan: 0,
-  })
 
+  // Now, add a state for kodeResi
+  const [kodeResi, setKodeResi] = useState<string>("")
+
+  // Add a dialog state for payment confirmation
+  const [confirmPaymentDialogOpen, setConfirmPaymentDialogOpen] = useState(false)
+  const [selectedMudhohiId, setSelectedMudhohiId] = useState<string | null>(null)
+  const [confirmPaymentAmount, setConfirmPaymentAmount] = useState<number>(0)
+  
+  // Add a function to handle payment confirmation dialog
+  const openConfirmPaymentDialog = (mudhohiId: string, currentAmount: number) => {
+    setSelectedMudhohiId(mudhohiId)
+    setConfirmPaymentAmount(currentAmount)
+    setKodeResi("")
+    setConfirmPaymentDialogOpen(true)
+  }
+
+  // Update the handleUpdatePaymentStatus function to include kodeResi
+  const handleUpdatePaymentStatus = async (
+    mudhohiId: string,
+    newStatus: PaymentStatus,
+    amount?: number,
+    kodeResi?: string,
+  ) => {
+    try {
+      const result = await updatePaymentStatus(mudhohiId, newStatus, amount, kodeResi)
+
+      if (result.success) {
+        toast({
+          title: "Status Updated",
+          description: `Payment status has been updated to ${getStatusLabel(newStatus)}.`,
+        })
+
+        // Update the mudhohi in the list
+        setMudhohi((prev) =>
+          prev.map((m) =>
+            m.id === mudhohiId
+              ? {
+                  ...m,
+                  payment: {
+                    ...m.payment!,
+                    paymentStatus: newStatus,
+                    dibayarkan: amount || m.payment?.dibayarkan || 0,
+                    kodeResi: kodeResi || m.payment?.kodeResi || null,
+                  },
+                }
+              : m,
+          ),
+        )
+
+        // Refresh data to get updated stats
+        refreshData()
+      } else {
+        throw new Error(result.error || "Failed to update payment status")
+      }
+    } catch (error) {
+      console.error("Error updating payment status:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update payment status. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+  
+  // Add a function to handle payment confirmation submission
+  const handleConfirmPayment = () => {
+    if (selectedMudhohiId) {
+      handleUpdatePaymentStatus(selectedMudhohiId, PaymentStatus.LUNAS, confirmPaymentAmount, kodeResi || undefined)
+      setConfirmPaymentDialogOpen(false)
+      setSelectedMudhohiId(null)
+    }
+  }
   const refreshData = async () => {
     setLoading(true)
     try {
@@ -166,101 +222,41 @@ export default function MudhohiManagement({ initialStats, initialMudhohi }: Mudh
     }
   }
 
-  const handleUpdatePaymentStatus = async (mudhohiId: string, newStatus: PaymentStatus, amount?: number) => {
+  const handleSubmitMudhohi = async (formData: any) => {
     try {
-      const result = await updatePaymentStatus(mudhohiId, newStatus, amount)
-
-      if (result.success) {
-        toast({
-          title: "Status Updated",
-          description: `Payment status has been updated to ${getStatusLabel(newStatus)}.`,
-        })
-
-        // Update the mudhohi in the list
-        setMudhohi((prev) =>
-          prev.map((m) =>
-            m.id === mudhohiId
-              ? {
-                  ...m,
-                  payment: {
-                    ...m.payment!,
-                    paymentStatus: newStatus,
-                    dibayarkan: amount || m.payment?.dibayarkan || 0,
-                  },
-                }
-              : m,
-          ),
-        )
-
-        // Refresh data to get updated stats
-        refreshData()
-      } else {
-        throw new Error(result.error || "Failed to update payment status")
-      }
-    } catch (error) {
-      console.error("Error updating payment status:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update payment status. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleFormChange = (field: string, value: any) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }))
-  }
-
-  const handleSubmitMudhohi = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-
-    try {
-      const result = await createMudhohi({
-        ...formData,
+      // Transform the form data to match the expected format
+      const transformedData = {
+        nama_pengqurban: formData.nama_pengqurban,
+        nama_peruntukan: formData.nama_peruntukan || "",
+        email: formData.email,
+        phone: formData.phone,
+        pesan_khusus: formData.pesan_khusus || "",
+        keterangan: formData.keterangan || "",
+        potong_sendiri: formData.potong_sendiri,
+        mengambilDaging: formData.mengambilDaging,
         tipeHewanId: Number.parseInt(formData.tipeHewanId),
-      })
+        quantity: formData.quantity,
+        isKolektif: formData.isKolektif,
+        cara_bayar: formData.cara_bayar,
+        paymentStatus: formData.paymentStatus,
+        dibayarkan: formData.dibayarkan,
+        kodeResi: "",
+      }
+
+      const result = await createMudhohi(transformedData)
 
       if (result.success) {
-        toast({
-          title: "Pengqurban Added",
-          description: "The new pengqurban has been added successfully.",
-        })
-
-        // Close dialog and reset form
+        // Close dialog and refresh data
         setAddDialogOpen(false)
-        setFormData({
-          nama_pengqurban: "",
-          nama_peruntukan: "",
-          email: "",
-          phone: "",
-          pesan_khusus: "",
-          keterangan: "",
-          potong_sendiri: false,
-          mengambilDaging: false,
-          tipeHewanId: "1",
-          cara_bayar: CaraBayar.TRANSFER,
-          paymentStatus: PaymentStatus.BELUM_BAYAR,
-          dibayarkan: 0,
-        })
-
-        // Refresh data
         refreshData()
+        
+        return { success: true, mudhohiId: result.mudhohiId }
       } else {
-        throw new Error(result.error || "Failed to add pengqurban")
+        return { success: false, error: result.error || "Failed to add pengqurban" }
       }
     } catch (error) {
       console.error("Error adding pengqurban:", error)
-      toast({
-        title: "Error",
-        description: "Failed to add pengqurban. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
+      return { success: false, error: "Failed to add pengqurban. Please try again." }
     }
   }
 
@@ -356,8 +352,10 @@ export default function MudhohiManagement({ initialStats, initialMudhohi }: Mudh
 
     exportToExcel(data, "pengqurban_data")
   }
+
   return (
     <div className="space-y-8">
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -393,6 +391,7 @@ export default function MudhohiManagement({ initialStats, initialMudhohi }: Mudh
         </Card>
       </div>
 
+      {/* Controls */}
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
         <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
           <div className="relative w-full md:w-64">
@@ -436,174 +435,27 @@ export default function MudhohiManagement({ initialStats, initialMudhohi }: Mudh
                 Tambah Mudhohi
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Form Tambah Mudhohi</DialogTitle>
-                <DialogDescription>Enter the details of the new pengqurban and their qurban.</DialogDescription>
+            <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden p-0">
+              <DialogHeader className="p-6 pb-0">
+                <DialogTitle>Tambah Pengqurban Baru</DialogTitle>
+                <DialogDescription>
+                  Gunakan form di bawah untuk menambahkan pengqurban baru ke dalam sistem.
+                </DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleSubmitMudhohi}>
-                <Tabs defaultValue="personal" className="mt-4">
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="personal">Personal Info</TabsTrigger>
-                    <TabsTrigger value="qurban">Qurban Details</TabsTrigger>
-                    <TabsTrigger value="payment">Payment</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="personal" className="space-y-4 mt-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="nama_pengqurban">Nama Pengqurban</Label>
-                        <Input
-                          id="nama_pengqurban"
-                          value={formData.nama_pengqurban}
-                          onChange={(e) => handleFormChange("nama_pengqurban", e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="nama_peruntukan">Nama Peruntukan</Label>
-                        <Input
-                          id="nama_peruntukan"
-                          value={formData.nama_peruntukan}
-                          onChange={(e) => handleFormChange("nama_peruntukan", e.target.value)}
-                          placeholder="Atas nama siapa qurban ini (opsional)"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={formData.email}
-                          onChange={(e) => handleFormChange("email", e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="phone">Nomor Telepon</Label>
-                        <Input
-                          id="phone"
-                          value={formData.phone}
-                          onChange={(e) => handleFormChange("phone", e.target.value)}
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="pesan_khusus">Pesan Khusus</Label>
-                      <Textarea
-                        id="pesan_khusus"
-                        value={formData.pesan_khusus}
-                        onChange={(e) => handleFormChange("pesan_khusus", e.target.value)}
-                        placeholder="Pesan khusus dari pengqurban (opsional)"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="keterangan">Keterangan</Label>
-                      <Textarea
-                        id="keterangan"
-                        value={formData.keterangan}
-                        onChange={(e) => handleFormChange("keterangan", e.target.value)}
-                        placeholder="Keterangan tambahan (opsional)"
-                      />
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="qurban" className="space-y-4 mt-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="tipeHewanId">Jenis Hewan</Label>
-                      <Select
-                        value={formData.tipeHewanId}
-                        onValueChange={(value) => handleFormChange("tipeHewanId", value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Pilih jenis hewan" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">🐮 Sapi</SelectItem>
-                          <SelectItem value="2">🐐 Domba</SelectItem>
-                          <SelectItem value="3">🐮 Sapi Kolektif</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-4 mt-4">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="potong_sendiri"
-                          checked={formData.potong_sendiri}
-                          onCheckedChange={(checked) => handleFormChange("potong_sendiri", checked)}
-                        />
-                        <Label htmlFor="potong_sendiri">Ingin menyaksikan penyembelihan</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="mengambilDaging"
-                          checked={formData.mengambilDaging}
-                          onCheckedChange={(checked) => handleFormChange("mengambilDaging", checked)}
-                        />
-                        <Label htmlFor="mengambilDaging">Ingin mengambil daging qurban</Label>
-                      </div>
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="payment" className="space-y-4 mt-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="cara_bayar">Metode Pembayaran</Label>
-                      <Select
-                        value={formData.cara_bayar}
-                        onValueChange={(value) => handleFormChange("cara_bayar", value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Pilih metode pembayaran" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={CaraBayar.TRANSFER}>Transfer Bank</SelectItem>
-                          <SelectItem value={CaraBayar.TUNAI}>Tunai</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="paymentStatus">Status Pembayaran</Label>
-                      <Select
-                        value={formData.paymentStatus}
-                        onValueChange={(value) => handleFormChange("paymentStatus", value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Pilih status pembayaran" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={PaymentStatus.BELUM_BAYAR}>Belum Bayar</SelectItem>
-                          <SelectItem value={PaymentStatus.MENUNGGU_KONFIRMASI}>Menunggu Konfirmasi</SelectItem>
-                          <SelectItem value={PaymentStatus.LUNAS}>Lunas</SelectItem>
-                          <SelectItem value={PaymentStatus.BATAL}>Batal</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="dibayarkan">Jumlah Dibayarkan</Label>
-                      <Input
-                        id="dibayarkan"
-                        type="number"
-                        value={formData.dibayarkan}
-                        onChange={(e) => handleFormChange("dibayarkan", Number(e.target.value))}
-                        placeholder="0"
-                      />
-                    </div>
-                  </TabsContent>
-                </Tabs>
-                <DialogFooter className="mt-6">
-                  <Button type="button" variant="outline" onClick={() => setAddDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={loading}>
-                    {loading ? "Saving..." : "Save Pengqurban"}
-                  </Button>
-                </DialogFooter>
-              </form>
+              <div className="px-6 pb-6 max-h-[calc(95vh-120px)] overflow-y-auto">
+                <QurbanForm
+                  tipeHewan={tipeHewan}
+                  onSubmit={handleSubmitMudhohi}
+                  onCancel={() => setAddDialogOpen(false)}
+                  mode="admin"
+                />
+              </div>
             </DialogContent>
           </Dialog>
         </div>
       </div>
 
+      {/* Mudhohi List */}
       <div className="space-y-4">
         {filteredMudhohi.length > 0 ? (
           filteredMudhohi.map((m) => (
@@ -658,6 +510,11 @@ export default function MudhohiManagement({ initialStats, initialMudhohi }: Mudh
                             <span className="font-medium">Dibayarkan:</span> Rp{" "}
                             {m.payment.dibayarkan.toLocaleString("id-ID")}
                           </div>
+                          {m.payment.kodeResi && (
+                            <div className="text-sm">
+                              <span className="font-medium">Kode Resi:</span> {m.payment.kodeResi}
+                            </div>
+                          )}
                         </>
                       )}
                       <div className="flex flex-wrap gap-2 mt-4">
@@ -688,9 +545,7 @@ export default function MudhohiManagement({ initialStats, initialMudhohi }: Mudh
                           <>
                             <Button
                               size="sm"
-                              onClick={() =>
-                                handleUpdatePaymentStatus(m.id, PaymentStatus.LUNAS, m.payment?.dibayarkan)
-                              }
+                              onClick={() => openConfirmPaymentDialog(m.id, m.payment?.dibayarkan || 0)}
                             >
                               Terima Pembayaran
                             </Button>
@@ -746,6 +601,42 @@ export default function MudhohiManagement({ initialStats, initialMudhohi }: Mudh
           </Card>
         )}
       </div>
+      
+      {/* Payment Confirmation Dialog */}
+      <Dialog open={confirmPaymentDialogOpen} onOpenChange={setConfirmPaymentDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Konfirmasi Pembayaran</DialogTitle>
+            <DialogDescription>Masukkan kode resi dan konfirmasi pembayaran.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="kodeResi">Kode Resi</Label>
+              <Input
+                id="kodeResi"
+                value={kodeResi}
+                onChange={(e) => setKodeResi(e.target.value)}
+                placeholder="Masukkan kode resi pembayaran"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="amount">Jumlah Dibayarkan</Label>
+              <Input
+                id="amount"
+                type="number"
+                value={confirmPaymentAmount}
+                onChange={(e) => setConfirmPaymentAmount(Number(e.target.value))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmPaymentDialogOpen(false)}>
+              Batal
+            </Button>
+            <Button onClick={handleConfirmPayment}>Konfirmasi Pembayaran</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

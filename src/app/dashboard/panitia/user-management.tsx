@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/hooks/use-toast"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Role } from "@prisma/client"
-import { createUser, updateUserRole, deleteUser } from "./actions"
+import { createUser, updateUserRole, deleteUser } from "@/services/panitia"
 
 type User = {
   id: string

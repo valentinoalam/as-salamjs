@@ -4,7 +4,7 @@ import { SocketProvider } from '@/contexts/socket-context';
 
 import { SessionProvider } from 'next-auth/react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { queryClient } from "@/lib/tanstack-query"
+import { queryClient } from "@/lib/tanstack-query/qurban"
 import { QurbanProvider } from '@/contexts/qurban-context';
 
 interface ProvidersProps {

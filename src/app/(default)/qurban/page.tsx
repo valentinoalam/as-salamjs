@@ -1,20 +1,20 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { getHewanQurban, getProdukHewan, getDistribution, getPenerima, getDistribusiLog } from "@/lib/db"
-import { jenisProduk } from "@prisma/client"
+import { getHewanQurban, getProdukHewan, getDistribution, getPenerima, getDistribusiLog } from "@/services/qurban"
+import { JenisProduk } from "@prisma/client"
 
 export default async function QurbanHome() {
   const sapiData = await getHewanQurban("sapi")
   const dombaData = await getHewanQurban("domba")
-  const produkDaging = await getProdukHewan(jenisProduk.DAGING)
+  const produkDaging = await getProdukHewan(JenisProduk.DAGING)
   const produkLainnya = await getProdukHewan()
   const distribution = await getDistribution()
   const penerima = await getPenerima()
   const distribusiLog = await getDistribusiLog()
 
   // Filter non-meat products
-  const nonMeatProducts = produkLainnya.filter((p) => p.jenisProduk !== jenisProduk.DAGING)
+  const nonMeatProducts = produkLainnya.filter((p) => p.JenisProduk !== JenisProduk.DAGING)
 
   // Calculate coupon stats
   const totalKupon = penerima.filter((p) => p.noKupon).length
@@ -97,7 +97,7 @@ export default async function QurbanHome() {
                 {produkLainnya.map((produk) => (
                   <div key={produk.id} className="flex justify-between items-center p-2 border rounded-md">
                     <span>{produk.nama}</span>
-                    <span className="font-medium">{produk.pkgReceived}</span>
+                    <span className="font-medium">{produk.diInventori}</span>
                   </div>
                 ))}
               </div>
@@ -108,7 +108,7 @@ export default async function QurbanHome() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Komulatif Timbang</CardTitle>
+          <CardTitle>Kumulatif Timbang</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -117,7 +117,7 @@ export default async function QurbanHome() {
                 <span className="text-xl mb-2">
                   {item.tipeId === 1 ? "🐮" : "🐐"} {item.berat}kg
                 </span>
-                <span className="text-3xl font-bold">{item.pkgOrigin}</span>
+                <span className="text-3xl font-bold">{item.diTimbang}</span>
                 <div className="text-xs mt-1">Target: {item.targetPaket}</div>
               </div>
             ))}
@@ -171,9 +171,9 @@ export default async function QurbanHome() {
         <CardContent>
           <div className="space-y-6">
             {produkLainnya.map((produk) => {
-              const total = produk.pkgDelivered
+              const total = produk.sdhDiserahkan
               const percentage =
-                produk.targetPaket > 0 ? Math.min(100, (produk.pkgDelivered / produk.targetPaket) * 100) : 0
+                produk.targetPaket > 0 ? Math.min(100, (produk.sdhDiserahkan / produk.targetPaket) * 100) : 0
 
               // Calculate distribution per category
               const categoryDistribution = distribution.map((cat) => {
@@ -196,7 +196,7 @@ export default async function QurbanHome() {
                   <div className="font-medium">{produk.nama}</div>
                   <Progress value={percentage} className="h-2" />
                   <div className="text-sm">
-                    {produk.pkgDelivered} / {produk.targetPaket} ({percentage.toFixed(1)}%)
+                    {produk.sdhDiserahkan} / {produk.targetPaket} ({percentage.toFixed(1)}%)
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
