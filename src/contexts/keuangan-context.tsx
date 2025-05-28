@@ -1,14 +1,14 @@
 "use client"
 
 import React, { createContext, useContext, useCallback, type ReactNode, useMemo } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { TransactionType } from '@prisma/client'
 import type { 
   Category, 
   Transaction, 
   Budget, 
   TransactionStats, 
-  CategoryDistribution, 
+  CategoryDistribution,
   QurbanSalesStats,
   ChartDataResponse,
   ProcessedData,
@@ -16,23 +16,44 @@ import type {
   TransactionFormValues,
   BudgetFormValues
 } from '@/types/keuangan'
-import { createBudget, createCategory, createQueryOptions, createTransaction, deleteBudget, deleteCategory, deleteTransaction, fetchBudgets, fetchCategories, fetchLatestTransactions, fetchOverviewData, fetchQurbanSalesStats, fetchTransactions, fetchTransactionStats, fetchWeeklyAnimalSales, QUERY_KEYS, updateBudget, updateCategory, uploadReceipt, useOptimizedMutation, type ApiResponse, type DataQuery } from '@/lib/tanstack-query/keuangan'
+import { createBudget, createCategory, createQueryOptions, createTransaction, deleteBudget, deleteCategory, deleteTransaction, fetchBudgets, fetchCategories, fetchLatestTransactions, fetchQurbanSalesStats, fetchTransactions, fetchTransactionStats, fetchWeeklyAnimalSales, QUERY_KEYS, updateBudget, updateCategory, uploadReceipt, useOptimizedMutation, type ApiResponse, type DataQuery } from '@/lib/tanstack-query/keuangan'
 
 // Enhanced Transaction type for combined data
 interface CombinedTransaction extends Transaction {
   isQurbanTransaction?: boolean
 }
+
+// Category colors for overview data
+const CATEGORY_COLORS = [
+  '#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1',
+  '#d084d0', '#87d068', '#ffb347', '#ff9999', '#87ceeb'
+];
+
 // Context interface
 interface KeuanganContextType {
   // Data queries with loading and error states
   statsQuery: DataQuery<TransactionStats> 
   transactionsQuery: DataQuery<Transaction[]> 
-  // latestTransactions: Transaction[] 
   categoriesQuery: DataQuery<Category[]> 
   budgetsQuery: DataQuery<Budget[]> 
-  overviewQuery: DataQuery<CategoryDistribution[]> ,
-  qurbanSalesQuery: DataQuery<QurbanSalesStats> ,
-  weeklySalesQuery: DataQuery<ChartDataResponse> ,
+  qurbanSalesQuery: DataQuery<QurbanSalesStats>
+  weeklySalesQuery: DataQuery<ChartDataResponse>
+
+  // Combined and processed data
+  allTransactions: CombinedTransaction[] // Regular + Qurban transactions combined
+  filteredTransactions: CombinedTransaction[] // Apply current filters
+  overviewData: ProcessedData // Calculated from allTransactions
+  
+  // Filter state and setters
+  searchTerm: string
+  typeFilter: TransactionType | "ALL"
+  categoryFilter: string
+  dateRange: { from?: Date; to?: Date }
+  setSearchTerm: (term: string) => void
+  setTypeFilter: (type: TransactionType | "ALL") => void
+  setCategoryFilter: (categoryId: string) => void
+  setDateRange: (range: { from?: Date; to?: Date }) => void
+  resetFilters: () => void
 
   // Mutation functions
   createTransaction: (data: TransactionFormValues) => Promise<ApiResponse<string>>
@@ -45,28 +66,14 @@ interface KeuanganContextType {
   updateBudget: (id: string, data: BudgetFormValues) => Promise<ApiResponse<Budget>>
   deleteBudget: (id: string) => Promise<ApiResponse<void>>
 
-  // Filter and utility functions
-  getTransactionsByType: (type: TransactionType) => Transaction[]
-  getTransactionsByCategory: (categoryId: number) => Transaction[]
-  getTransactionsByDateRange: (startDate: Date, endDate: Date) => Transaction[]
+  // Utility functions
   getCategoriesByType: (type: TransactionType) => Category[]
   getBudgetsByCategory: (categoryId: number) => Budget[]
   processDataForCharts: () => ProcessedData
   getCategoryById: (id: number) => Category | undefined
-  getTransactionById: (id: string) => Transaction | undefined
+  getTransactionById: (id: string) => CombinedTransaction | undefined
   getBudgetById: (id: string) => Budget | undefined
   
-  // Enhanced search and filter functions
-  searchTransactions: (searchTerm: string, type?: TransactionType) => Transaction[]
-  getFilteredTransactions: (filters: {
-    type?: TransactionType
-    categoryId?: string
-    searchTerm?: string
-    startDate?: Date
-    endDate?: Date
-  }) => Promise<Transaction[]>
-  getWeeklyAnimalSalesData: (year?: number, month?: number) => Promise<ChartDataResponse>
-
   // Stats functions
   calculateCategoryTotal: (categoryId: number, type: TransactionType) => number
   calculateBudgetUsage: (budgetId: string) => { used: number; percentage: number; remaining: number }
@@ -80,26 +87,26 @@ interface KeuanganProviderProps {
   initialData?: {
     stats?: TransactionStats
     transactions?: Transaction[]
-    latestTransactions?: Transaction[]
     categories?: Category[]
     budgets?: Budget[]
-    overviewData?: CategoryDistribution[]
     qurbanSalesStats?: QurbanSalesStats
     weeklyAnimalSales?: ChartDataResponse
   }
 }
 
 export function KeuanganProvider({ children, initialData }: KeuanganProviderProps) {
-  const queryClient = useQueryClient()
+  // Filter state - moved to context for global state management
+  const [searchTerm, setSearchTerm] = React.useState("")
+  const [typeFilter, setTypeFilter] = React.useState<TransactionType | "ALL">("ALL")
+  const [categoryFilter, setCategoryFilter] = React.useState<string>("ALL")
+  const [dateRange, setDateRange] = React.useState<{ from?: Date; to?: Date }>({})
 
   // Data queries
   const statsQuery = useQuery(
     createQueryOptions(
       QUERY_KEYS.stats,
       fetchTransactionStats,
-      { 
-        initialData: initialData?.stats,
-      }
+      { initialData: initialData?.stats }
     )
   )
 
@@ -115,9 +122,7 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
     createQueryOptions(
       QUERY_KEYS.categories,
       fetchCategories,
-      { 
-        initialData: initialData?.categories,
-      }
+      { initialData: initialData?.categories }
     )
   )
 
@@ -126,15 +131,6 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
       QUERY_KEYS.budgets,
       fetchBudgets,
       { initialData: initialData?.budgets }
-    )
-  )
-  
-  
-  const overviewQuery = useQuery(
-    createQueryOptions(
-      QUERY_KEYS.overview,
-      fetchOverviewData,
-      { initialData: initialData?.overviewData }
     )
   )
 
@@ -157,16 +153,171 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
   const transactions = transactionsQuery.data
   const categories = categoriesQuery.data
   const budgets = budgetsQuery.data
-  // Mutations
-  // Optimized mutations using useOptimizedMutation
+  const qurbanSales = qurbanSalesQuery.data
+
+  // Combined transactions - merge regular and qurban transactions
+  const allTransactions = useMemo((): CombinedTransaction[] => {
+    const regularTransactions: CombinedTransaction[] = (transactions || []).map(t => ({
+      ...t,
+      isQurbanTransaction: false
+    }))
+    
+    if (!qurbanSales?.perTipeHewan) {
+      return regularTransactions
+    }
+
+    const qurbanCategory: Category = {
+      id: 0,
+      name: "Penjualan Hewan Qurban",
+      type: TransactionType.PEMASUKAN
+    }
+
+    // Create transactions for each TipeHewan with sales
+    const qurbanTransactions: CombinedTransaction[] = qurbanSales.perTipeHewan
+      .filter((tipe: { count: number }) => tipe.count > 0)
+      .map((tipe: { tipeHewanId: any; totalAmount: any; nama: any }) => ({
+        id: `qurban-${tipe.tipeHewanId}`,
+        amount: tipe.totalAmount,
+        description: `Penjualan ${tipe.nama}`,
+        type: TransactionType.PEMASUKAN,
+        categoryId: qurbanCategory?.id || -1,
+        category: {
+          ...qurbanCategory,
+          name: `Qurban - ${tipe.nama}`
+        },
+        date: new Date(),
+        receiptUrl: [],
+        createdBy: 'system',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isQurbanTransaction: true
+      }))
+
+    // Combine and sort by date (newest first)
+    return [...qurbanTransactions, ...regularTransactions]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }, [transactions, qurbanSales])
+
+  // Calculate overview data from allTransactions
+  const overviewData = useMemo((): ProcessedData => {
+    if (!allTransactions || allTransactions.length === 0) {
+      return {
+        pemasukanData: [],
+        pengeluaranData: [],
+        totalPemasukan: 0,
+        totalPengeluaran: 0,
+      }
+    }
+    const totalsByCategoryAndType = new Map<string, number>()
+
+    allTransactions.forEach(transaction => {
+      const categoryName = transaction.category?.name
+      const type = transaction.type
+
+      if (!categoryName || !type) return
+
+      const key = `${type}:${categoryName}`
+      const current = totalsByCategoryAndType.get(key) || 0
+      totalsByCategoryAndType.set(key, current + transaction.amount)
+    })
+
+    const rawData: CategoryDistribution[] = Array.from(totalsByCategoryAndType.entries())
+      .map(([key, value], index) => {
+        const [type, name] = key.split(':')
+        return {
+          name: `${type === 'PENGELUARAN' ? 'Pengeluaran' : 'Pemasukan'} - ${name}`,
+          value,
+          color: CATEGORY_COLORS[index % CATEGORY_COLORS.length],
+        }
+      })
+      .sort((a, b) => b.value - a.value)
+    // Separate income and expense data
+    const pemasukanItems = rawData.filter(item => 
+      item.name.startsWith('Pemasukan'))
+    const pengeluaranItems = rawData.filter(item => 
+      item.name.startsWith('Pengeluaran'))
+
+    // Calculate totals
+    const totalPemasukan = pemasukanItems.reduce((sum, item) => sum + item.value, 0);
+    const totalPengeluaran = pengeluaranItems.reduce((sum, item) => sum + item.value, 0);
+
+    // Format data for charts
+    const pemasukanData = pemasukanItems.map(item => ({
+      name: item.name.replace('Pemasukan - ', ''),
+      value: item.value,
+      fill: item.color,
+    }));
+
+    const pengeluaranData = pengeluaranItems.map(item => ({
+      name: item.name.replace('Pengeluaran - ', ''),
+      value: item.value,
+      fill: item.color,
+    }));
+
+    const pieData = {
+      pemasukanData,
+      pengeluaranData,
+      totalPemasukan,
+      totalPengeluaran,
+    };
+    return pieData
+  }, [allTransactions])
+
+  // Apply filters to combined transactions - centralized filtering logic
+  const filteredTransactions = useMemo(() => {
+    let filtered = [...allTransactions]
+
+    // Search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase()
+      filtered = filtered.filter(t => 
+        t.description.toLowerCase().includes(term) ||
+        t.category.name.toLowerCase().includes(term) ||
+        t.amount.toString().includes(term)
+      )
+    }
+
+    // Type filter
+    if (typeFilter !== "ALL") {
+      filtered = filtered.filter(t => t.type === typeFilter)
+    }
+
+    // Category filter
+    if (categoryFilter !== "ALL") {
+      const categoryId = parseInt(categoryFilter)
+      filtered = filtered.filter(t => t.categoryId === categoryId)
+    }
+
+    // Date range filter
+    if (dateRange.from && dateRange.to) {
+      filtered = filtered.filter(t => {
+        const transactionDate = new Date(t.date)
+        return transactionDate >= dateRange.from! && transactionDate <= dateRange.to!
+      })
+    } else if (dateRange.from) {
+      filtered = filtered.filter(t => new Date(t.date) >= dateRange.from!)
+    }
+
+    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }, [allTransactions, searchTerm, typeFilter, categoryFilter, dateRange])
+
+  // Reset filters function
+  const resetFilters = useCallback(() => {
+    setSearchTerm("")
+    setTypeFilter("ALL")
+    setCategoryFilter("ALL")
+    setDateRange({})
+  }, [])
+
+  // Mutations - updated to invalidate stats instead of overview
   const createTransactionMutation = useOptimizedMutation(
     createTransaction,
-    [QUERY_KEYS.transactions(), QUERY_KEYS.latestTransactions, QUERY_KEYS.stats, QUERY_KEYS.overview]
+    [QUERY_KEYS.transactions(), QUERY_KEYS.latestTransactions, QUERY_KEYS.stats]
   )
 
   const deleteTransactionMutation = useOptimizedMutation(
     deleteTransaction,
-    [QUERY_KEYS.transactions(), QUERY_KEYS.latestTransactions, QUERY_KEYS.stats, QUERY_KEYS.overview]
+    [QUERY_KEYS.transactions(), QUERY_KEYS.latestTransactions, QUERY_KEYS.stats]
   )
 
   const uploadReceiptMutation = useOptimizedMutation(uploadReceipt, [])
@@ -201,33 +352,7 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
     [QUERY_KEYS.budgets]
   )
 
-  // Filter functions
-  const getTransactionsByType = useCallback(
-    (type: TransactionType): Transaction[] => {
-      return transactions?.filter((t) => t.type === type) || []
-    },
-    [transactions]
-  )
-
-  const getTransactionsByCategory = useCallback(
-    (categoryId: number): Transaction[] => {
-      return transactions?.filter((t) => t.categoryId === categoryId) || []
-    },
-    [transactions]
-  )
-
-  const getTransactionsByDateRange = useCallback(
-    (startDate: Date, endDate: Date): Transaction[] => {
-      return (
-        transactions?.filter((t) => {
-          const transactionDate = new Date(t.date)
-          return transactionDate >= startDate && transactionDate <= endDate
-        }) || []
-      )
-    },
-    [transactions]
-  )
-
+  // Utility functions - simplified since we use centralized filtering
   const getCategoriesByType = useCallback(
     (type: TransactionType): Category[] => {
       return categories?.filter((c) => c.type === type) || []
@@ -242,48 +367,9 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
     [budgets]
   )
 
-  // Enhanced search function
-  const searchTransactions = useCallback(
-    (searchTerm: string, type?: TransactionType): Transaction[] => {
-      if (!transactions) return []
-      
-      const term = searchTerm.toLowerCase()
-      return transactions.filter(t => {
-        const matchesType = !type || t.type === type
-        const matchesSearch = 
-          t.description.toLowerCase().includes(term) ||
-          t.amount.toString().includes(term)
-        
-        return matchesType && matchesSearch
-      })
-    },
-    [transactions]
-  )
-  // Additional filter function for fetching filtered transactions from API
-  const getFilteredTransactions = useCallback(
-    async (filters: {
-      type?: TransactionType
-      categoryId?: string
-      searchTerm?: string
-      startDate?: Date
-      endDate?: Date
-    }): Promise<Transaction[]> => {
-      return fetchTransactions(filters)
-    },
-    []
-  )
-
-  // Additional function for fetching weekly sales data
-  const getWeeklyAnimalSalesData = useCallback(
-    async (year?: number, month?: number): Promise<ChartDataResponse> => {
-      return fetchWeeklyAnimalSales(year, month)
-    },
-    []
-  )
-
-  // Optimized chart data processing with useMemo
+  // Optimized chart data processing using allTransactions
   const processDataForCharts = useCallback((): ProcessedData => {
-    if (!transactions || !categories) {
+    if (!allTransactions || !categories) {
       return { 
         pemasukanData: [], 
         pengeluaranData: [], 
@@ -306,8 +392,8 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
     let totalPemasukan = 0
     let totalPengeluaran = 0
 
-    transactions.forEach(transaction => {
-      const category = categoryMap.get(transaction.categoryId)
+    allTransactions.forEach(transaction => {
+      const category = categoryMap.get(transaction.categoryId) || transaction.category
       const categoryName = category?.name || 'Unknown'
       const key = `${transaction.categoryId}-${categoryName}`
       
@@ -361,7 +447,7 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
       totalPemasukan,
       totalPengeluaran
     }
-  }, [transactions, categories])
+  }, [allTransactions, categories])
 
   // Lookup functions with useMemo for better performance
   const getCategoryById = useMemo(() => {
@@ -370,25 +456,25 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
   }, [categories])
 
   const getTransactionById = useMemo(() => {
-    const transactionMap = new Map(transactions?.map(t => [t.id, t]) || [])
+    const transactionMap = new Map(allTransactions?.map(t => [t.id, t]) || [])
     return (id: string) => transactionMap.get(id)
-  }, [transactions])
+  }, [allTransactions])
 
   const getBudgetById = useMemo(() => {
     const budgetMap = new Map(budgets?.map(b => [b.id, b]) || [])
     return (id: string) => budgetMap.get(id)
   }, [budgets])
 
-  // Stats functions with proper memoization
+  // Stats functions using allTransactions for consistency
   const calculateCategoryTotal = useCallback(
     (categoryId: number, type: TransactionType): number => {
       return (
-        transactions
+        allTransactions
           ?.filter((t) => t.categoryId === categoryId && t.type === type)
           .reduce((sum, t) => sum + t.amount, 0) || 0
       )
     },
-    [transactions]
+    [allTransactions]
   )
 
   const calculateBudgetUsage = useCallback(
@@ -397,12 +483,13 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
       if (!budget) return { used: 0, percentage: 0, remaining: 0 }
 
       const relevantTransactions =
-        transactions?.filter(
+        allTransactions?.filter(
           (t) =>
             t.categoryId === budget.categoryId &&
             new Date(t.date) >= new Date(budget.startDate) &&
             new Date(t.date) <= new Date(budget.endDate) &&
-            t.type === budget.category.type,
+            t.type === budget.category.type &&
+            !t.isQurbanTransaction // Exclude qurban transactions from budget calculations
         ) || []
 
       const used = relevantTransactions.reduce((sum, t) => sum + t.amount, 0)
@@ -411,7 +498,7 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
 
       return { used, percentage, remaining }
     },
-    [transactions, budgets]
+    [allTransactions, budgets]
   )
 
   const getMonthlyStats = useCallback(
@@ -419,7 +506,10 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
       const startDate = new Date(year, month - 1, 1)
       const endDate = new Date(year, month, 0, 23, 59, 59, 999)
 
-      const monthlyTransactions = getTransactionsByDateRange(startDate, endDate)
+      const monthlyTransactions = allTransactions.filter(t => {
+        const transactionDate = new Date(t.date)
+        return transactionDate >= startDate && transactionDate <= endDate
+      })
 
       const income = monthlyTransactions
         .filter((t) => t.type === TransactionType.PEMASUKAN)
@@ -431,18 +521,34 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
 
       return { income, expense, balance: income - expense }
     },
-    [getTransactionsByDateRange]
+    [allTransactions]
   )
 
   const contextValue: KeuanganContextType = {
-    // Data
+    // Data queries (removed overviewQuery)
     statsQuery,
     transactionsQuery,
     categoriesQuery,
     budgetsQuery,
-    overviewQuery,
     qurbanSalesQuery,
     weeklySalesQuery,
+
+    // Combined and processed data
+    allTransactions,
+    filteredTransactions,
+    overviewData, // Now calculated from allTransactions
+
+    // Filter state and setters
+    searchTerm,
+    typeFilter,
+    categoryFilter,
+    dateRange,
+    setSearchTerm,
+    setTypeFilter,
+    setCategoryFilter,
+    setDateRange,
+    resetFilters,
+
     // Mutations
     createTransaction: createTransactionMutation.mutateAsync,
     deleteTransaction: deleteTransactionMutation.mutateAsync,
@@ -454,21 +560,13 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
     updateBudget: (id: string, data: BudgetFormValues) => updateBudgetMutation.mutateAsync({ id, data }),
     deleteBudget: deleteBudgetMutation.mutateAsync,
 
-    // Filter and utility functions
-    getTransactionsByType,
-    getTransactionsByCategory,
-    getTransactionsByDateRange,
+    // Utility functions
     getCategoriesByType,
     getBudgetsByCategory,
     processDataForCharts,
     getCategoryById,
     getTransactionById,
     getBudgetById,
-
-    // Enhanced search and filter functions
-    searchTransactions,
-    getFilteredTransactions,
-    getWeeklyAnimalSalesData,
 
     // Stats functions
     calculateCategoryTotal,
@@ -487,4 +585,4 @@ export function useKeuangan() {
   return context
 }
 
-export type { KeuanganContextType }
+export type { KeuanganContextType, CombinedTransaction }

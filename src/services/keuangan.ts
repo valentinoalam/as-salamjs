@@ -8,7 +8,7 @@ import { writeFile, mkdir } from "fs/promises"
 import { join } from "path"
 import { v4 as uuidv4 } from "uuid"
 import type { CategoryFormValues, TransactionFormValues, BudgetFormValues } from "@/lib/zod/keuangan"
-import type { ChartDataResponse, QurbanSalesStats, TransactionDetail, WeeklySalesData } from "@/types/qurban"
+import type { ChartDataResponse, QurbanSalesStats, TransactionDetail, WeeklySalesData } from "@/types/keuangan"
 import type { CategoryDistribution, DataPoint } from "@/types/keuangan"
 
 export async function createCategory(data: CategoryFormValues) {
@@ -72,8 +72,22 @@ export async function getCategories() {
   try {
     const categories = await prisma.transactionCategory.findMany({
       orderBy: { name: "asc" },
+      include: {
+        _count: {
+          select: {
+            transactions: true
+          }
+        }
+      }
     })
-    return categories
+    return categories.map(category => ({
+      id: category.id,
+      name: category.name,
+      type: category.type,
+      trxCount: category._count.transactions,
+      createdAt: category.createdAt,
+      updatedAt: category.updatedAt
+    }))
   } catch (error) {
     console.error("Error fetching categories:", error)
     throw new Error("Failed to fetch categories")
@@ -110,17 +124,23 @@ export async function createTransaction(data: TransactionFormValues) {
 export async function getTransactionStats() {
   const totalIncome = await prisma.transaction.aggregate({
     where: { type: TransactionType.PEMASUKAN },
+    _count: { _all: true},
     _sum: { amount: true },
   })
 
+  const qurbanTrx = await prisma.mudhohi.count()
+
   const totalExpense = await prisma.transaction.aggregate({
     where: { type: TransactionType.PENGELUARAN },
+    _count: { _all: true},
     _sum: { amount: true },
   })
 
   return {
     totalIncome: totalIncome._sum.amount || 0,
     totalExpense: totalExpense._sum.amount || 0,
+    incomeTransactionCount: totalIncome._count._all + qurbanTrx,  // Added
+    expenseTransactionCount: totalExpense._count._all,
     balance: (totalIncome._sum.amount || 0) - (totalExpense._sum.amount || 0),
   }
 }
@@ -375,16 +395,15 @@ export async function getQurbanSalesStats(): Promise<QurbanSalesStats> {
   });
 
   // Calculate sales for each TipeHewan and accumulate totals
-  let totalCount = 0;
-  let totalSales = 0;
+  const totalCount = await prisma.mudhohi.count();
+  let totalSales = 0, animalCount = 0;
   
   const perTipeHewan = result.map(tipe => {
     const count = tipe._count.hewan;
     const sales = count * tipe.harga;
     
-    totalCount += count;
     totalSales += sales;
-
+    animalCount += count;
     return {
       tipeHewanId: tipe.id,
       nama: tipe.nama,
@@ -395,7 +414,7 @@ export async function getQurbanSalesStats(): Promise<QurbanSalesStats> {
     };
   });
 
-  return { perTipeHewan, totalCount, totalSales };
+  return { perTipeHewan, animalCount, totalCount, totalSales };
 }
 
 export async function getWeeklyAnimalSales(
@@ -724,33 +743,22 @@ export async function getOverviewData(): Promise<CategoryDistribution[]> {
 // Alternative function to get summary statistics
 export async function getOverviewSummary() {
   try {
-    const currentMonth = new Date();
-    const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-    const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
-
     // Get current month transactions
-    const currentMonthTransactions = await prisma.transaction.findMany({
-      where: {
-        date: {
-          gte: startOfMonth,
-          lte: endOfMonth,
-        },
-      },
-    });
+    const transactions = await prisma.transaction.findMany();
 
     // Calculate totals
-    const totalIncome = currentMonthTransactions
+    const totalIncome = transactions
       .filter(t => t.type === TransactionType.PEMASUKAN)
       .reduce((sum, t) => sum + t.amount, 0);
 
-    const totalExpense = currentMonthTransactions
+    const totalExpense = transactions
       .filter(t => t.type === TransactionType.PENGELUARAN)
       .reduce((sum, t) => sum + t.amount, 0);
 
     const balance = totalIncome - totalExpense;
 
     // Get transaction count
-    const transactionCount = currentMonthTransactions.length;
+    const transactionCount = transactions.length;
 
     return {
       totalIncome,

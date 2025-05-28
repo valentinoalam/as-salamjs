@@ -106,7 +106,7 @@ model Mudhohi {
   id               String   @id @default(cuid()) @db.Char(36)
   userId           String   @db.Char(36)
   paymentId        String
-  nama_pengqurban  String?   @db.VarChar(200)
+  nama_pengqurban  String   @db.VarChar(200)
   nama_peruntukan  String?   @db.VarChar(200)
   alamat           String?
   pesan_khusus     String?   @db.VarChar(500)

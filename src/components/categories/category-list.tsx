@@ -31,7 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ArrowUp, ArrowDown, Edit, MoreHorizontal, Trash2, Plus } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 
 interface Category {
   id: string;
@@ -41,7 +41,7 @@ interface Category {
 }
 
 interface CategoryListProps {
-  type: 'ALL' | 'INCOME' | 'EXPENSE';
+  type: 'ALL' | 'PEMASUKAN' | 'PENGELUARAN';
 }
 
 export function CategoryList({ type }: CategoryListProps) {
@@ -63,22 +63,22 @@ export function CategoryList({ type }: CategoryListProps) {
         
         // Mock data
         const mockCategories = [
-          { id: '1', name: 'Pembelian Hewan Qurban - Sapi', type: TransactionType.EXPENSE, transactionCount: 1 },
-          { id: '2', name: 'Biaya Distribusi Daging', type: TransactionType.EXPENSE, transactionCount: 1 },
-          { id: '3', name: 'Donasi Qurban', type: TransactionType.INCOME, transactionCount: 1 },
-          { id: '4', name: 'Biaya Pemotongan & Pengulitan', type: TransactionType.EXPENSE, transactionCount: 1 },
-          { id: '5', name: 'Belanja Bumbu & Bahan Masakan', type: TransactionType.EXPENSE, transactionCount: 1 },
-          { id: '6', name: 'Sedekah Idul Adha', type: TransactionType.INCOME, transactionCount: 0 },
-          { id: '7', name: 'Penjualan Kulit Hewan', type: TransactionType.INCOME, transactionCount: 0 },
-          { id: '8', name: 'Lain-lain (Pemasukan)', type: TransactionType.INCOME, transactionCount: 0 },
-          { id: '9', name: 'Sewa Alat', type: TransactionType.EXPENSE, transactionCount: 0 },
-          { id: '10', name: 'Lain-lain (Pengeluaran)', type: TransactionType.EXPENSE, transactionCount: 0 },
+          { id: '1', name: 'Pembelian Hewan Qurban - Sapi', type: TransactionType.PENGELUARAN, transactionCount: 1 },
+          { id: '2', name: 'Biaya Distribusi Daging', type: TransactionType.PENGELUARAN, transactionCount: 1 },
+          { id: '3', name: 'Donasi Qurban', type: TransactionType.PEMASUKAN, transactionCount: 1 },
+          { id: '4', name: 'Biaya Pemotongan & Pengulitan', type: TransactionType.PENGELUARAN, transactionCount: 1 },
+          { id: '5', name: 'Belanja Bumbu & Bahan Masakan', type: TransactionType.PENGELUARAN, transactionCount: 1 },
+          { id: '6', name: 'Sedekah Idul Adha', type: TransactionType.PEMASUKAN, transactionCount: 0 },
+          { id: '7', name: 'Penjualan Kulit Hewan', type: TransactionType.PEMASUKAN, transactionCount: 0 },
+          { id: '8', name: 'Lain-lain (Pemasukan)', type: TransactionType.PEMASUKAN, transactionCount: 0 },
+          { id: '9', name: 'Sewa Alat', type: TransactionType.PENGELUARAN, transactionCount: 0 },
+          { id: '10', name: 'Lain-lain (Pengeluaran)', type: TransactionType.PENGELUARAN, transactionCount: 0 },
         ];
         
-        if (type === 'INCOME') {
-          setCategories(mockCategories.filter(c => c.type === TransactionType.INCOME));
-        } else if (type === 'EXPENSE') {
-          setCategories(mockCategories.filter(c => c.type === TransactionType.EXPENSE));
+        if (type === 'PEMASUKAN') {
+          setCategories(mockCategories.filter(c => c.type === TransactionType.PEMASUKAN));
+        } else if (type === 'PENGELUARAN') {
+          setCategories(mockCategories.filter(c => c.type === TransactionType.PENGELUARAN));
         } else {
           setCategories(mockCategories);
         }
@@ -148,7 +148,7 @@ export function CategoryList({ type }: CategoryListProps) {
         <h3 className="text-lg font-medium">
           {type === 'ALL' 
             ? 'Tidak ada kategori' 
-            : type === 'INCOME' 
+            : type === 'PEMASUKAN' 
               ? 'Tidak ada kategori pemasukan' 
               : 'Tidak ada kategori pengeluaran'
           }
@@ -184,10 +184,10 @@ export function CategoryList({ type }: CategoryListProps) {
                 <TableCell className="font-medium">{category.name}</TableCell>
                 <TableCell>
                   <Badge 
-                    variant={category.type === TransactionType.INCOME ? "success" : "destructive"}
+                    variant={category.type === TransactionType.PEMASUKAN ? "default" : "destructive"}
                     className="flex items-center w-fit"
                   >
-                    {category.type === TransactionType.INCOME ? (
+                    {category.type === TransactionType.PEMASUKAN ? (
                       <>
                         <ArrowUp className="mr-1 h-3 w-3" />
                         Pemasukan
@@ -238,7 +238,7 @@ export function CategoryList({ type }: CategoryListProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus Kategori</AlertDialogTitle>
             <AlertDialogDescription>
-              {deleteCategory?.transactionCount > 0 ? (
+              {deleteCategory?.transactionCount! > 0 ? (
                 <span className="text-destructive font-medium">
                   Kategori ini tidak dapat dihapus karena digunakan oleh {deleteCategory?.transactionCount} transaksi.
                   Ubah atau hapus transaksi terkait terlebih dahulu.

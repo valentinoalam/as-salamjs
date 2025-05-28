@@ -184,7 +184,7 @@ export default function CategoriesTab() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Created At</TableHead>
+                  <TableHead>Transaksi</TableHead>
                   <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -193,7 +193,7 @@ export default function CategoriesTab() {
                   <TableRow key={category.id}>
                     <TableCell className="font-medium">{category.name}</TableCell>
                     <TableCell>{getTypeBadge(category.type)}</TableCell>
-                    <TableCell>{format(new Date(category.createdAt!), "dd/MM/yyyy HH:mm")}</TableCell>
+                    <TableCell>{category.trxCount}</TableCell>
                     <TableCell className="text-center">
                       <div className="flex justify-center space-x-2">
                         <Button

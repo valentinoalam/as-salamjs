@@ -9,6 +9,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } f
 
 import { TrendingUp } from "lucide-react";
 import { formatCurrency } from "@/lib/formatters";
+import { useKeuangan } from "@/contexts/keuangan-context";
 
 // Define chart configuration for different categories
 const chartConfig = {
@@ -25,64 +26,59 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 export function Overview() {
-
-  const [data, setData] = useState<ProcessedData>({
-    pemasukanData: [],
-    pengeluaranData: [],
-    totalPemasukan: 0,
-    totalPengeluaran: 0,
-  })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true)
-        const rawData = await getOverviewData()
+  const { overviewData: data } = useKeuangan()
+  
+  // const [loading, setLoading] = useState(true)
+  // const [error, setError] = useState<string | null>(null)
+  // useEffect(() => {
+  //   async function fetchData() {
+  //     try {
+  //       setLoading(true)
+  //       const rawData = await getOverviewData()
         
-        // Separate and process the data
-        const pemasukanItems = rawData.filter(item => 
-          item.name.startsWith('Pemasukan')
-        )
-        const pengeluaranItems = rawData.filter(item => 
-          item.name.startsWith('Pengeluaran')
-        )
+  //       // Separate and process the data
+  //       const pemasukanItems = rawData.filter(item => 
+  //         item.name.startsWith('Pemasukan')
+  //       )
+  //       const pengeluaranItems = rawData.filter(item => 
+  //         item.name.startsWith('Pengeluaran')
+  //       )
 
-        // Calculate totals
-        const totalPemasukan = pemasukanItems.reduce((sum, item) => sum + item.value, 0)
-        const totalPengeluaran = pengeluaranItems.reduce((sum, item) => sum + item.value, 0)
+  //       // Calculate totals
+  //       const totalPemasukan = pemasukanItems.reduce((sum, item) => sum + item.value, 0)
+  //       const totalPengeluaran = pengeluaranItems.reduce((sum, item) => sum + item.value, 0)
 
-        // Format data for charts
-        const pemasukanData = pemasukanItems.map(item => ({
-          name: item.name.replace('Pemasukan - ', ''),
-          value: item.value,
-          fill: item.color,
-        }))
+  //       // Format data for charts
+  //       const pemasukanData = pemasukanItems.map(item => ({
+  //         name: item.name.replace('Pemasukan - ', ''),
+  //         value: item.value,
+  //         fill: item.color,
+  //       }))
 
-        const pengeluaranData = pengeluaranItems.map(item => ({
-          name: item.name.replace('Pengeluaran - ', ''),
-          value: item.value,
-          fill: item.color,
-        }))
+  //       const pengeluaranData = pengeluaranItems.map(item => ({
+  //         name: item.name.replace('Pengeluaran - ', ''),
+  //         value: item.value,
+  //         fill: item.color,
+  //       }))
 
-        setData({
-          pemasukanData,
-          pengeluaranData,
-          totalPemasukan,
-          totalPengeluaran,
-        })
-      } catch (err) {
-        setError('Failed to load financial data')
-        console.error('Error loading financial data:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
+  //       setData({
+  //         pemasukanData,
+  //         pengeluaranData,
+  //         totalPemasukan,
+  //         totalPengeluaran,
+  //       })
+  //     } catch (err) {
+  //       setError('Failed to load financial data')
+  //       console.error('Error loading financial data:', err)
+  //     } finally {
+  //       setLoading(false)
+  //     }
+  //   }
 
-    fetchData()
-  }, [])
+  //   fetchData()
+  // }, [])
 
-  if (loading) {
+  if (!data) {
     return (
       <Card className="flex flex-col">
         <CardHeader className="items-center pb-0">
@@ -98,21 +94,21 @@ export function Overview() {
     )
   }
 
-  if (error) {
-    return (
-      <Card className="flex flex-col">
-        <CardHeader className="items-center pb-0">
-          <CardTitle>Financial Overview</CardTitle>
-          <CardDescription>Error loading data</CardDescription>
-        </CardHeader>
-        <CardContent className="flex-1 pb-0">
-          <div className="mx-auto aspect-square max-h-[250px] flex items-center justify-center">
-            <div className="text-destructive">{error}</div>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
+  // if (error) {
+  //   return (
+  //     <Card className="flex flex-col">
+  //       <CardHeader className="items-center pb-0">
+  //         <CardTitle>Financial Overview</CardTitle>
+  //         <CardDescription>Error loading data</CardDescription>
+  //       </CardHeader>
+  //       <CardContent className="flex-1 pb-0">
+  //         <div className="mx-auto aspect-square max-h-[250px] flex items-center justify-center">
+  //           <div className="text-destructive">{error}</div>
+  //         </div>
+  //       </CardContent>
+  //     </Card>
+  //   )
+  // }
 
   const netAmount = data.totalPemasukan - data.totalPengeluaran
   const isPositive = netAmount >= 0

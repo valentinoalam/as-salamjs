@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -29,159 +29,46 @@ import { Calendar } from "@/components/ui/calendar"
 import type { DateRange } from "react-day-picker"
 import { exportToExcel } from "@/lib/excel"
 import { Overview } from "@/components/dashboard/summaries/overview"
-import type { Category, Image, Transaction } from "@/types/keuangan"
+import type { Category, Image } from "@/types/keuangan"
 import { formatCurrency } from "@/lib/formatters"
 import { useKeuangan } from "@/contexts/keuangan-context"
 
 const ITEMS_PER_PAGE = 10
 
 export default function TransactionsTab() {
-  // Use keuangan context
+  // Use centralized keuangan context with filter state
   const {
     transactionsQuery,
     categoriesQuery,
-    qurbanSalesQuery,
     deleteTransaction,
-    searchTransactions,
-    getTransactionsByType,
-    getTransactionsByCategory,
-    getTransactionsByDateRange,
-    getCategoryById,
+    filteredTransactions,
+    searchTerm,
+    typeFilter,
+    categoryFilter,
+    dateRange,
+    setSearchTerm,
+    setTypeFilter,
+    setCategoryFilter,
+    setDateRange,
+    resetFilters,
   } = useKeuangan()
 
-  // Local state for filters and UI
-  const [searchTerm, setSearchTerm] = useState("")
-  const [typeFilter, setTypeFilter] = useState<TransactionType | "ALL">("ALL")
-  const [categoryFilter, setCategoryFilter] = useState<string>("ALL")
-  const [dateRange, setDateRange] = useState<{
-    from?: Date
-    to?: Date
-  }>({})
+  // Local UI state only
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
 
   // Get data from context
-  const { data: transactions = [], isLoading: transactionsLoading, refetch: refetchTransactions } = transactionsQuery
+  const { isLoading: transactionsLoading, refetch: refetchTransactions } = transactionsQuery
   const { data: categories = [] } = categoriesQuery
-  const { data: qurbanSales } = qurbanSalesQuery
-
-  // Create combined transactions including qurban data
-  const allTransactions = useMemo(() => {
-    const regularTransactions = transactions || []
-    
-    if (!qurbanSales?.perTipeHewan) {
-      return regularTransactions
-    }
-
-    const qurbanCategory: Category = {
-      id: 0,
-      name: "Penjualan Hewan Qurban",
-      type: TransactionType.PEMASUKAN
-    }
-
-    // Create transactions for each TipeHewan with sales
-    const qurbanTransactions = qurbanSales.perTipeHewan
-      .filter((tipe: { count: number }) => tipe.count > 0)
-      .map((tipe: { tipeHewanId: any; totalAmount: any; nama: any }) => ({
-        id: `qurban-${tipe.tipeHewanId}`,
-        amount: tipe.totalAmount,
-        description: `Penjualan ${tipe.nama}`,
-        type: TransactionType.PEMASUKAN,
-        categoryId: qurbanCategory?.id || -1,
-        category: {
-          ...qurbanCategory,
-          name: `Qurban - ${tipe.nama}`
-        },
-        date: new Date(),
-        receiptUrl: [],
-        createdBy: 'system',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }))
-
-    // Combine and sort by date (newest first)
-    return [...qurbanTransactions, ...regularTransactions]
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  }, [transactions, qurbanSales])
-
-  // Apply filters using context functions and local logic
-  const filteredTransactions = useMemo(() => {
-    let filtered = [...allTransactions]
-
-    // Search filter using context function
-    if (searchTerm) {
-      filtered = searchTransactions(searchTerm)
-      // For qurban transactions, apply additional manual filtering
-      const qurbanFiltered = allTransactions
-        .filter((t: Transaction) => t.id.startsWith('qurban-'))
-        .filter((t: Transaction) => 
-          t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          t.category.name.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      
-      // Combine and dedupe
-      const regularFiltered = filtered.filter(t => !t.id.startsWith('qurban-'))
-      filtered = [...qurbanFiltered, ...regularFiltered]
-    }
-
-    // Type filter using context function
-    if (typeFilter !== "ALL") {
-      const typeFiltered = getTransactionsByType(typeFilter)
-      filtered = filtered.filter(t => 
-        typeFiltered.some((tf: Transaction) => tf.id === t.id) || 
-        (t.id.startsWith('qurban-') && t.type === typeFilter)
-      )
-    }
-
-    // Category filter using context function
-    if (categoryFilter !== "ALL") {
-      const categoryId = parseInt(categoryFilter)
-      const categoryFiltered = getTransactionsByCategory(categoryId)
-      filtered = filtered.filter(t => 
-        categoryFiltered.some((cf: Transaction) => cf.id === t.id) || 
-        (t.id.startsWith('qurban-') && t.categoryId === categoryId)
-      )
-    }
-
-    // Date range filter using context function
-    if (dateRange.from && dateRange.to) {
-      const dateFiltered = getTransactionsByDateRange(dateRange.from, dateRange.to)
-      filtered = filtered.filter(t => 
-        dateFiltered.some((df: Transaction) => df.id === t.id) || 
-        (t.id.startsWith('qurban-') && 
-         new Date(t.date) >= dateRange.from! && 
-         new Date(t.date) <= dateRange.to!)
-      )
-    } else if (dateRange.from) {
-      const dateFiltered = getTransactionsByDateRange(dateRange.from, new Date())
-      filtered = filtered.filter(t => 
-        dateFiltered.some((df: Transaction) => df.id === t.id) || 
-        (t.id.startsWith('qurban-') && new Date(t.date) >= dateRange.from!)
-      )
-    }
-
-    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  }, [
-    allTransactions, 
-    searchTerm, 
-    typeFilter, 
-    categoryFilter, 
-    dateRange,
-    searchTransactions,
-    getTransactionsByType,
-    getTransactionsByCategory,
-    getTransactionsByDateRange
-  ])
 
   // Reset current page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, typeFilter, categoryFilter, dateRange])
+  }, [filteredTransactions.length])
 
   const handleTransactionCreated = async (success: boolean) => {
     if (success) {
       setIsFormOpen(false)
-      // Refetch data using context
       await refetchTransactions()
     }
   }
@@ -223,6 +110,7 @@ export default function TransactionsTab() {
       Date: format(new Date(t.date), "dd/MM/yyyy"),
       "Number of Receipts": t.receiptUrl?.length || 0,
       "Created At": format(new Date(t.createdAt), "dd/MM/yyyy HH:mm"),
+      "Source": t.isQurbanTransaction ? "Qurban Sales" : "Manual Entry"
     }))
 
     exportToExcel(data, "keuangan_transactions")
@@ -272,14 +160,6 @@ export default function TransactionsTab() {
         {category.name}
       </Badge>
     )
-  }
-
-  const resetFilters = () => {
-    setSearchTerm("")
-    setTypeFilter("ALL")
-    setCategoryFilter("ALL")
-    setDateRange({})
-    setCurrentPage(1)
   }
 
   // Pagination calculations
@@ -332,7 +212,7 @@ export default function TransactionsTab() {
 
               <Select
                 value={categoryFilter}
-                onValueChange={(value) => setCategoryFilter(value)}
+                onValueChange={setCategoryFilter}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Filter by category" />

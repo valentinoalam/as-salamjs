@@ -26,7 +26,6 @@ import { useKeuangan } from "@/contexts/keuangan-context"
 import type { Budget, Category } from "@/types/keuangan"
 import { Skeleton } from "@/components/ui/skeleton"
 
-
 export default function BudgetsTab() {
   const {
     budgetsQuery,
@@ -34,12 +33,18 @@ export default function BudgetsTab() {
     transactionsQuery,
     deleteBudget,
   } = useKeuangan()
-  const {data: budgets, isLoading: isBudgetsLoading} = budgetsQuery
-  const {data: transactions, isLoading: isTransactionsLoading} = transactionsQuery
-  const {data: categories, isLoading: isCategoriesLoading} = categoriesQuery
+  
+  const { data: budgets, isLoading: isBudgetsLoading } = budgetsQuery
+  const { data: transactions, isLoading: isTransactionsLoading } = transactionsQuery
+  const { data: categories, isLoading: isCategoriesLoading } = categoriesQuery
+  
   const [updating, setUpdating] = useState(false)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null)
+
+  // Derived states
+  const isLoading = isBudgetsLoading || isTransactionsLoading || isCategoriesLoading
+  const isEmpty = !isLoading && (!budgets || budgets.length === 0)
 
   const handleBudgetCreated = async (success: boolean, newBudget?: Budget) => {
     if (success && newBudget) {
@@ -116,7 +121,11 @@ export default function BudgetsTab() {
   }
 
   const getBudgetProgress = (budget: Budget) => {
-    const relevantTransactions = (transactions || []).filter(
+    if (!transactions) {
+      return { usedAmount: 0, percentageUsed: 0, isOverBudget: false }
+    }
+
+    const relevantTransactions = transactions.filter(
       (t) =>
         t.categoryId === budget.categoryId &&
         new Date(t.date) >= new Date(budget.startDate) &&
@@ -132,7 +141,7 @@ export default function BudgetsTab() {
     return {
       usedAmount,
       percentageUsed,
-      isOverBudget: percentageUsed > 100,
+      isOverBudget: usedAmount > budget.amount,
     }
   }
 
@@ -190,6 +199,102 @@ export default function BudgetsTab() {
     </Card>
   )
 
+  const renderBudgetCard = (budget: Budget) => {
+    const { usedAmount, percentageUsed, isOverBudget } = getBudgetProgress(budget)
+    
+    return (
+      <Card key={budget.id} className="overflow-hidden">
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row justify-between mb-4">
+            <div>
+              <h4 className="text-lg font-semibold">{budget.category.name}</h4>
+              <div className="flex items-center gap-2 mt-1">
+                {getTypeBadge(budget.category.type)}
+                {getBudgetProgressBadge(budget)}
+              </div>
+            </div>
+            <div className="mt-2 md:mt-0 text-right">
+              <div className="text-lg font-bold">{formatCurrency(budget.amount)}</div>
+              <div className="text-sm text-muted-foreground">
+                {format(new Date(budget.startDate), "dd MMM yyyy")} -{" "}
+                {format(new Date(budget.endDate), "dd MMM yyyy")}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>Used: {formatCurrency(usedAmount)}</span>
+              <span>Remaining: {formatCurrency(Math.max(budget.amount - usedAmount, 0))}</span>
+            </div>
+            <Progress
+              value={percentageUsed}
+              className={`h-2 ${isOverBudget ? "bg-red-200" : "bg-gray-200"}`}
+              indicatorClassName={isOverBudget ? "bg-red-500" : undefined}
+            />
+          </div>
+
+          <div className="flex justify-end mt-4 space-x-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => handleEditBudget(budget)}
+              disabled={updating}
+            >
+              <Edit className="h-4 w-4 mr-1" />
+              Edit
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-red-500 hover:text-red-700"
+                  disabled={updating}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Budget</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete this budget? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => handleDeleteBudget(budget.id)}
+                    className="bg-red-500 hover:bg-red-600"
+                    disabled={updating}
+                  >
+                    {updating ? "Deleting..." : "Delete"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const renderEmptyState = () => (
+    <Card>
+      <CardContent className="flex flex-col items-center justify-center p-6">
+        <p className="text-muted-foreground mb-4">
+          No budgets found. Add your first budget to get started.
+        </p>
+        <Button onClick={() => setIsFormOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Budget
+        </Button>
+      </CardContent>
+    </Card>
+  )
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -199,6 +304,7 @@ export default function BudgetsTab() {
             setEditingBudget(null)
             setIsFormOpen(true)
           }}
+          disabled={updating}
         >
           <Plus className="h-4 w-4 mr-2" />
           Add Budget
@@ -215,104 +321,18 @@ export default function BudgetsTab() {
       />
 
       <div className="space-y-4">
-        isLoading ? (
+        {isLoading ? (
           <div className="grid grid-cols-1 gap-4">
             {[1, 2, 3].map((i) => <BudgetSkeleton key={i} />)}
           </div>
         ) : isEmpty ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center p-6">
-              <p className="text-muted-foreground mb-4">
-                No budgets found. Add your first budget to get started.
-              </p>
-              <Button onClick={() => setIsFormOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Budget
-              </Button>
-            </CardContent>
-          </Card>
-        ) : { budgets && budgets.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4">
-            {budgets.map((budget) => {
-              const { usedAmount, percentageUsed, isOverBudget } = getBudgetProgress(budget)
-              return (
-                <Card key={budget.id} className="overflow-hidden">
-                  <CardContent className="p-6">
-                    <div className="flex flex-col md:flex-row justify-between mb-4">
-                      <div>
-                        <h4 className="text-lg font-semibold">{budget.category.name}</h4>
-                        <div className="flex items-center gap-2 mt-1">
-                          {getTypeBadge(budget.category.type)}
-                          {getBudgetProgressBadge(budget)}
-                        </div>
-                      </div>
-                      <div className="mt-2 md:mt-0 text-right">
-                        <div className="text-lg font-bold">{formatCurrency(budget.amount)}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {format(new Date(budget.startDate), "dd MMM yyyy")} -{" "}
-                          {format(new Date(budget.endDate), "dd MMM yyyy")}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Used: {formatCurrency(usedAmount)}</span>
-                        <span>Remaining: {formatCurrency(Math.max(budget.amount - usedAmount, 0))}</span>
-                      </div>
-                      <Progress
-                        value={percentageUsed}
-                        className={`h-2 ${isOverBudget ? "bg-red-200" : "bg-gray-200"}`}
-                        indicatorClassName={isOverBudget ? "bg-red-500" : undefined}
-                      />
-                    </div>
-
-                    <div className="flex justify-end mt-4 space-x-2">
-                      <Button variant="ghost" size="sm" onClick={() => handleEditBudget(budget)}>
-                        <Edit className="h-4 w-4 mr-1" />
-                        Edit
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700">
-                            <Trash2 className="h-4 w-4 mr-1" />
-                            Delete
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Budget</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete this budget? This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDeleteBudget(budget.id)}
-                              className="bg-red-500 hover:bg-red-600"
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
+          renderEmptyState()
         ) : (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center p-6">
-              <p className="text-muted-foreground mb-4">No budgets found. Add your first budget to get started.</p>
-              <Button onClick={() => setIsFormOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Budget
-              </Button>
-            </CardContent>
-          </Card>
+          budgets && budgets.length > 0 && (
+            <div className="grid grid-cols-1 gap-4">
+              {budgets.map(renderBudgetCard)}
+            </div>
+          )
         )}
       </div>
     </div>

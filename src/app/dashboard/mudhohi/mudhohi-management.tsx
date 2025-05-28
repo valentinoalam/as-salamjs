@@ -24,7 +24,7 @@ import { exportToExcel } from "@/lib/excel"
 import { CheckCircle, XCircle, Clock, AlertCircle, Search, Plus, RefreshCw, Download } from "lucide-react"
 import QurbanForm from "@/components/qurban/form-pemesanan-qurban"
 import { Label } from "@/components/ui/label"
-import type { TipeHewan } from "@/types/qurban"
+import type { TipeHewan } from "@/types/keuangan"
 
 type MudhohiStats = {
   totalMudhohi: number

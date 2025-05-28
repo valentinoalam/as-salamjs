@@ -2,7 +2,7 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { TrendingUp } from 'lucide-react'
-import type { ChartDataResponse } from '@/types/qurban'
+import type { ChartDataResponse } from'@/types/keuangan'
 
 const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300']
 

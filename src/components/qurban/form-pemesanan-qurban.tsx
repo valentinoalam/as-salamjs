@@ -23,7 +23,7 @@ import { toast } from "@/hooks/use-toast"
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
-import type { TipeHewan } from "@/types/qurban"
+import type { TipeHewan } from "@/types/keuangan"
 
 // Form Schema
 const qurbanFormSchema = z.object({

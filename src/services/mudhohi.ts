@@ -5,7 +5,9 @@ import { revalidatePath } from "next/cache"
 import { PaymentStatus, type CaraBayar } from "@prisma/client"
 import { randomUUID } from "crypto"
 import { generateHewanId } from "@/services/qurban"
-
+import { differenceInDays, format, startOfDay, subDays } from "date-fns"
+import moment from "moment-hijri"
+import "moment/locale/id"
 export async function getMudhohiStats() {
   const totalMudhohi = await prisma.mudhohi.count()
   const totalHewan = await prisma.hewanQurban.count({
@@ -259,4 +261,67 @@ export async function createMudhohi(data: {
     console.error("Error creating mudhohi:", error)
     return { success: false, error: "Failed to create mudhohi" }
   }
+}
+
+const HIJRI_MONTH_MAP: { [key: string]: string } = {
+  'Muharram': 'Muharam',
+  'Safar': 'Safar',
+  "Rabi' al-Awwal": 'Rabiul Awal',
+  "Rabi' al-Thani": 'Rabiul Akhir',
+  'Jumada al-Ula': 'Jumadil Awal',
+  'Jumada al-Alkhirah': 'Jumadil Akhir',
+  'Rajab': 'Rajab',
+  'Sha’ban': "Sya'ban",
+  'Ramadhan': 'Ramadan',
+  'Shawwal': 'Syawal',
+  "Dhu al-Qi'dah": 'Dzulqodah',
+  'Thul-Qi’dah': 'Dzulqodah',
+  'Dhu al-Hijjah': 'Dzulhijjah',
+  'Thul-Hijjah': 'Dzulhijjah',
+};
+
+export async function getMudhohiProgress() {
+  const date = moment().iYear(); // Get current Hijri year
+  const hijriDate = moment(`${date}-12-10`, 'iYYYY-iMM-iDD');
+  const day = hijriDate.toDate(); // Convert to JavaScript Date
+  const startDate = subDays(startOfDay(day), 20);
+
+  const mudhohiRecords = await prisma.mudhohi.findMany({
+    where: {
+      createdAt: {
+        gte: startDate,
+        lt: day
+      }
+    },
+    select: {
+      createdAt: true
+    }
+  });
+
+  const grouped: { [key: string]: number } = {};
+
+  mudhohiRecords.forEach(record => {
+    const daysAgo = differenceInDays(day, record.createdAt);
+    const bucket = Math.floor((20 - daysAgo) / 2); // 2-day intervals
+    const bucketStart = subDays(day, 20 - bucket * 2);
+    const dateKey = format(bucketStart, 'yyyy-MM-dd');
+
+    grouped[dateKey] = (grouped[dateKey] || 0) + 1;
+  });
+  moment.locale('id');
+  const result = Object.entries(grouped)
+    .map(([date, total]) => ({ date, total }))
+    .sort((a, b) => new Date(a.date).getTime()  - new Date(b.date).getTime() )
+    .map(({ date, total }) => {
+      const hijri = moment(date);
+      const rawMonth = hijri.format('iMMMM');
+      const day = hijri.format('iD');
+      const mappedMonth = HIJRI_MONTH_MAP[rawMonth] || rawMonth;
+
+      return {
+        date: `${day} ${mappedMonth}`,
+        total,
+      };
+    });
+  return result; // Added return statement
 }

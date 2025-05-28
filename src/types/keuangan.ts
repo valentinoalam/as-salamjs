@@ -1,5 +1,51 @@
-import type { TipeHewan, TransactionType } from "@prisma/client";
+import type { TransactionType } from "@prisma/client";
 
+export type perHewanSalesStat = {
+  tipeHewanId: number;
+  nama: string;
+  jenis: string;
+  harga: number;
+  count: number;
+  totalAmount: number;
+}
+
+export type QurbanSalesStats = {
+  totalSales: number
+  totalCount: number
+  perTipeHewan: perHewanSalesStat[]
+  animalCount: number
+}
+
+export interface ChartDataResponse {
+  data: WeeklySalesData[]
+  animalTypes: string[]
+  totalSales: number
+  transactions: TransactionDetail[]
+  totalRevenue: number
+}
+
+export interface TransactionDetail {
+  id: string
+  nama_pengqurban: string
+  createdAt: Date
+  totalAmount: number
+  hewanTypes: Array<{
+    nama: string
+    harga: number
+    count: number
+  }>
+  paymentStatus: string //"PAID" | "PENDING"
+}
+
+export type TipeHewan = {
+  id: number
+  nama: string
+  icon: string | null
+  harga: number
+  hargaKolektif?: number | null
+  note?: string | null
+  jenis?: string
+}
 export interface DataPoint {
   name: string;
   value: number
@@ -22,6 +68,7 @@ export interface Category {
   id: number
   name: string
   type: TransactionType
+  trxCount?: number
   createdAt?: Date
   updatedAt?: Date
 }
@@ -75,41 +122,16 @@ export interface TransactionFormValues {
 export type TransactionStats = {
   totalIncome: number
   totalExpense: number
+  incomeTransactionCount: number  // New
+  expenseTransactionCount: number  // New
   balance: number
-}
-
-export interface QurbanSalesStats {
-  perTipeHewan: Array<{
-    tipeHewanId: number
-    nama: string
-    jenis: string
-    harga: number
-    count: number
-    totalAmount: number
-  }>
-  totalCount: number
-  totalSales: number
-}
-
-export interface TransactionDetail {
-  id: string
-  nama_pengqurban: string
-  createdAt: Date
-  totalAmount: number
-  hewanTypes: Array<{
-    nama: string
-    harga: number
-    count: number
-  }>
-  paymentStatus: "PAID" | "PENDING"
 }
 
 export interface WeeklySalesData {
   week: string
   weekNumber: number
-  [key: string]: string | number
+  [animalType: string]: number | string
 }
-
 export interface ChartDataResponse {
   data: WeeklySalesData[]
   animalTypes: string[]
@@ -134,13 +156,4 @@ export interface BudgetFormValues {
   categoryId: number
   startDate: Date
   endDate: Date
-}
-
-
-interface KeuanganDashboardProps {
-  initialStats: TransactionStats
-  initialTransactions: Transaction[]
-  initialCategories: Category[]
-  initialBudgets: Budget[]
-  initialTipeHewan?: TipeHewan[]
 }

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Calendar, TrendingUp, Users } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { TransactionList } from './transaction-list'
-import type { ChartDataResponse } from '@/types/qurban'
+import type { ChartDataResponse } from'@/types/keuangan'
 import ChartComponent from './qurban-sales-view/animal-sales-chart'
 import { useKeuangan } from '@/contexts/keuangan-context'
 

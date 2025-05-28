@@ -1,34 +1,14 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingDown, TrendingUp, Wallet, Loader2 } from "lucide-react";
+import { TrendingDown, TrendingUp, Wallet, Scale } from "lucide-react";
 import { formatCurrency } from "@/lib/formatters";
 import { useKeuangan } from "@/contexts/keuangan-context";
 
-export function FinancialSummary() {
+  
+export function FinancialSummary({qSales}: {qSales: number}) {
   const { statsQuery } = useKeuangan();
-  const { data: stats, isLoading, error} = statsQuery
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="grid gap-4 md:grid-cols-3">
-        {[1, 2, 3].map((i) => (
-          <Card key={i} className="animate-pulse">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                <div className="h-4 bg-gray-200 rounded w-20"></div>
-              </CardTitle>
-              <div className="h-4 w-4 bg-gray-200 rounded"></div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-8 bg-gray-200 rounded w-24 mb-2"></div>
-              <div className="h-3 bg-gray-200 rounded w-16"></div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    );
-  }
+  const { data: stats, error} = statsQuery
 
   // Error state
   if (error) {
@@ -68,39 +48,45 @@ export function FinancialSummary() {
     );
   }
 
-  const { totalIncome, totalExpense, balance } = stats;
-
+  const { 
+    totalIncome: otherIncome, 
+    totalExpense, 
+    incomeTransactionCount, 
+    expenseTransactionCount
+  } = stats;
+  const totalIncome = qSales + otherIncome
+  const balance = totalIncome - totalExpense
   // Determine balance trend
   const balanceColor = balance >= 0 ? "text-green-600" : "text-red-600";
-  const BalanceIcon = balance >= 0 ? TrendingUp : TrendingDown;
+  const BalanceIcon = balance === 0 ? Scale : balance >= 0 ? TrendingUp : TrendingDown;
 
   return (
     <div className="grid gap-4 md:grid-cols-3">
       {/* Income Card */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Pemasukan</CardTitle>
+          <CardTitle className="text-sm font-medium">Total pemasukan dari {incomeTransactionCount} transaksi</CardTitle>
           <TrendingUp className="h-4 w-4 text-green-600" />
         </CardHeader>
         <CardContent>
+
           <div className="text-2xl font-bold text-green-600">
             {formatCurrency(totalIncome)}
           </div>
-          <p className="text-xs text-muted-foreground">Total pemasukan</p>
+          { qSales && <p className="text-xs text-muted-foreground">Pemasukan lain-lainnya: {formatCurrency(otherIncome)}</p> }
         </CardContent>
       </Card>
 
       {/* Expense Card */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Pengeluaran</CardTitle>
+          <CardTitle className="text-sm font-medium">Total pengeluaran dari {expenseTransactionCount} transaksi</CardTitle>
           <TrendingDown className="h-4 w-4 text-red-600" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-red-600">
             {formatCurrency(totalExpense)}
           </div>
-          <p className="text-xs text-muted-foreground">Total pengeluaran</p>
         </CardContent>
       </Card>
 

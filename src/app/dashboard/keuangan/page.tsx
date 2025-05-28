@@ -2,27 +2,20 @@
 
 import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { TipeHewan, TransactionType } from "@prisma/client"
-
 import TransactionsTab from "./parts/transactions-tab"
 import CategoriesTab from "./parts/categories-tab"
 import BudgetsTab from "./parts/budgets-tab"
 import QurbanSales from "./parts/qurban-sales-view/view"
-import { FinancialSummary } from "@/components/dashboard/summaries/financial-summary"
 import QurbanTransactionTab from "./parts/qurban-trx-tab"
 // import { BudgetProgress } from '@/components/dashboard/summaries/budget-progress';
 
 export default function KeuanganPage() {
   const [activeTab, setActiveTab] = useState("transactions")
 
-    // const handleStatsUpdate = (newStats: TransactionStats) => {
-  //   setStats(newStats)
-  // }
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-bold">Manajemen Keuangan</h1>
       <QurbanSales />
-      <FinancialSummary />
       {/* <BudgetProgress /> */}
       <Tabs defaultValue="transactions" value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-4">

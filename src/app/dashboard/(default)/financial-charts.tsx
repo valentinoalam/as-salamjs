@@ -25,7 +25,9 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart"
-import type { QurbanSalesStats } from '@/types/qurban';
+import type { QurbanSalesStats } from'@/types/keuangan';
+import moment from 'moment';
+import { getMudhohiProgress } from '@/services/mudhohi';
 
 // Dynamically import all chart components with SSR disabled
 const AreaChart = dynamic(
@@ -51,55 +53,24 @@ export default function FinancialCharts({
   salesReport,
 }: FinancialChartsProps) {
   const [isMounted, setIsMounted] = useState(false);
+  const [areaChartData, setAreaChartData] = useState<{date:string,total:number}[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const data = await getMudhohiProgress();
+      setAreaChartData(data);
+    };
+
+    fetchData();
+
+  }, []);
+  useEffect(()=> console.log(areaChartData), [areaChartData])
   const COLORS = ['#0F766E', '#14b8a6', '#2dd4bf'];
   const pieChartData = salesReport.perTipeHewan.map((tipe: { nama: any; totalAmount: any; }, index) => ({
     name: tipe.nama,
     value: tipe.totalAmount,
     fill: COLORS[index]
   }));
-
-  const areaChartData = [
-    {
-      name: '1 Dzulhijjah',
-      jumlah: 35,
-    },
-    {
-      name: '2 Dzulhijjah',
-      jumlah: 40,
-    },
-    {
-      name: '3 Dzulhijjah',
-      jumlah: 52,
-    },
-    {
-      name: '4 Dzulhijjah',
-      jumlah: 68,
-    },
-    {
-      name: '5 Dzulhijjah',
-      jumlah: 75,
-    },
-    {
-      name: '6 Dzulhijjah',
-      jumlah: 83,
-    },
-    {
-      name: '7 Dzulhijjah',
-      jumlah: 95,
-    },
-    {
-      name: '8 Dzulhijjah',
-      jumlah: 110,
-    },
-    {
-      name: '9 Dzulhijjah',
-      jumlah: 122,
-    },
-    {
-      name: '10 Dzulhijjah',
-      jumlah: 128,
-    },
-  ];
 
   const barChartData = [
     {
@@ -123,6 +94,7 @@ export default function FinancialCharts({
       jumlah: 100,
     },
   ];
+
   const pieChartConfig = salesReport.perTipeHewan.reduce(
     (acc: ChartConfig, tipe: { nama: string; totalAmount: number }, index: number) => {
       acc[tipe.nama] = {
@@ -182,13 +154,14 @@ export default function FinancialCharts({
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis
-                  dataKey="name"
+                  dataKey="date"
                   tickLine={false}
                   axisLine={false}
                   tickMargin={8}
-                  tickFormatter={(value) => value.slice(0, 5)}
+                  angle={45}
+                  tickFormatter={(value) => value}
                 />
-                <YAxis />
+                <YAxis/>
                 <ChartTooltip
                   cursor={false}
                   content={<ChartTooltipContent indicator="line" />}
@@ -357,4 +330,8 @@ export default function FinancialCharts({
       </TabsContent>
     </Tabs>
   );
+}
+
+function data(prevState: null): null {
+  throw new Error('Function not implemented.');
 }

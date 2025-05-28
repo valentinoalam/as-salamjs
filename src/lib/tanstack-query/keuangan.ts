@@ -221,7 +221,6 @@ export const QUERY_KEYS = {
   latestTransactions: ["keuangan", "transactions", "latest"] as const,
   categories: ["keuangan", "categories"] as const,
   budgets: ["keuangan", "budgets"] as const,
-  overview: ["keuangan", "overview"] as const,
   qurbanSales: ["keuangan", "qurban-sales"] as const,
   weeklySales: ["keuangan", "weekly-sales"] as const,
 }

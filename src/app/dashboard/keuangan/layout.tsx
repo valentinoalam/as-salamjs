@@ -10,5 +10,5 @@ export default function KeuanganLayout({
 }: {
   children: React.ReactNode
 }) {
-  return <KeuanganProvider>{children}</KeuanganProvider>
+  return <>{children}</>
 }

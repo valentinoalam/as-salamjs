@@ -1,7 +1,7 @@
 'use client'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useUIState } from "@/contexts/ui-state-context"
-import ProgressHewan from "../../../components/qurban/progress-hewan"
+import ProgressHewan from "@/components/qurban/progress-hewan"
 import { useQurban } from "@/contexts/qurban-context"
 
 export default function ProgressSembelihPage() {

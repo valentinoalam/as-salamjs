@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Calendar } from "@/components/ui/calendar"
 import { Badge } from "@/components/ui/badge"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import type { Category } from "@/types/keuangan"
 import { useKeuangan } from "@/contexts/keuangan-context"
 
@@ -142,196 +143,206 @@ export default function TransactionForm({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
+      <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6">
           <DialogTitle>Add New Transaction</DialogTitle>
           <DialogDescription>Enter the details of the financial transaction.</DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="type"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Transaction Type</FormLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      field.onChange(value)
-                      // Reset category when type changes
-                      const defaultCategory = categories.find((c) => c.type === value)?.id || 1
-                      form.setValue("categoryId", defaultCategory)
-                    }}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select transaction type" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value={TransactionType.PEMASUKAN}>Pemasukan</SelectItem>
-                      <SelectItem value={TransactionType.PENGELUARAN}>Pengeluaran</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="categoryId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Category</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value.toString()}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {filteredCategories.length > 0 ? (
-                        filteredCategories.map((category) => (
-                          <SelectItem key={category.id} value={category.id.toString()}>
-                            {category.name}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="" disabled>
-                          No categories available
-                        </SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  {filteredCategories.length === 0 && (
-                    <FormDescription className="text-red-500">
-                      Please add categories first in the Categories tab
-                    </FormDescription>
-                  )}
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="amount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Amount (Rp)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="0"
-                      {...field}
-                      onChange={(e) => field.onChange(Number(e.target.value))}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="date"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Date</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
+        <ScrollArea className="flex-1 px-6 overflow-y-auto">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-6">
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Transaction Type</FormLabel>
+                    <Select
+                      onValueChange={(value) => {
+                        field.onChange(value)
+                        // Reset category when type changes
+                        const defaultCategory = categories.find((c) => c.type === value)?.id || 1
+                        form.setValue("categoryId", defaultCategory)
+                      }}
+                      defaultValue={field.value}
+                    >
                       <FormControl>
-                        <Button
-                          variant={"outline"}
-                          className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
-                        >
-                          {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select transaction type" />
+                        </SelectTrigger>
                       </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                      <SelectContent>
+                        <SelectItem value={TransactionType.PEMASUKAN}>Pemasukan</SelectItem>
+                        <SelectItem value={TransactionType.PENGELUARAN}>Pengeluaran</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Enter transaction details" className="resize-none" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="categoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value.toString()}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {filteredCategories.length > 0 ? (
+                          filteredCategories.map((category) => (
+                            <SelectItem key={category.id} value={category.id.toString()}>
+                              {category.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="" disabled>
+                            No categories available
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {filteredCategories.length === 0 && (
+                      <FormDescription className="text-red-500">
+                        Please add categories first in the Categories tab
+                      </FormDescription>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <div className="space-y-2">
-              <FormLabel htmlFor="receipt">Receipt Photo (Optional)</FormLabel>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="receipt"
-                  type="file"
-                  accept="image/*"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  className="flex-1"
-                  multiple
-                />
-              </div>
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Amount (Rp)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="0"
+                        {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-              {receiptFiles.length > 0 && (
-                <div className="mt-2 space-y-2">
-                  <p className="text-sm font-medium">Selected Files:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {receiptFiles.map((file, index) => (
-                      <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                        {file.name}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
-                          onClick={() => removeReceiptFile(index)}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </Badge>
-                    ))}
-                  </div>
+              <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={"outline"}
+                            className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                          >
+                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Enter transaction details" 
+                        className="resize-none min-h-[80px]" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="space-y-3">
+                <FormLabel htmlFor="receipt">Receipt Photo (Optional)</FormLabel>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="receipt"
+                    type="file"
+                    accept="image/*"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="flex-1"
+                    multiple
+                  />
                 </div>
-              )}
 
-              <p className="text-xs text-muted-foreground">Upload photos of receipts or invoices (JPG, PNG)</p>
-            </div>
+                {receiptFiles.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Selected Files:</p>
+                    <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
+                      {receiptFiles.map((file, index) => (
+                        <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                          <span className="truncate max-w-[120px]">{file.name}</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
+                            onClick={() => removeReceiptFile(index)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  resetForm()
-                  onOpenChange(false)
-                }}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading || filteredCategories.length === 0}>
-                {loading ? "Saving..." : "Save Transaction"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+                <p className="text-xs text-muted-foreground">Upload photos of receipts or invoices (JPG, PNG)</p>
+              </div>
+            </form>
+          </Form>
+        </ScrollArea>
+
+        <DialogFooter className="px-6 pb-6 pt-4 border-t">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              resetForm()
+              onOpenChange(false)
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            type="submit" 
+            disabled={loading || filteredCategories.length === 0}
+            onClick={form.handleSubmit(onSubmit)}
+          >
+            {loading ? "Saving..." : "Save Transaction"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

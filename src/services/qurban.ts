@@ -1,6 +1,6 @@
 "use server"
 import prisma from "@/lib/prisma";
-import type { ErrorLog } from "@/app/dashboard/counter-inventori/counter-inventori-client"
+import type { ErrorLog } from "@/app/dashboard/(default)/counter-inventori/counter-inventori-client"
 import { HewanStatus, JenisProduk, Counter, PengirimanStatus, JenisHewan } from "@prisma/client"
 
 // Helper functions for database operations
