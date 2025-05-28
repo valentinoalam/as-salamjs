@@ -340,9 +340,9 @@ async function main() {
 
 main()
   .catch((e) => {
-    console.error(e)
-    process.exit(1)
+    console.error('❌ Error during seeding:\n', e instanceof Error ? e.stack : e);
+    process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect()
-  })
+    await prisma.$disconnect();
+  });
