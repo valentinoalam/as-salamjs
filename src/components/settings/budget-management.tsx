@@ -35,7 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/formatters";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { Pencil, Plus, Trash2, PiggyBank } from "lucide-react";
 
 interface Category {
@@ -75,7 +75,7 @@ export function BudgetManagement() {
         // In a real application, you would fetch from API
         // const [budgetsResponse, categoriesResponse] = await Promise.all([
         //   fetch('/api/budgets'),
-        //   fetch('/api/categories?type=EXPENSE')
+        //   fetch('/api/categories?type=PENGELUARAN')
         // ]);
         
         // if (budgetsResponse.ok && categoriesResponse.ok) {
@@ -136,12 +136,12 @@ export function BudgetManagement() {
         ];
         
         const mockCategories = [
-          { id: '1', name: 'Pembelian Hewan Qurban - Sapi', type: TransactionType.EXPENSE },
-          { id: '2', name: 'Biaya Distribusi Daging', type: TransactionType.EXPENSE },
-          { id: '4', name: 'Biaya Pemotongan & Pengulitan', type: TransactionType.EXPENSE },
-          { id: '5', name: 'Belanja Bumbu & Bahan Masakan', type: TransactionType.EXPENSE },
-          { id: '9', name: 'Sewa Alat', type: TransactionType.EXPENSE },
-          { id: '10', name: 'Lain-lain (Pengeluaran)', type: TransactionType.EXPENSE },
+          { id: '1', name: 'Pembelian Hewan Qurban - Sapi', type: TransactionType.PENGELUARAN },
+          { id: '2', name: 'Biaya Distribusi Daging', type: TransactionType.PENGELUARAN },
+          { id: '4', name: 'Biaya Pemotongan & Pengulitan', type: TransactionType.PENGELUARAN },
+          { id: '5', name: 'Belanja Bumbu & Bahan Masakan', type: TransactionType.PENGELUARAN },
+          { id: '9', name: 'Sewa Alat', type: TransactionType.PENGELUARAN },
+          { id: '10', name: 'Lain-lain (Pengeluaran)', type: TransactionType.PENGELUARAN },
         ];
         
         setBudgets(mockBudgets);

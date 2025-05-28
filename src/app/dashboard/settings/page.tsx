@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { BudgetManagement } from "@/components/settings/budget-management";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { Wallet, Bell, Download, DatabaseBackup } from "lucide-react";
 import { set } from "date-fns";
 
