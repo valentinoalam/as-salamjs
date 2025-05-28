@@ -1,7 +1,7 @@
-import prisma from "@/lib/prisma"
-import { JenisProduk, Role, TransactionType } from "@prisma/client"
+import { PrismaClient, JenisProduk, Role, TransactionType } from "@prisma/client"
 import { hash } from "bcryptjs"
 
+const prisma = new PrismaClient()
 async function main() {
   console.log("🌱 Starting seeding...")
 

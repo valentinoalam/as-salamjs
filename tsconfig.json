@@ -46,6 +46,7 @@
     "**/*.tsx",
     "**/*.js", // Include JS files if allowJs is true
     "**/*.jsx", // Include JSX files if allowJs is true
+    "migrate/*.ts",
     ".next/types/**/*.ts", // For Next.js generated types
     "server/socket-server.ts", // Explicitly include server-side TS files
     "server.ts" // Explicitly include server.ts
