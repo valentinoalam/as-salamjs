@@ -3,19 +3,9 @@
 import { revalidatePath } from "next/cache"
 import prisma from "@/lib/prisma"
 import type { JenisHewan, JenisProduk } from "@prisma/client"
+import type { TipeHewanWithImages } from "@/types/keuangan"
 
 // TipeHewan actions
-export async function getAllTipeHewan() {
-  try {
-    return await prisma.tipeHewan.findMany({
-      orderBy: { nama: "asc" },
-    })
-  } catch (error) {
-    console.error("Error fetching tipe hewan:", error)
-    throw new Error("Failed to fetch tipe hewan")
-  }
-}
-
 export async function addTipeHewan(data: {
   nama: string
   icon?: string
@@ -24,18 +14,50 @@ export async function addTipeHewan(data: {
   hargaKolektif?: number
   note: string
   jenis: JenisHewan
+  imageUrls?: string[]
 }) {
   try {
     const result = await prisma.tipeHewan.create({
       data: {
-        ...data,
+        nama: data.nama,
+        icon: data.icon,
         target: Number(data.target),
         harga: Number(data.harga),
-        hargaKolektif: Number(data.hargaKolektif),
+        hargaKolektif: data.hargaKolektif ? Number(data.hargaKolektif) : null,
+        note: data.note,
+        jenis: data.jenis,
       },
     })
+
+    // Create image records if provided
+    const images = []
+    if (data.imageUrls && data.imageUrls.length > 0) {
+      const imageRecords = await Promise.all(
+        data.imageUrls.map((url) =>
+          prisma.image.create({
+            data: {
+              url,
+              alt: `${data.nama} image`,
+              relatedId: result.id.toString(),
+              relatedType: "TipeHewan",
+            },
+          }),
+        ),
+      )
+      images.push(...imageRecords.map(img => ({
+        id: img.id,
+        url: img.url,
+        alt: img.alt || `${data.nama} image`
+      })))
+    }
+
+    const resultWithImages: TipeHewanWithImages = {
+      ...result,
+      images
+    }
+
     revalidatePath("/dashboard/pengaturan")
-    return { success: true, data: result }
+    return { success: true, data: resultWithImages }
   } catch (error) {
     console.error("Error adding tipe hewan:", error)
     throw new Error("Failed to add tipe hewan")
@@ -52,23 +74,81 @@ export async function updateTipeHewan(
     hargaKolektif?: number
     note?: string
     jenis?: JenisHewan
+    imageUrls?: string[]
   },
 ) {
   try {
     // Convert string numbers to actual numbers
     const processedData = {
-      ...data,
+      nama: data.nama,
+      icon: data.icon,
       target: data.target !== undefined ? Number(data.target) : undefined,
       harga: data.harga !== undefined ? Number(data.harga) : undefined,
-      hargaKolektif: data.hargaKolektif !== undefined ? Number(data.hargaKolektif) : undefined,
+      hargaKolektif: data.hargaKolektif !== undefined ? Number(data.hargaKolektif) : null,
+      note: data.note,
+      jenis: data.jenis,
     }
 
     const result = await prisma.tipeHewan.update({
       where: { id },
       data: processedData,
     })
+
+    let images: { id: string; url: string; alt: string }[] = []
+    
+    // Update images if provided
+    if (data.imageUrls !== undefined) {
+      // Delete existing images
+      await prisma.image.deleteMany({
+        where: {
+          relatedId: id.toString(),
+          relatedType: "TipeHewan",
+        },
+      })
+
+      // Create new image records
+      if (data.imageUrls.length > 0) {
+        const imageRecords = await Promise.all(
+          data.imageUrls.map((url) =>
+            prisma.image.create({
+              data: {
+                url,
+                alt: `${data.nama || "Animal"} image`,
+                relatedId: id.toString(),
+                relatedType: "TipeHewan",
+              },
+            }),
+          ),
+        )
+        images = imageRecords.map(img => ({
+          id: img.id,
+          url: img.url,
+          alt: img.alt || `${data.nama || "Animal"} image`
+        }))
+      }
+    } else {
+      // If imageUrls not provided, fetch existing images
+      const existingImages = await prisma.image.findMany({
+        where: {
+          relatedId: id.toString(),
+          relatedType: "TipeHewan",
+        },
+        orderBy: { createdAt: "desc" },
+      })
+      images = existingImages.map(img => ({
+        id: img.id,
+        url: img.url,
+        alt: img.alt || `${result.nama} image`
+      }))
+    }
+
+    const resultWithImages: TipeHewanWithImages = {
+      ...result,
+      images
+    }
+
     revalidatePath("/dashboard/pengaturan")
-    return { success: true, data: result }
+    return { success: true, data: resultWithImages }
   } catch (error) {
     console.error("Error updating tipe hewan:", error)
     throw new Error("Failed to update tipe hewan")
@@ -94,6 +174,14 @@ export async function deleteTipeHewan(id: number) {
     if (productsUsingType > 0) {
       throw new Error("Tidak dapat menghapus tipe hewan yang sedang digunakan oleh produk")
     }
+
+    // Delete associated images
+    await prisma.image.deleteMany({
+      where: {
+        relatedId: id.toString(),
+        relatedType: "TipeHewan",
+      },
+    })
 
     await prisma.tipeHewan.delete({
       where: { id },

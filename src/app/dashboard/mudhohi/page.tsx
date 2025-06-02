@@ -1,4 +1,4 @@
-import { getTipeHewan } from "@/app/(default)/qurban/pemesanan/actions"
+import { getTipeHewan } from "@/services/mudhohi"
 import { getMudhohiStats, getMudhohiList } from "@/services/mudhohi"
 import MudhohiManagement from "./mudhohi-management"
 

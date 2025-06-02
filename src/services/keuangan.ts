@@ -9,7 +9,7 @@ import { join } from "path"
 import { v4 as uuidv4 } from "uuid"
 import type { CategoryFormValues, TransactionFormValues, BudgetFormValues } from "@/lib/zod/keuangan"
 import type { ChartDataResponse, QurbanSalesStats, TransactionDetail, WeeklySalesData } from "@/types/keuangan"
-import type { CategoryDistribution, DataPoint } from "@/types/keuangan"
+import type { CategoryDistribution } from "@/types/keuangan"
 
 export async function createCategory(data: CategoryFormValues) {
   try {
@@ -153,6 +153,7 @@ export async function getTransactions(
   endDate?: Date,
 ) {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {}
 
     if (type) {
@@ -186,7 +187,12 @@ export async function getTransactions(
       where,
       include: {
         category: true,
-        receiptUrl: true,
+        receiptUrl: {
+          select: {
+            url: true,
+            alt: true
+          }
+        }
       },
       orderBy: {
         date: "desc",
@@ -382,39 +388,52 @@ export async function calculateSalesStats(tipeHewanId: number): Promise<number> 
  * @returns SalesReport with individual and total statistics
  */
 export async function getQurbanSalesStats(): Promise<QurbanSalesStats> {
-  const result = await prisma.tipeHewan.findMany({
-    select: {
-      id: true,
-      nama: true,
-      jenis: true,
-      harga: true,
-      _count: {
-        select: { hewan: true } // Count related HewanQurban entries
-      }
-    }
-  });
+  const result = await prisma.$queryRaw<
+    Array<{
+      tipeid: number;
+      nama: string;
+      jenis: string;
+      harga: number;
+      totaldibayarkan: number;
+      totalhewan: number;
+    }>
+  >`
+  SELECT
+    t.id AS tipeid,
+    t.nama,
+    t.jenis,
+    t.harga,
+    COALESCE(SUM(p.dibayarkan), 0) AS totaldibayarkan,
+    COUNT(h.id) AS totalhewan
+  FROM \`TipeHewan\` t
+  LEFT JOIN \`HewanQurban\` h ON t.id = h.\`tipeId\`
+  LEFT JOIN \`Pembayaran\` p ON t.id = p.\`tipeid\` AND p.\`paymentStatus\` IN ('LUNAS', 'DOWN_PAYMENT')
+  GROUP BY t.id, t.nama, t.jenis, t.harga
+  `;
 
-  // Calculate sales for each TipeHewan and accumulate totals
+  // Assign the number value safely
+  const currentIncome = result.reduce((sum, tipe) => sum + Number(tipe.totaldibayarkan), 0);
   const totalCount = await prisma.mudhohi.count();
-  let totalSales = 0, animalCount = 0;
-  
+  let totalSales = 0;
+  let animalCount = 0;
   const perTipeHewan = result.map(tipe => {
-    const count = tipe._count.hewan;
-    const sales = count * tipe.harga;
-    
+    const count = Number(tipe.totalhewan);
+    const sales = count * Number(tipe.harga);
     totalSales += sales;
     animalCount += count;
     return {
-      tipeHewanId: tipe.id,
+      tipeHewanId: tipe.tipeid,
       nama: tipe.nama,
       jenis: tipe.jenis,
       harga: tipe.harga,
       count,
-      totalAmount: sales
+      totalAmount: sales,
+      currentAmount: tipe.totaldibayarkan
     };
   });
 
-  return { perTipeHewan, animalCount, totalCount, totalSales };
+  return { perTipeHewan, animalCount, totalCount, totalSales, currentIncome };
+
 }
 
 export async function getWeeklyAnimalSales(

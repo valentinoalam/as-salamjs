@@ -24,7 +24,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { addTipeHewan, updateTipeHewan, deleteTipeHewan } from "./actions"
 import { formatCurrency } from "@/lib/formatters"
-import { JenisHewan, type TipeHewan } from "@prisma/client"
+import { JenisHewan } from "@prisma/client"
+import { ImageUpload } from "@/components/ui/image-upload"
+import type { TipeHewanWithImages } from "@/types/keuangan"
 
 type TipeHewanFormData = {
   nama: string
@@ -37,16 +39,16 @@ type TipeHewanFormData = {
 }
 
 type TipeHewanSettingsProps = {
-  initialTipeHewan: TipeHewan[]
+  initialTipeHewan: TipeHewanWithImages[]
 }
 
 export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) {
-  const [tipeHewan, setTipeHewan] = useState<TipeHewan[]>(initialTipeHewan)
+  const [tipeHewan, setTipeHewan] = useState<TipeHewanWithImages[]>(initialTipeHewan)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [selectedTipeHewan, setSelectedTipeHewan] = useState<TipeHewan | null>(null)
+  const [selectedTipeHewan, setSelectedTipeHewan] = useState<TipeHewanWithImages | null>(null)
   const [formData, setFormData] = useState<TipeHewanFormData>({
     nama: "",
     icon: "",
@@ -56,6 +58,7 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
     note: "",
     jenis: JenisHewan.SAPI,
   })
+  const [uploadedImages, setUploadedImages] = useState<string[]>([])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -91,10 +94,11 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
         hargaKolektif: formData.hargaKolektif? formData.hargaKolektif :  undefined,
         note: formData.note,
         jenis: formData.jenis,
+        imageUrls: uploadedImages,
       })
 
       if (result.success && result.data) {
-        setTipeHewan((prev) => [...prev, result.data as TipeHewan])
+        setTipeHewan((prev) => [...prev, result.data as TipeHewanWithImages])
         resetForm()
         setIsAddDialogOpen(false)
         toast.success("Tipe hewan berhasil ditambahkan")
@@ -122,11 +126,12 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
         hargaKolektif: formData.hargaKolektif? formData.hargaKolektif : undefined,
         note: formData.note,
         jenis: formData.jenis,
+        imageUrls: uploadedImages,
       })
 
       if (result.success && result.data) {
         setTipeHewan((prev) =>
-          prev.map((item) => (item.id === selectedTipeHewan.id ? (result.data as TipeHewan) : item)),
+          prev.map((item) => (item.id === selectedTipeHewan.id ? (result.data as TipeHewanWithImages) : item)),
         )
         setIsEditDialogOpen(false)
         toast.success("Tipe hewan berhasil diperbarui")
@@ -152,6 +157,7 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
         setIsDeleteDialogOpen(false)
         toast.success("Tipe hewan berhasil dihapus")
       }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Error deleting tipe hewan:", error)
       toast.error(error.message || "Gagal menghapus tipe hewan")
@@ -160,12 +166,12 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
     }
   }
 
-  const openEditDialog = (tipe: TipeHewan) => {
+  const openEditDialog = (tipe: TipeHewanWithImages) => {
     setSelectedTipeHewan(tipe)
     setFormData({
       nama: tipe.nama,
       icon: tipe.icon || "",
-      target: tipe.target,
+      target: tipe.target || 0,
       harga: tipe.harga,
       hargaKolektif: formData.hargaKolektif? formData.hargaKolektif : undefined,
       note: tipe.note || "",
@@ -174,7 +180,7 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
     setIsEditDialogOpen(true)
   }
 
-  const openDeleteDialog = (tipe: TipeHewan) => {
+  const openDeleteDialog = (tipe: TipeHewanWithImages) => {
     setSelectedTipeHewan(tipe)
     setIsDeleteDialogOpen(true)
   }
@@ -183,8 +189,8 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
     const labels = {
       [JenisHewan.UNTA]: "Unta",
       [JenisHewan.SAPI]: "Sapi",
-      [JenisHewan.DOMBA]: "Domba",
       [JenisHewan.KAMBING]: "Kambing",
+      [JenisHewan.DOMBA]: "Domba",
     }
     return labels[jenis] || jenis
   }
@@ -235,7 +241,7 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
                       <SelectItem value={JenisHewan.UNTA}>Unta</SelectItem>
                       <SelectItem value={JenisHewan.SAPI}>Sapi</SelectItem>
                       <SelectItem value={JenisHewan.DOMBA}>Domba</SelectItem>
-                      <SelectItem value={JenisHewan.KAMBING}>Kambing</SelectItem>
+                      <SelectItem value={JenisHewan.DOMBA}>Domba</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -309,6 +315,20 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
                     className="col-span-3"
                     rows={3}
                   />
+                </div>
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label className="text-right mt-2">Gambar</Label>
+                  <div className="col-span-3">
+                    <ImageUpload
+                      relatedId={selectedTipeHewan?.id.toString() || "temp"}
+                      relatedType="TipeHewan"
+                      existingImages={selectedTipeHewan?.images || []}
+                      onImagesChange={(images) => {
+                        setUploadedImages(images.map((img) => img.url))
+                      }}
+                      maxFiles={3}
+                    />
+                  </div>
                 </div>
               </div>
               <DialogFooter>
@@ -407,7 +427,7 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
                     <SelectItem value={JenisHewan.UNTA}>Unta</SelectItem>
                     <SelectItem value={JenisHewan.SAPI}>Sapi</SelectItem>
                     <SelectItem value={JenisHewan.DOMBA}>Domba</SelectItem>
-                    <SelectItem value={JenisHewan.KAMBING}>Kambing</SelectItem>
+                    <SelectItem value={JenisHewan.DOMBA}>Domba</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -481,6 +501,20 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
                   className="col-span-3"
                   rows={3}
                 />
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label className="text-right mt-2">Gambar</Label>
+                <div className="col-span-3">
+                  <ImageUpload
+                    relatedId={selectedTipeHewan?.id.toString() || "temp"}
+                    relatedType="TipeHewan"
+                    existingImages={selectedTipeHewan?.images || []}
+                    onImagesChange={(images) => {
+                      setUploadedImages(images.map((img) => img.url))
+                    }}
+                    maxFiles={3}
+                  />
+                </div>
               </div>
             </div>
             <DialogFooter>

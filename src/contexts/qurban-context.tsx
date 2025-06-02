@@ -1,6 +1,8 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
-import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from "react"
 import { useSocket } from "@/contexts/socket-context"
 import type {
   HewanQurban,
@@ -238,6 +240,12 @@ export function QurbanProvider({
   const queryClient = useQueryClient()
   const { socket, isConnected } = useSocket()
   const { pagination, setPagination } = useUIState()
+  
+  // Track pending mutations to avoid race conditions
+  const pendingMutations = useRef<Set<string>>(new Set())
+  
+  // Debounce socket updates to prevent rapid fire updates
+  const socketUpdateTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map())
 
   // Fetch functions
   const fetchHewan = async (
@@ -356,7 +364,6 @@ export function QurbanProvider({
     queryKey: queryKeys.meta,
     queryFn: async () => {
       const metaData = await fetchMeta()
-      console.log(metaData)
       return {
         sapi: { total: metaData.sapi.total || 0, target: metaData.sapi.target || 0, slaughtered: metaData.sapi.slaughtered || 0 },
         domba: { total: metaData.domba.total || 0, target: metaData.domba.target || 0, slaughtered: metaData.domba.slaughtered || 0 },
@@ -434,6 +441,17 @@ export function QurbanProvider({
     errorMessage: "Failed to fetch shipments. Please try again.",
   })
 
+  // Helper function to debounce socket updates
+  const debounceSocketUpdate = (key: string, callback: () => void, delay = 100) => {
+    const existingTimeout = socketUpdateTimeouts.current.get(key)
+    if (existingTimeout) {
+      clearTimeout(existingTimeout)
+    }
+    
+    const timeout = setTimeout(callback, delay)
+    socketUpdateTimeouts.current.set(key, timeout)
+  }
+
   // Mutations
   const updateHewanMutation = useMutation({
     mutationFn: async (data: {
@@ -447,50 +465,51 @@ export function QurbanProvider({
       if (!data.hewanId || !data.status || !data.tipeId) {
         throw new Error("Missing required fields: hewanId, status, or tipeId");
       }
-      // Send to backend first
-      const response = await fetch("/api/hewan/status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to update status");
+      // Track this mutation to prevent socket race conditions
+      const mutationKey = `${data.hewanId}-${data.status}`
+      pendingMutations.current.add(mutationKey)
+
+      try {
+        // Send to backend first
+        const response = await fetch("/api/hewan/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || "Failed to update status");
+        }
+
+        const result = await response.json()
+
+        // Only emit socket event if backend succeeded
+        if (socket && isConnected) {
+          return await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              reject(new Error("Server response timeout"));
+            }, 5000);
+
+            socket.emit("update-hewan", data, (response: any) => {
+              clearTimeout(timeout);
+              if (response?.error) {
+                reject(response.error);
+              } else {
+                resolve({ success: true, ...response });
+              }
+            })
+          });
+        }
+
+        return result
+      } finally {
+        // Remove from pending mutations after a delay to prevent immediate socket conflicts
+        setTimeout(() => {
+          pendingMutations.current.delete(mutationKey)
+        }, 500)
       }
-
-      await response.json()
-
-      // If slaughtered status changed, update meta
-      if (data.slaughtered !== undefined) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.meta })
-      }
-
-      // Emit to socket after success
-      if (!socket || !isConnected) {
-        throw new Error("Not connected to server");
-      }
-
-      return await new Promise((resolve, reject) => {
-        // Add timeout handling
-        const timeout = setTimeout(() => {
-          reject(new Error("Server response timeout"));
-        }, 3000); // 3-second timeout
-
-        // Make sure server acknowledges with callback
-        socket.emit("update-hewan", data, (response: any) => {
-          clearTimeout(timeout);
-          console.log("Server response:", response); // Add logging
-          
-          // Server must return SOME response
-          if (response?.error) {
-            reject(response.error);
-          } else {
-            // Resolve with explicit value
-            resolve({ success: true, ...response });
-          }
-        })
-      });
     },
     onMutate: async (newHewanData) => {
       const queryKey = newHewanData.tipeId === 1 
@@ -521,12 +540,17 @@ export function QurbanProvider({
 
       return { previousData, queryKey };
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       toast({
         title: "Success!",
         description: "Hewan updated successfully",
         variant: "default",
       });
+
+      // Only invalidate meta if slaughtered status changed
+      if (variables.slaughtered !== undefined) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.meta })
+      }
     },
     onError: (err, variables, context) => {
       if (context?.previousData) {
@@ -535,16 +559,11 @@ export function QurbanProvider({
 
       toast({
         title: "Error",
-        description: err.message, //"Failed to update hewan data. Please try again.",
+        description: err.message,
         variant: "destructive",
       });
     },
-
-    onSettled: (data, error, variables) => {
-      const { tipeId } = variables;
-      const queryKey = tipeId === 1 ? queryKeys.sapi : queryKeys.domba;
-      queryClient.invalidateQueries({ queryKey });
-    },
+    // Remove onSettled invalidation - rely on socket updates instead
   })
 
   const updateProductMutation = useMutation({
@@ -558,7 +577,7 @@ export function QurbanProvider({
       if (!data.productId || !data.operation || !data.value) {
         throw new Error("Missing required fields: productId, operation, or value");
       }
-      // Send to backend first
+
       const response = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -570,32 +589,26 @@ export function QurbanProvider({
         throw new Error(error.message || "Failed to update status");
       }
 
-      await response.json();
-      // Invalidate product logs query after updating a product
-      queryClient.invalidateQueries({ queryKey: queryKeys.productLogs || ["productLogs"] })
+      const result = await response.json();
 
-      if (!socket || !isConnected) {
-        throw new Error("Not connected to server")
-      }
-      
-      return new Promise((resolve, reject) => {
-        socket.emit("update-product", data, (response: any) => {
-          if (response?.error) {
-            reject(response.error)
-          } else {
-            resolve(response)
-          }
+      if (socket && isConnected) {
+        return new Promise((resolve, reject) => {
+          socket.emit("update-product", data, (response: any) => {
+            if (response?.error) {
+              reject(response.error)
+            } else {
+              resolve(response)
+            }
+          })
         })
-      })
+      }
+
+      return result
     },
     onMutate: async (newProductData) => {
-      // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: queryKeys.products })
-
-      // Snapshot the previous value
       const previousProductData = queryClient.getQueryData(queryKeys.products)
 
-      // Optimistically update the cache
       queryClient.setQueryData(queryKeys.products, (old: ProdukHewan[] | []) => {
         if (!old) return []
         return old.map((product) => {
@@ -622,11 +635,9 @@ export function QurbanProvider({
         })
       })
 
-      // Return the snapshot
       return { previousProductData }
     },
     onError: (err, newProduct, context) => {
-      // Roll back to the previous state
       if (context?.previousProductData) {
         queryClient.setQueryData(queryKeys.products, context.previousProductData)
       }
@@ -637,10 +648,7 @@ export function QurbanProvider({
         variant: "destructive",
       })
     },
-    onSettled: () => {
-      // Invalidate product logs query after updating a product
-      queryClient.invalidateQueries({ queryKey: queryKeys.productLogs || ["productLogs"] })
-    },
+    // Remove onSettled - rely on socket updates
   })
 
   const createShipmentMutation = useMutation({
@@ -658,19 +666,19 @@ export function QurbanProvider({
 
       const result = await response.json();
 
-      if (!socket || !isConnected) {
-        throw new Error("Not connected to server")
-      }
-      
-      return new Promise((resolve, reject) => {
-        socket.emit("new-shipment", { products: data.products, note: data.note }, (response: any) => {
-          if (response?.error) {
-            reject(response.error)
-          } else {
-            resolve({ ...result, ...response })
-          }
+      if (socket && isConnected) {
+        return new Promise((resolve, reject) => {
+          socket.emit("new-shipment", { products: data.products, note: data.note }, (response: any) => {
+            if (response?.error) {
+              reject(response.error)
+            } else {
+              resolve({ ...result, ...response })
+            }
+          })
         })
-      })
+      }
+
+      return result
     },
     onSuccess: () => {
       toast({
@@ -679,7 +687,7 @@ export function QurbanProvider({
         variant: "default",
       });
       
-      // Refresh related queries
+      // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: queryKeys.products });
       queryClient.invalidateQueries({ queryKey: queryKeys.shipments || ["shipments"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.productLogs || ["productLogs"] })
@@ -692,10 +700,6 @@ export function QurbanProvider({
       })
     },
   })
-  useEffect(() => {
-    if (pagination.sapiPage !== undefined) sapiQuery.refetch();
-    if (pagination.dombaPage !== undefined) dombaQuery.refetch();
-  }, [pagination.sapiPage, pagination.dombaPage]);
   // Set up socket listeners to update the query cache
   useEffect(() => {
     if (!socket) return
@@ -709,122 +713,145 @@ export function QurbanProvider({
       onInventory?: boolean
       tipeId?: number
     }) => {
-      // If slaughtered status changed, invalidate meta to refresh counts
-      if (data.slaughtered !== undefined) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.meta })
-      }
-      if (data.tipeId === 1 || !data.tipeId) {
-        const sapiQueryKey = [...queryKeys.sapi, pagination.sapiPage, pagination.sapiGroup, sapiPaginationConfig];
-        queryClient.setQueryData(sapiQueryKey, (old: any) => {
-          if (!old || !old.data) {
-            console.log("No existing sapi data to update");
-            return old;
-          }
-          
-          console.log("Updating sapi data for animal:", data.hewanId);
-          return {
-            ...old,
-            data: old.data.map((item: HewanQurban) =>
-              item.hewanId === data.hewanId
-                ? {
-                    ...item,
-                    ...(data.status && { status: data.status }),
-                    ...(data.slaughtered !== undefined && { slaughtered: data.slaughtered }),
-                    ...(data.receivedByMdhohi !== undefined && { receivedByMdhohi: data.receivedByMdhohi }),
-                    ...(data.onInventory !== undefined && { onInventory: data.onInventory }),
-                  }
-                : item
-            )
-          }
-        })
+      // Skip if we have a pending mutation for this animal
+      const mutationKey = `${data.hewanId}-${data.status}`
+      if (pendingMutations.current.has(mutationKey)) {
+        console.log(`Skipping socket update for ${data.hewanId} - mutation in progress`)
+        return
       }
 
-      if (data.tipeId === 2 || !data.tipeId) {
-        const dombaQueryKey = [...queryKeys.domba, pagination.dombaPage, pagination.dombaGroup, dombaPaginationConfig];
-        queryClient.setQueryData(dombaQueryKey, (old: any) => {
-          if (!old || !old.data) {
-            console.log("No existing domba data to update");
-            return old;
-          }
-          
-          console.log("Updating domba data for animal:", data.hewanId);
-          return {
-            ...old,
-            data: old.data.map((item: HewanQurban) =>
-              item.hewanId === data.hewanId
-                ? {
-                    ...item,
-                    ...(data.status && { status: data.status }),
-                    ...(data.slaughtered !== undefined && { slaughtered: data.slaughtered }),
-                    ...(data.receivedByMdhohi !== undefined && { receivedByMdhohi: data.receivedByMdhohi }),
-                    ...(data.onInventory !== undefined && { onInventory: data.onInventory }),
-                  }
-                : item
-            )
-          }
-        })
-      }
+      debounceSocketUpdate(`hewan-${data.hewanId}`, () => {
+        // If slaughtered status changed, invalidate meta to refresh counts
+        if (data.slaughtered !== undefined) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.meta })
+        }
+
+        if (data.tipeId === 1 || !data.tipeId) {
+          const sapiQueryKey = [...queryKeys.sapi, pagination.sapiPage, pagination.sapiGroup, sapiPaginationConfig];
+          queryClient.setQueryData(sapiQueryKey, (old: any) => {
+            if (!old || !old.data) return old;
+            
+            return {
+              ...old,
+              data: old.data.map((item: HewanQurban) =>
+                item.hewanId === data.hewanId
+                  ? {
+                      ...item,
+                      ...(data.status && { status: data.status }),
+                      ...(data.slaughtered !== undefined && { slaughtered: data.slaughtered }),
+                      ...(data.receivedByMdhohi !== undefined && { receivedByMdhohi: data.receivedByMdhohi }),
+                      ...(data.onInventory !== undefined && { onInventory: data.onInventory }),
+                    }
+                  : item
+              )
+            }
+          })
+        }
+
+        if (data.tipeId === 2 || !data.tipeId) {
+          const dombaQueryKey = [...queryKeys.domba, pagination.dombaPage, pagination.dombaGroup, dombaPaginationConfig];
+          queryClient.setQueryData(dombaQueryKey, (old: any) => {
+            if (!old || !old.data) return old;
+            
+            return {
+              ...old,
+              data: old.data.map((item: HewanQurban) =>
+                item.hewanId === data.hewanId
+                  ? {
+                      ...item,
+                      ...(data.status && { status: data.status }),
+                      ...(data.slaughtered !== undefined && { slaughtered: data.slaughtered }),
+                      ...(data.receivedByMdhohi !== undefined && { receivedByMdhohi: data.receivedByMdhohi }),
+                      ...(data.onInventory !== undefined && { onInventory: data.onInventory }),
+                    }
+                  : item
+              )
+            }
+          })
+        }
+      })
     }
 
-    // Handle bulk data updates
+    // Handle bulk data updates - only when data actually changes
     const handleSapiDataUpdate = (data: HewanQurban[]) => {
-      // queryClient.setQueryData(queryKeys.sapi, data)
-      const sapiQueryKey = [...queryKeys.sapi, pagination.sapiPage, pagination.sapiGroup, sapiPaginationConfig];
-      console.log("Received bulk sapi data update:", data.length, "items");
-      queryClient.setQueryData(sapiQueryKey, (old: any) => {
-        return {
-          data: Array.isArray(data) ? data : [],
-          pagination: old?.pagination || {
-            currentPage: pagination.sapiPage,
-            totalPages: Math.ceil((data?.length || 0) / sapiPaginationConfig.pageSize)
-          }
+      debounceSocketUpdate('sapi-bulk', () => {
+        const sapiQueryKey = [...queryKeys.sapi, pagination.sapiPage, pagination.sapiGroup, sapiPaginationConfig];
+        
+        // Check if data actually changed before updating
+        const currentData = queryClient.getQueryData(sapiQueryKey) as any
+        if (currentData?.data && JSON.stringify(currentData.data) === JSON.stringify(data)) {
+          return // No changes, skip update
         }
-      });
-      
-      // Also invalidate to ensure UI updates
-      queryClient.invalidateQueries({ queryKey: sapiQueryKey });
-      queryClient.invalidateQueries({ queryKey: queryKeys.meta })
+
+        queryClient.setQueryData(sapiQueryKey, (old: any) => {
+          return {
+            data: Array.isArray(data) ? data : [],
+            pagination: old?.pagination || {
+              currentPage: pagination.sapiPage,
+              totalPages: Math.ceil((data?.length || 0) / sapiPaginationConfig.pageSize)
+            }
+          }
+        });
+        
+        queryClient.invalidateQueries({ queryKey: queryKeys.meta })
+      }, 200) // Longer debounce for bulk updates
     }
 
     const handleDombaDataUpdate = (data: HewanQurban[]) => {
-      // queryClient.setQueryData(queryKeys.domba, data)
-      const dombaQueryKey = [...queryKeys.domba, pagination.dombaPage, pagination.dombaGroup, dombaPaginationConfig];
-      console.log("Received bulk domba data update:", data.length, "items");
-      queryClient.setQueryData(dombaQueryKey, (old: any) => {
-        return {
-          data: Array.isArray(data) ? data : [],
-          pagination: old?.pagination || {
-            currentPage: pagination.dombaPage,
-            totalPages: Math.ceil((data?.length || 0) / dombaPaginationConfig.pageSize)
-          }
+      debounceSocketUpdate('domba-bulk', () => {
+        const dombaQueryKey = [...queryKeys.domba, pagination.dombaPage, pagination.dombaGroup, dombaPaginationConfig];
+        
+        // Check if data actually changed before updating
+        const currentData = queryClient.getQueryData(dombaQueryKey) as any
+        if (currentData?.data && JSON.stringify(currentData.data) === JSON.stringify(data)) {
+          return // No changes, skip update
         }
-      });
-      
-      // Also invalidate to ensure UI updates
-      queryClient.invalidateQueries({ queryKey: dombaQueryKey });
-      queryClient.invalidateQueries({ queryKey: queryKeys.meta })
+
+        queryClient.setQueryData(dombaQueryKey, (old: any) => {
+          return {
+            data: Array.isArray(data) ? data : [],
+            pagination: old?.pagination || {
+              currentPage: pagination.dombaPage,
+              totalPages: Math.ceil((data?.length || 0) / dombaPaginationConfig.pageSize)
+            }
+          }
+        });
+        
+        queryClient.invalidateQueries({ queryKey: queryKeys.meta })
+      }, 200)
     }
 
-    // Handle product updates
+    // Handle product updates with change detection
     const handleProductUpdate = (data: { products: ProdukHewan[] }) => {
-      queryClient.setQueryData(queryKeys.products, data.products)
-      // Also invalidate product logs when products are updated
-      queryClient.invalidateQueries({ queryKey: queryKeys.productLogs || ["productLogs"] })
+      debounceSocketUpdate('products', () => {
+        const currentData = queryClient.getQueryData(queryKeys.products)
+        if (currentData && JSON.stringify(currentData) === JSON.stringify(data.products)) {
+          return // No changes, skip update
+        }
+
+        queryClient.setQueryData(queryKeys.products, data.products)
+        queryClient.invalidateQueries({ queryKey: queryKeys.productLogs || ["productLogs"] })
+      })
     }
 
-    // Handle error log updates
+    // Other socket handlers remain the same but with debouncing
     const handleErrorLogsUpdate = (data: { errorLogs: ErrorLog[] }) => {
-      queryClient.setQueryData(queryKeys.errorLogs, data.errorLogs)
+      debounceSocketUpdate('errorLogs', () => {
+        queryClient.setQueryData(queryKeys.errorLogs, data.errorLogs)
+      })
     }
 
-    // Handle shipment updates
     const handleShipmentUpdate = (data: { shipments: Shipment[] }) => {
-      queryClient.setQueryData(queryKeys.shipments || ["shipments"], data.shipments)
-    }    
+      debounceSocketUpdate('shipments', () => {
+        queryClient.setQueryData(queryKeys.shipments || ["shipments"], data.shipments)
+      })
+    }  
     
     // Handle product logs updates
     const handleProductLogsUpdate = (data: { productLogs: ProductLogWithProduct[] }) => {
-      queryClient.setQueryData(queryKeys.productLogs || ["productLogs"], data.productLogs)
+      debounceSocketUpdate('shipments', () => {
+        queryClient.setQueryData(queryKeys.productLogs || ["productLogs"], data.productLogs)
+      })
     }
     // Register socket listeners
     socket.on("update-hewan", handleHewanUpdate)

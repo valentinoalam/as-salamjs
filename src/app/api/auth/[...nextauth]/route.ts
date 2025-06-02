@@ -73,7 +73,7 @@ export const authOptions: AuthOptions = {
       }
       return session
     },
-    async signIn({ user, credentials }) {
+    async signIn({ user }) {
       if (!user) {
         // Custom error handling for sign-in page
         return '/login?error=Invalid%20credentials';

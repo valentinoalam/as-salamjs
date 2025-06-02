@@ -42,7 +42,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowUp, ArrowDown, Eye, MoreHorizontal, Pencil, Trash2, ImageIcon, Plus } from "lucide-react";
+import { Eye, MoreHorizontal, Pencil, Trash2, ImageIcon, Plus } from "lucide-react";
 
 interface Transaction {
   id: string;
@@ -91,110 +91,13 @@ export function TransactionsList({ type }: TransactionsListProps) {
         if (toDate) params.set('to', toDate);
         if (category) params.set('category', category);
         
-        const response = await fetch(`/api/transactions?${params.toString()}`);
+        const response = await fetch(`/api/keuangan/transactions?${params.toString()}`);
         if (response.ok) {
           const data = await response.json();
           setTransactions(data);
         }
       } catch (error) {
         console.error('Failed to fetch transactions:', error);
-        // Mock data
-        const mockTransactions = [
-          {
-            id: '1',
-            amount: 9000000,
-            type: TransactionType.PENGELUARAN,
-            date: new Date().toISOString(),
-            description: 'Pembelian sapi qurban dari peternak',
-            categoryId: '1',
-            category: {
-              id: '1',
-              name: 'Pembelian Hewan Qurban - Sapi'
-            },
-            images: [
-              {
-                id: '1',
-                url: 'https://images.pexels.com/photos/422218/pexels-photo-422218.jpeg'
-              }
-            ]
-          },
-          {
-            id: '2',
-            amount: 1500000,
-            type: TransactionType.PENGELUARAN,
-            date: new Date().toISOString(),
-            description: 'Biaya transportasi dan distribusi daging qurban',
-            categoryId: '2',
-            category: {
-              id: '2',
-              name: 'Biaya Distribusi Daging'
-            },
-            images: [
-              {
-                id: '2',
-                url: 'https://images.pexels.com/photos/4473398/pexels-photo-4473398.jpeg'
-              }
-            ]
-          },
-          {
-            id: '3',
-            amount: 15000000,
-            type: TransactionType.PEMASUKAN,
-            date: new Date().toISOString(),
-            description: 'Sumbangan untuk qurban masjid',
-            categoryId: '3',
-            category: {
-              id: '3',
-              name: 'Donasi Qurban'
-            },
-            images: [
-              {
-                id: '3',
-                url: 'https://images.pexels.com/photos/7638274/pexels-photo-7638274.jpeg'
-              }
-            ]
-          },
-          {
-            id: '4',
-            amount: 1250000,
-            type: TransactionType.PENGELUARAN,
-            date: new Date().toISOString(),
-            description: 'Bayar jasa pemotongan qurban',
-            categoryId: '4',
-            category: {
-              id: '4',
-              name: 'Biaya Pemotongan & Pengulitan'
-            },
-            images: []
-          },
-          {
-            id: '5',
-            amount: 750000,
-            type: TransactionType.PENGELUARAN,
-            date: new Date().toISOString(),
-            description: 'Belanja bumbu dan bahan masakan',
-            categoryId: '5',
-            category: {
-              id: '5',
-              name: 'Belanja Bumbu & Bahan Masakan'
-            },
-            images: [
-              {
-                id: '5',
-                url: 'https://images.pexels.com/photos/2802527/pexels-photo-2802527.jpeg'
-              }
-            ]
-          },
-        ];
-        
-        // Filter based on type
-        if (type === 'PEMASUKAN') {
-          setTransactions(mockTransactions.filter(t => t.type === TransactionType.PEMASUKAN));
-        } else if (type === 'PENGELUARAN') {
-          setTransactions(mockTransactions.filter(t => t.type === TransactionType.PENGELUARAN));
-        } else {
-          setTransactions(mockTransactions);
-        }
       } finally {
         setLoading(false);
       }
@@ -208,9 +111,9 @@ export function TransactionsList({ type }: TransactionsListProps) {
     
     try {
       // In a real application, you would call the API to delete the transaction
-      // await fetch(`/api/transactions/${deleteTransaction.id}`, {
-      //   method: 'DELETE',
-      // });
+      await fetch(`/api/keuangan/transactions/${deleteTransaction.id}`, {
+        method: 'DELETE',
+      });
       
       // Update the UI
       setTransactions(transactions.filter(t => t.id !== deleteTransaction.id));
@@ -277,7 +180,7 @@ export function TransactionsList({ type }: TransactionsListProps) {
                   <Badge variant="outline">{transaction.category.name}</Badge>
                 </TableCell>
                 <TableCell>
-                  {transaction.images.length > 0 ? (
+                  {transaction.images && transaction.images.length > 0 ? (
                     <Badge variant="secondary">
                       <ImageIcon className="h-3 w-3 mr-1" />
                       {transaction.images.length}

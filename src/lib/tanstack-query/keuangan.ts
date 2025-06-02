@@ -6,7 +6,7 @@ import type {
   CategoryDistribution, 
   QurbanSalesStats,
   ChartDataResponse,
-  ProcessedData,
+  // ProcessedData,
   CategoryFormValues,
   TransactionFormValues,
   BudgetFormValues
@@ -132,7 +132,7 @@ export async function fetchWeeklyAnimalSales(year?: number, month?: number): Pro
 
 // Mutation functions
 // Generic JSON POST/PUT helper
-function jsonRequest<T>(url: string, method: string, data: any): Promise<T> {
+function jsonRequest<T>(url: string, method: string, data: unknown): Promise<T> {
   return apiClient<T>(url, {
     method,
     body: JSON.stringify(data),
@@ -248,7 +248,7 @@ export const useOptimizedMutation = <T, V>(
       )
       // Call original onSuccess if provided
       if (options?.onSuccess && typeof options.onSuccess === 'function') {
-        ;(options.onSuccess as any)(data, variables, context)
+        ;(options.onSuccess)(data, variables, context)
       }
     }, onError: (error, variables, context) => {
       // Enhanced error logging

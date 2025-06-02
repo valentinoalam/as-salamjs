@@ -1,39 +1,44 @@
-import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card";
 import { 
-  Facebook, 
-  Instagram, 
-  Youtube, 
-} from "lucide-react";
+  Card, 
+  CardContent, 
+  CardHeader, 
+  // CardFooter 
+} from "@/components/ui/card";
+// import { 
+//   Facebook, 
+//   Instagram, 
+//   Youtube, 
+// } from "lucide-react";
 import Logo from '@/components/layout/logo';
-import FloatingSocialMedia from "@/components/layout/floating-socmed";
+// import FloatingSocialMedia from "@/components/layout/floating-socmed";
 
 // Other features array
-const otherFeatures = [
-  {
-    name: "Blog",
-    icon: <Facebook className="text-3xl mb-2" />,
-    bgColor: "bg-green-500",
-    text: "Like & Follow",
-    tooltip: "Facebook",
-    url: "#"
-  },
-  {
-    name: "Tausiah",
-    icon: <Youtube className="text-3xl mb-2" />,
-    bgColor: "bg-red-600",
-    text: "Subscribe",
-    tooltip: "Tausiyah",
-    url: "#"
-  },
-  {
-    name: "Instagram",
-    icon: <Instagram className="text-3xl mb-2" />,
-    bgColor: "bg-gradient-to-r from-purple-500 to-pink-500",
-    text: "Follow Us",
-    tooltip: "Instagram",
-    url: "#"
-  },
-];
+// const otherFeatures = [
+//   {
+//     name: "Blog",
+//     icon: <Facebook className="text-3xl mb-2" />,
+//     bgColor: "bg-green-500",
+//     text: "Like & Follow",
+//     tooltip: "Facebook",
+//     url: "#"
+//   },
+//   {
+//     name: "Tausiah",
+//     icon: <Youtube className="text-3xl mb-2" />,
+//     bgColor: "bg-red-600",
+//     text: "Subscribe",
+//     tooltip: "Tausiyah",
+//     url: "#"
+//   },
+//   {
+//     name: "Instagram",
+//     icon: <Instagram className="text-3xl mb-2" />,
+//     bgColor: "bg-gradient-to-r from-purple-500 to-pink-500",
+//     text: "Follow Us",
+//     tooltip: "Instagram",
+//     url: "#"
+//   },
+// ];
 
 // Featured content links with background images
 const featuredLinks = [

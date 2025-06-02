@@ -13,7 +13,7 @@ export default function TransactionsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Riwayat Transaksi</h1>
         <Button asChild>
-          <Link href="/transactions/new">
+          <Link href="/dashboard/transactions/new">
             <Plus className="mr-2 h-4 w-4" />
             Transaksi Baru
           </Link>
@@ -39,13 +39,13 @@ export default function TransactionsPage() {
         
         <TabsContent value="income" className="space-y-4">
           <Suspense fallback={<Skeleton className="h-[500px] w-full" />}>
-            <TransactionsList type="INCOME" />
+            <TransactionsList type="PEMASUKAN" />
           </Suspense>
         </TabsContent>
         
         <TabsContent value="expense" className="space-y-4">
           <Suspense fallback={<Skeleton className="h-[500px] w-full" />}>
-            <TransactionsList type="EXPENSE" />
+            <TransactionsList type="PENGELUARAN" />
           </Suspense>
         </TabsContent>
       </Tabs>

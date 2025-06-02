@@ -30,6 +30,7 @@ async function main() {
   ];
   //   QURBAN_PAYMENT
   //   OPERATIONAL
+  //   UPAH
   //   SUPPLIES
   //   TRANSPORT
   //   SALARY
@@ -75,7 +76,7 @@ async function main() {
       password: adminPassword,
     },
   })
-
+  console.log(admin)
   // Create other staff users with passwords
   const staffPassword = await hash("staff123", 10)
 
@@ -91,7 +92,7 @@ async function main() {
       password: staffPassword,
     },
   })
-
+  console.log(petugasPendaftaran)
   const petugasInventory = await prisma.user.upsert({
     where: { email: "inventory@qurban.org" },
     update: {
@@ -104,7 +105,7 @@ async function main() {
       password: staffPassword,
     },
   })
-
+  console.log(petugasInventory)
   const petugasPenyembelihan = await prisma.user.upsert({
     where: { email: "penyembelihan@qurban.org" },
     update: {
@@ -117,7 +118,7 @@ async function main() {
       password: staffPassword,
     },
   })
-
+  console.log(petugasPenyembelihan)
   // Create TipeHewan
   const sapi = await prisma.tipeHewan.upsert({
     where: { id: 1 },
@@ -136,7 +137,7 @@ async function main() {
       note: "Sapi (berat ±300 kg)",
     },
   })
-
+  console.log(sapi)
   const domba = await prisma.tipeHewan.upsert({
     where: { id: 2 },
     update: {
@@ -154,7 +155,7 @@ async function main() {
       note: "Domba (berat 23-26 kg)",
     },
   })
-
+  console.log(domba)
   // Create ProdukHewan
   const produkHewan = [
     // Sapi products
@@ -243,7 +244,6 @@ async function main() {
 //     const mudhohi = await prisma.mudhohi.create({
 //       data: {
 //         userId: admin.id,
-//         paymentId: `pay-${i}`,
 //         nama_pengqurban: `Pengqurban ${i}`,
 //         nama_peruntukan: `Peruntukan ${i}`,
 //         potong_sendiri: i % 3 === 0,

@@ -42,7 +42,7 @@ export function NewCategoryForm() {
   const onSubmit = async (values: FormValues) => {
     try {
       // In a real application, you would send this to your API
-      // const response = await fetch('/api/categories', {
+      // const response = await fetch('/api/keuangan/categories', {
       //   method: 'POST',
       //   headers: { 'Content-Type': 'application/json' },
       //   body: JSON.stringify(values),

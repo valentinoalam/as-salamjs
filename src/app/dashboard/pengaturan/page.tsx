@@ -1,7 +1,9 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TipeHewanSettings } from "./tipe-hewan-settings"
 import { ProdukHewanSettings } from "./produk-hewan-settings"
-import { getAllTipeHewan, getAllProdukHewan } from "./actions"
+import { getAllProdukHewan } from "./actions"
+import { getAllTipeHewan } from "@/services/qurban"
+import type { TipeHewan } from "@prisma/client"
 
 export const metadata = {
   title: "Pengaturan - Qurban Management System",
@@ -27,7 +29,7 @@ export default async function PengaturanPage() {
         </TabsContent>
         <TabsContent value="produk-hewan">
           <div className="mt-6">
-            <ProdukHewanSettings initialProdukHewan={produkHewan} tipeHewan={tipeHewan} />
+            <ProdukHewanSettings initialProdukHewan={produkHewan} tipeHewan={tipeHewan as TipeHewan[]} />
           </div>
         </TabsContent>
       </Tabs>

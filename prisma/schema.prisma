@@ -22,8 +22,9 @@ enum Role {
 
 model User {
   id        String    @id @default(cuid()) @db.Char(36)
-  name      String?
+  name      String?   @unique
   email     String?   @unique
+  phone     String?   
   password  String?   @default("password123")
   urlAvatar String? 
   role      Role      @default(MEMBER)
@@ -77,6 +78,7 @@ enum CaraBayar {
 enum PaymentStatus {
   BELUM_BAYAR
   MENUNGGU_KONFIRMASI
+  DOWN_PAYMENT
   LUNAS
   BATAL
 }
@@ -93,19 +95,25 @@ enum HewanStatus {
 model Pembayaran {
   id               String   @id @default(cuid()) @db.Char(36)
   mudhohiId        String   @unique
+  tipeid           Int?      
+  quantity         Int?
+  isKolektif       Boolean?
+  totalAmount      Int?
   cara_bayar       CaraBayar
   paymentStatus    PaymentStatus
   dibayarkan       Int
   urlTandaBukti    String?
   kodeResi         String?
   createdAt        DateTime  @default(now()) @map("date_created")
+  updatedAt        DateTime? @updatedAt
+  tipe             TipeHewan? @relation(fields: [tipeid], references: [id])
   mudhohi          Mudhohi  @relation(fields: [mudhohiId], references: [id], onDelete: Cascade)
+  @@index([tipeid])
 }
 
 model Mudhohi {
   id               String   @id @default(cuid()) @db.Char(36)
   userId           String   @db.Char(36)
-  paymentId        String
   nama_pengqurban  String   @db.VarChar(200)
   nama_peruntukan  String?   @db.VarChar(200)
   alamat           String?
@@ -125,7 +133,7 @@ model Mudhohi {
 model HewanQurban {
   id                String       @id @default(cuid())
   tipeId            Int       
-  hewanId          String          @unique // External ID for the animal
+  hewanId           String          @unique // External ID for the animal
   // Animal slaughter progress
   status            HewanStatus  @default(TERDAFTAR)
   slaughtered       Boolean      @default(false)
@@ -136,7 +144,7 @@ model HewanQurban {
   isKolektif        Boolean      @default(false)
   isCustom          Boolean      @default(false)
   slotTersisa       Int?          // Jika Kolektif
-
+  keterangan        String?
   // ... relationships
   mudhohi           Mudhohi[]
   tipe              TipeHewan    @relation(fields: [tipeId], references: [id])
@@ -144,6 +152,7 @@ model HewanQurban {
   updatedAt         DateTime     @updatedAt
   @@index([tipeId])
 }
+
 
 enum JenisHewan {
   UNTA
@@ -166,6 +175,7 @@ model TipeHewan {
   jenis           JenisHewan
   hewan           HewanQurban[]
   paketQurban     ProdukHewan[]
+  pembayaran      Pembayaran[]
 }
 
 enum JenisProduk {
@@ -185,7 +195,7 @@ model ProdukHewan {
   nama            String       @unique // daging sapi 5 kg
   tipeId          Int?
   berat           Float?
-  avgProdPerHewan Int              @default(1)
+  avgProdPerHewan Int?             @default(1)
   // Product tracking
   targetPaket     Int              @default(0)
   kumulatif       Int              @default(0)
@@ -322,12 +332,15 @@ model Transaction {
 model Image {
   id            String       @id @default(uuid())
   url           String
-  transactionId String
-  transaction   Transaction  @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  alt           String?
+  transactionId String?
+  relatedId     String?
+  relatedType   String?
   createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
 
   @@map("images")
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+  @@index([relatedType])
 }
 
 model Budget {

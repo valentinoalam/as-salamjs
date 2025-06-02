@@ -1,72 +1,67 @@
 "use server"
 import prisma from "@/lib/prisma";
 import type { ErrorLog } from "@/app/dashboard/(default)/counter-inventori/counter-inventori-client"
-import { HewanStatus, JenisProduk, Counter, PengirimanStatus, JenisHewan } from "@prisma/client"
+import { HewanStatus, JenisProduk, Counter, PengirimanStatus, type TipeHewan } from "@prisma/client"
 
 // Helper functions for database operations
-const calculateOffset = (page: number, pageSize: number, group?: string) => {
-  if (group) {
-    const groupIndex = group.charCodeAt(0) - 65;
-    return (groupIndex * 50) + ((page - 1) * pageSize);
-  }
-  return (page - 1) * pageSize;
-};
+// const calculateOffset = (page: number, pageSize: number, group?: string) => {
+//   if (group) {
+//     const groupIndex = group.charCodeAt(0) - 65;
+//     return (groupIndex * 50) + ((page - 1) * pageSize);
+//   }
+//   return (page - 1) * pageSize;
+// };
 
-export async function generateHewanId(tipeId: number): Promise<string> {
-  // 1. Ambil data TipeHewan
-  const tipeHewan = await prisma.tipeHewan.findUnique({
-    where: { id: tipeId },
-    select: {
-      nama: true,
-      jenis: true,
-      target: true
-    }
-  });
-
-  if (!tipeHewan) {
-    throw new Error('TipeHewan tidak ditemukan');
-  }
-
-  // 2. Hitung total hewan dengan tipe ini
-  const totalHewan = await prisma.hewanQurban.count({
-    where: { tipeId }
-  });
-
-  // 3. Tentukan apakah perlu grup khusus
-  type SingleQurban = 'KAMBING' | 'DOMBA';
-  const isSingleQurban = (jenis: JenisHewan): jenis is SingleQurban => {
-    return jenis === JenisHewan.KAMBING || jenis === JenisHewan.DOMBA;
-  };
-  
-  // Kemudian di dalam fungsi:
-  const inLargeQuota =  isSingleQurban(tipeHewan.jenis) || tipeHewan.target > 100;
-
-  // 4. Generate ID sesuai logika
-  if (inLargeQuota) {
-    const groupIndex = Math.floor(totalHewan / 50);
-    const remainder = totalHewan % 50;
-    const currentNumber = remainder + 1;
-    
-    const groupChar = String.fromCharCode(65 + groupIndex);
-    const formattedNumber = currentNumber.toString().padStart(2, '0');
-    
-    return `${tipeHewan.nama}_${groupChar}-${formattedNumber}`;
-  }
-  
-  // Untuk kasus normal (non-kambing/domba dan target ≤ 100)
-  return `${tipeHewan.nama}_${totalHewan + 1}`;
-}
 // Get all animal types
-export async function getAllTipeHewan() {
+type Image = {
+  id: string
+  url: string
+  alt: string
+}
+
+interface TipeHewanWithImages extends TipeHewan {images: Image[]}
+
+export async function getAllTipeHewan(): Promise<TipeHewanWithImages[]> {
   try {
-    return await prisma.tipeHewan.findMany({
+    const tipeHewan = await prisma.tipeHewan.findMany({
       orderBy: { nama: "asc" },
     })
+
+    // Get images for each tipe hewan
+    const tipeHewanWithImages = await Promise.all(
+      tipeHewan.map(async (tipe) => {
+        const imagesData = await prisma.image.findMany({
+          where: {
+            relatedId: tipe.id.toString(),
+            relatedType: "TipeHewan",
+          },
+          orderBy: { createdAt: "desc" },
+        })
+        const images = imagesData.length > 0
+          ? imagesData.map(img => ({
+              id: img.id || "",
+              url: img.url || "",
+              alt: img.alt || `${tipe.nama} image`
+            }))
+          : [{ // Default placeholder object
+              id: "default",
+              url: "/path/to/placeholder.jpg", // Your placeholder URL
+              alt: `Placeholder for ${tipe.nama}`
+            }];
+        return {
+          ...tipe,
+          images
+        }
+      }),
+    )
+
+    return tipeHewanWithImages
   } catch (error) {
     console.error("Error fetching tipe hewan:", error)
-    return []
+    throw new Error("Failed to fetch tipe hewan")
   }
 }
+
 
 export async function getHewanQurban(
   type: "sapi" | "domba", 
@@ -100,18 +95,12 @@ export async function getHewanQurban(
   })
 }
 
-export async function updateHewanInventoryStatus(hewanId: string, onInventory: any) {
+export async function updateHewanInventoryStatus(hewanId: string, onInventory: boolean) {
   const result = await prisma.hewanQurban.update({
     where: { hewanId },
     data: {
       onInventory,
     },
-  })
-
-  // Get animal type for emitting the correct event
-  const animal = await prisma.hewanQurban.findUnique({
-    where: { hewanId },
-    select: { tipeId: true },
   })
 
   return result
@@ -186,22 +175,6 @@ export async function getDistribusiLog() {
   })
 }
 
-export async function getMudhohi(page = 1, pageSize = 10) {
-  const skip = (page - 1) * pageSize
-
-  return await prisma.mudhohi.findMany({
-    skip,
-    take: pageSize,
-    include: {
-      hewan: true,
-      payment: true,
-    },
-  })
-}
-
-export async function countMudhohi() {
-  return await prisma.mudhohi.count()
-}
 export async function updateHewanStatus(hewanId: string, status: HewanStatus, slaughtered = false) {
   const hewan = await prisma.hewanQurban.findUnique({
     where: { hewanId },
@@ -259,11 +232,6 @@ export async function updateHewanStatus(hewanId: string, status: HewanStatus, sl
 }
 
 export async function updateMudhohiReceived(hewanId: string, received: boolean) {
-  const hewan = await prisma.hewanQurban.findUnique({
-    where: { hewanId },
-    select: { tipeId: true }
-  })
-
   const result = await prisma.hewanQurban.update({
     where: { hewanId },
     data: {
@@ -274,45 +242,95 @@ export async function updateMudhohiReceived(hewanId: string, received: boolean) 
   return result
 }
 
-export async function addProductLog(produkId: number, event: string, place: Counter, value: number, note: string) {
+export async function addProductLog(
+  produkId: number,
+  event: 'add' | 'decrease', // Restrict event type to 'add' or 'decrease'
+  place: Counter,
+  value: number,
+  note: string,
+) {
+  // 1. Fetch the product with only the necessary fields
   const product = await prisma.produkHewan.findUnique({
     where: { id: produkId },
-  })
+    select: {
+      id: true,
+      diTimbang: true,
+      diInventori: true,
+      kumulatif: true,
+    },
+  });
 
   if (!product) {
-    throw new Error(`Product with id ${produkId} not found`)
+    throw new Error(`Product with id ${produkId} not found`);
   }
 
-  // Update product counts based on event and place
-  const updateData: any = {}
+  // 2. Define the update data structure with proper types for increment/decrement
+  const updateData: {
+    diTimbang?: { increment?: number; decrement?: number };
+    diInventori?: { increment?: number; decrement?: number };
+    kumulatif?: { increment?: number; decrement?: number };
+  } = {};
 
-  if (event === "add") {
-    if (place === "PENYEMBELIHAN") {
-      updateData.diTimbang = { increment: value }
-      updateData.kumulatif = { increment: value }
-    } else if (place === "INVENTORY") {
-      updateData.diInventori = { increment: value }
+  // 3. Process events and prepare update data
+  if (event === 'add') {
+    if (place === 'PENYEMBELIHAN') {
+      updateData.diTimbang = { increment: value };
+      updateData.kumulatif = { increment: value };
+    } else if (place === 'INVENTORY') {
+      updateData.diInventori = { increment: value };
 
-      // Check if there's a discrepancy
+      // Log discrepancy if `diInventori` after 'add' exceeds `diTimbang`
       if (product.diInventori + value > product.diTimbang) {
         await prisma.errorLog.create({
           data: {
             produkId,
-            event,
-            note: `Discrepancy detected: Received (${product.diInventori + value}) > Origin (${product.diTimbang})`,
+            event: 'discrepancy_add_inventory', // More specific error event
+            note: `Discrepancy detected: Added to inventory (${value}), resulting in ${product.diInventori + value} which exceeds 'diTimbang' of ${product.diTimbang}.`,
           },
-        })
+        });
       }
     }
-  } else if (event === "decrease") {
-    if (place === "PENYEMBELIHAN") {
-      updateData.diTimbang = { decrement: Math.min(value, product.diTimbang) }
-    } else if (place === "INVENTORY") {
-      updateData.diInventori = { decrement: Math.min(value, product.diInventori) }
+  } else if (event === 'decrease') {
+    if (place === 'PENYEMBELIHAN') {
+      // Ensure decrement doesn't go below zero for diTimbang
+      const decrementValue = Math.min(value, product.diTimbang);
+      updateData.diTimbang = { decrement: decrementValue };
+
+      // Optional: If 'kumulatif' also decreases with 'PENYEMBELIHAN' decreases
+      // updateData.kumulatif = { decrement: decrementValue };
+    } else if (place === 'INVENTORY') {
+      // Ensure decrement doesn't go below zero for diInventori
+      const decrementValue = Math.min(value, product.diInventori);
+      updateData.diInventori = { decrement: decrementValue };
+
+      // Optional: Log if an attempt to decrement below zero was made
+      if (product.diInventori < value) {
+        await prisma.errorLog.create({
+          data: {
+            produkId,
+            event: 'attempt_decrease_below_zero_inventory', // More specific error event
+            note: `Attempted to decrease inventory (${value}) below current stock (${product.diInventori}). Decremented by ${decrementValue}.`,
+          },
+        });
+      }
     }
+  } else {
+    // Handle unexpected event types
+    throw new Error(`Invalid event type: "${event}". Expected 'add' or 'decrease'.`);
   }
 
-  // Create log entry
+  // 4. Perform the product update if there are changes to apply
+  // This is crucial to prevent an empty update call.
+  if (Object.keys(updateData).length === 0) {
+    throw new Error(`No update data generated for event "${event}" and place "${place}".`);
+  }
+
+  const updatedProduct = await prisma.produkHewan.update({
+    where: { id: produkId },
+    data: updateData,
+  });
+
+  // 5. Create log entry (do this after the product update for consistency)
   await prisma.productLog.create({
     data: {
       produkId,
@@ -321,15 +339,9 @@ export async function addProductLog(produkId: number, event: string, place: Coun
       value,
       note,
     },
-  })
+  });
 
-  // Update product
-  const updatedProduct = await prisma.produkHewan.update({
-    where: { id: produkId },
-    data: updateData,
-  })
-
-  return updatedProduct
+  return updatedProduct;
 }
 
 // New functions for shipping flow
@@ -565,7 +577,7 @@ export async function createDistribusi(penerimaId: string, produkIds: number[], 
       penerimaId,
       numberOfPackages,
       produkQurban: {
-        connect: produkIds.map((id: any) => ({ id })),
+        connect: produkIds.map((id: number) => ({ id })),
       },
     },
   })

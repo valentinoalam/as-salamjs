@@ -1,217 +1,62 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
-import { getHewanQurban, getProdukHewan, getDistribution, getPenerima, getDistribusiLog } from "@/services/qurban"
-import { JenisProduk } from "@prisma/client"
+import Image from "next/image"
+
+import PemesananForm from "@/components/qurban/pemesanan/pemesanan-form"
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
+import { getAllTipeHewan } from "@/services/qurban"
 
 export default async function QurbanHome() {
-  const sapiData = await getHewanQurban("sapi")
-  const dombaData = await getHewanQurban("domba")
-  const produkDaging = await getProdukHewan(JenisProduk.DAGING)
-  const produkLainnya = await getProdukHewan()
-  const distribution = await getDistribution()
-  const penerima = await getPenerima()
-  const distribusiLog = await getDistribusiLog()
-
-  // Filter non-meat products
-  const nonMeatProducts = produkLainnya.filter((p) => p.JenisProduk !== JenisProduk.DAGING)
-
-  // Calculate coupon stats
-  const totalKupon = penerima.filter((p) => p.noKupon).length
-  const returnedKupon = penerima.filter((p) => p.noKupon && p.isDiterima).length
-
+  const tipeHewan = await getAllTipeHewan()
+  console.log(tipeHewan)
   return (
-    <div className="space-y-8">
-      <Tabs defaultValue="sapi" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="sapi">Status Sapi</TabsTrigger>
-          <TabsTrigger value="domba">Status Domba</TabsTrigger>
-        </TabsList>
-        <TabsContent value="sapi">
-          <Card>
-            <CardHeader>
-              <CardTitle>Status Sapi</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-5 gap-2">
-                {sapiData.map((sapi) => (
-                  <div key={sapi.id} className="flex flex-col items-center justify-center p-2 border rounded-md">
-                    <span className="text-lg">🐮{sapi.hewanId}</span>
-                    <div className="flex flex-col items-center">
-                      <span className="text-2xl">{sapi.slaughtered ? "✅" : "⬜️"}</span>
-                      {sapi.slaughtered && (
-                        <span className="text-xs mt-1">{sapi.receivedByMdhohi ? "🧑‍🤝‍🧑✓" : "🧑‍🤝‍🧑✗"}</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="domba">
-          <Card>
-            <CardHeader>
-              <CardTitle>Status Domba</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-5 gap-2">
-                {dombaData.map((domba) => (
-                  <div key={domba.id} className="flex flex-col items-center justify-center p-2 border rounded-md">
-                    <span className="text-lg">🐐{domba.hewanId}</span>
-                    <div className="flex flex-col items-center">
-                      <span className="text-2xl">{domba.slaughtered ? "✅" : "⬜️"}</span>
-                      {domba.slaughtered && (
-                        <span className="text-xs mt-1">{domba.receivedByMdhohi ? "🧑‍🤝‍🧑✓" : "🧑‍🤝‍🧑✗"}</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+    <>
+      {/* Hero Section */}
+      <section id="home" className="relative h-screen flex items-center justify-center">
+        <div className="absolute inset-0 z-0">
+          <Image
+            src="/placeholder.svg?height=800&width=1200"
+            alt="Ternak Qurban"
+            fill
+            className="object-cover"
+            priority
+          />
+          <div className="absolute inset-0 bg-black/40"></div>
+        </div>
+        <div className="relative z-10 text-center text-white px-4">
+          <h1 className="text-5xl md:text-7xl font-bold text-green-400 mb-4 mt-20">Qurban Yuk</h1>
+          <p className="text-xl md:text-2xl text-green-300 mb-8">Berqurban Sambil Bersedekah</p>
+          <Button
+            className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg font-semibold rounded-lg transition-colors"
+          >
+            <Link href="#menu" >
+            Pesan Sekarang
+            </Link>
+          </Button>
+        </div>
+      </section>
+      
+      {/* Menu Section */}
+      <section id="menu" className="py-20 bg-gray-900">
+        <PemesananForm tipeHewan={tipeHewan} />
+      </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Penerimaan</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h3 className="text-lg font-medium mb-4">Status Kupon</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span>Kupon Kembali</span>
-                  <span className="font-medium">
-                    {returnedKupon} / {totalKupon}
-                  </span>
-                </div>
-                <Progress value={(returnedKupon / totalKupon) * 100} className="h-2" />
-              </div>
-            </div>
-            <div>
-              <h3 className="text-lg font-medium mb-4">Produk di Inventori</h3>
-              <div className="grid grid-cols-2 gap-4">
-                {produkLainnya.map((produk) => (
-                  <div key={produk.id} className="flex justify-between items-center p-2 border rounded-md">
-                    <span>{produk.nama}</span>
-                    <span className="font-medium">{produk.diInventori}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Kumulatif Timbang</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {produkDaging.map((item) => (
-              <div key={item.id} className="flex flex-col items-center p-4 border rounded-md">
-                <span className="text-xl mb-2">
-                  {item.tipeId === 1 ? "🐮" : "🐐"} {item.berat}kg
-                </span>
-                <span className="text-3xl font-bold">{item.diTimbang}</span>
-                <div className="text-xs mt-1">Target: {item.targetPaket}</div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Distribusi Log</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2">Institusi/Lembaga</th>
-                  <th className="text-left p-2">Kode Distribusi</th>
-                  <th className="text-left p-2">Produk Diterima</th>
-                  <th className="text-left p-2">Jumlah</th>
-                  <th className="text-left p-2">Tanggal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {distribusiLog.map((log) => (
-                  <tr key={log.id} className="border-b">
-                    <td className="p-2">{log.penerima.institusi || "-"}</td>
-                    <td className="p-2">{log.penerima.category.category}</td>
-                    <td className="p-2">{log.produkQurban.map((p) => p.nama).join(", ")}</td>
-                    <td className="p-2">{log.numberOfPackages}</td>
-                    <td className="p-2">{new Date(log.createdAt).toLocaleDateString()}</td>
-                  </tr>
-                ))}
-                {distribusiLog.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="p-2 text-center">
-                      Belum ada data distribusi
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Distribusi per Kategori</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            {produkLainnya.map((produk) => {
-              const total = produk.sdhDiserahkan
-              const percentage =
-                produk.targetPaket > 0 ? Math.min(100, (produk.sdhDiserahkan / produk.targetPaket) * 100) : 0
-
-              // Calculate distribution per category
-              const categoryDistribution = distribution.map((cat) => {
-                const catLogs = distribusiLog.filter(
-                  (log) => log.penerima.distributionId === cat.id && log.produkQurban.some((p) => p.id === produk.id),
-                )
-
-                const count = catLogs.reduce((sum, log) => sum + log.numberOfPackages, 0)
-                const catPercentage = total > 0 ? (count / total) * 100 : 0
-
-                return {
-                  category: cat.category,
-                  count,
-                  percentage: catPercentage,
-                }
-              })
-
-              return (
-                <div key={produk.id} className="space-y-2">
-                  <div className="font-medium">{produk.nama}</div>
-                  <Progress value={percentage} className="h-2" />
-                  <div className="text-sm">
-                    {produk.sdhDiserahkan} / {produk.targetPaket} ({percentage.toFixed(1)}%)
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
-                    {categoryDistribution.map((dist, idx) => (
-                      <div key={idx} className="text-xs p-1 border rounded">
-                        {dist.category}: {dist.count} ({dist.percentage.toFixed(1)}%)
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+      {/* Testimoni Section */}
+      <section id="testimoni" className="py-20 text-white relative">
+        <div className="absolute inset-0 z-0">
+          <Image src="/placeholder.svg?height=500&width=1200" alt="Quran Background" fill className="object-cover" />
+          <div className="absolute inset-0 bg-black/60"></div>
+        </div>
+        <div className="relative z-10 container mx-auto px-4 text-center">
+          <figure className="max-w-4xl mx-auto">
+            <blockquote className="text-lg md:text-xl font-medium mb-6 leading-relaxed">
+              &quot;Dan bagi setiap umat telah Kami syariatkan penyembelihan (qurban), agar mereka menyebut nama Allah atas
+              rezeki yang dikaruniakan Allah kepada mereka berupa hewan ternak. Maka Tuhanmu adalah Tuhan Yang Maha Esa,
+              karena itu berserah dirilah kamu kepada-Nya.&quot;
+            </blockquote>
+            <figcaption className="text-white font-bold text-xl">(QS: Al-Hajj: 34)</figcaption>
+          </figure>
+        </div>
+      </section>
+    </>
   )
 }

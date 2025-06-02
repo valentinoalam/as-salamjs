@@ -52,7 +52,7 @@ export function TransactionFilters() {
     // Fetch categories for the filter
     const fetchCategories = async () => {
       try {
-        const response = await fetch('/api/categories');
+        const response = await fetch('/api/keuangan/categories');
         if (response.ok) {
           const data = await response.json();
           setCategories(data);
@@ -169,19 +169,14 @@ export function TransactionFilters() {
           <Label htmlFor="category">Kategori</Label>
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
             <SelectTrigger id="category" className="w-full">
-              <SelectValue placeholder="Semua kategori">
-                <div className="flex items-center">
-                  <Tag className="mr-2 h-4 w-4" />
-                  <span>
-                    {selectedCategory
-                      ? categories.find((c) => c.id === selectedCategory)?.name || "Pilih kategori"
-                      : "Semua kategori"}
-                  </span>
-                </div>
-              </SelectValue>
+              <div className="flex items-center">
+                <Tag className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Semua kategori" />
+              </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Semua kategori</SelectItem>
+              {/* Fixed: Added "all" value instead of empty string */}
+              <SelectItem value="all">Semua kategori</SelectItem>
               {categories.map((category) => (
                 <SelectItem key={category.id} value={category.id}>
                   {category.name}

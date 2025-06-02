@@ -16,6 +16,8 @@ import {
 import moment from 'moment-hijri'
 import FooterSidebar from "./footer-sidebar"
 import { usePathname } from "next/navigation"
+import { useEffect, useState } from "react"
+import { checkAccess } from "@/app/actions"
 
 const data = {
   event: ["Itikaf", "Qurban"],
@@ -27,6 +29,10 @@ const data = {
         {
           title: "Keuangan",
           url: "/dashboard/keuangan",
+        },
+        {
+          title: "Transaksi Lainnya",
+          url: "/dashboard/transactions",
         },
         {
           title: "Pengqurban",
@@ -72,6 +78,17 @@ const getDefaultEvent = () => {
 }
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
+  const [accessiblePages, setAccessiblePages] = useState<string[]>([])
+
+  useEffect(() => {
+    const fetchAccessiblePages = async () => {
+      const result = await checkAccess()
+      setAccessiblePages(result.accessiblePages)
+    }
+
+  fetchAccessiblePages()
+    
+  }, [])
   return (
     <Sidebar {...props}>
       <SidebarHeader>
@@ -81,27 +98,49 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         />
       </SidebarHeader>
       <SidebarContent>
-        {data.navMain.map((item) => item.items ? ( 
-          <SidebarGroup key={item.title}>
-            <SidebarGroupLabel>{item.title}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {item.items.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={pathname === item.url}>
-                      <a href={item.url}>{item.title}</a>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+        {data.navMain.map((item) => {
+          // Check accessibility for top-level items
+          const topLevelSlug = item.url ? (item.url.startsWith("/") ? item.url.slice(1) : item.url) : ""
+          const isTopLevelAccessible = 
+            (accessiblePages.includes(topLevelSlug) || item.url === "/")
+
+          if (item.items) {
+            // For groups with sub-items, filter accessible sub-items
+            const accessibleItems = item.items.filter((subItem) => {
+              const slug = subItem.url.startsWith("/") ? subItem.url.slice(1) : subItem.url
+              const isAccessible =
+                (accessiblePages.includes(slug) || subItem.url === "/")
+              return isAccessible
+            })
+
+            // Only render the group if there are accessible items
+            return accessibleItems.length > 0 ? (
+              <SidebarGroup key={item.title}>
+                <SidebarGroupLabel>{item.title}</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {accessibleItems.map((item) => (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton asChild isActive={pathname === item.url}>
+                          <a href={item.url}>{item.title}</a>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ) : null
+          } else {
+            // For single items, check accessibility
+            return isTopLevelAccessible ? (
+              <SidebarMenu key={item.title}>
+                <SidebarMenuButton asChild isActive={pathname === item.url}>
+                  <a href={item.url}>{item.title}</a>
+                </SidebarMenuButton>
               </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup> ):( 
-            <SidebarMenu key={item.title}>
-              <SidebarMenuButton asChild isActive={pathname === item.url}>
-                <a href={item.url}>{item.title}</a>
-              </SidebarMenuButton>
-            </SidebarMenu>)
-        )}
+            ) : null
+          }
+        })}
       </SidebarContent>
       <SidebarRail />
       <FooterSidebar />

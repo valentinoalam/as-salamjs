@@ -1,28 +1,17 @@
 import { NextResponse } from "next/server"
-import { createShipment, getPendingShipments, getAllShipments, countShipments } from "@/services/qurban"
+import { createShipment, getPendingShipments, getAllShipments } from "@/services/qurban"
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const pending = searchParams.get("pending")
-    const page = Number.parseInt(searchParams.get("page") || "1")
-    const pageSize = Number.parseInt(searchParams.get("pageSize") || "10")
 
     if (pending === "true") {
       const pendingShipments = await getPendingShipments()
       return NextResponse.json(pendingShipments)
     } else {
-      const [shipments, total] = await Promise.all([getAllShipments(page, pageSize), countShipments()])
-
-      return NextResponse.json({
-        shipments,
-        pagination: {
-          page,
-          pageSize,
-          total,
-          totalPages: Math.ceil(total / pageSize),
-        },
-      })
+      const shipments = await getAllShipments() // ← Tanpa pagination
+      return NextResponse.json(shipments)
     }
   } catch (error) {
     console.error("Error fetching shipments:", error)

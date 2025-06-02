@@ -9,6 +9,7 @@ const protectedRoutes = {
   "/dashboard/progres-sembelih": ["ADMIN", "PETUGAS_PENYEMBELIHAN"],
   "/dashboard/panitia": ["ADMIN"],
   "/dashboard/keuangan": ["ADMIN", "PETUGAS_KEUANGAN"],
+  "/dashboard/transactions": ["ADMIN", "PETUGAS_KEUANGAN"],
   "/dashboard/mudhohi": ["ADMIN", "PETUGAS_PENDAFTARAN"],
 }
 

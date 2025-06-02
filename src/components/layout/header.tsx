@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { ModeToggle } from "@/components/ui/mode-toggle"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Role } from "@prisma/client"
 import { checkAccess } from "@/app/actions"
 import { useSession, signOut } from "next-auth/react"
@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { LogOut, User } from "lucide-react"
+import moment from 'moment-hijri'
 
 export default function Header() {
   const pathname = usePathname()
@@ -36,20 +37,15 @@ export default function Header() {
     }
   }, [status])
 
-  const navItems = [
-    { name: "Dashboard", href: "/" },
-    { name: "Pemesanan", href: "/pemesanan" },
-    { name: "Pengqurban", href: "/mudhohi" },
-    { name: "Progres Sembelih", href: "/progres-sembelih" },
-    { name: "Counter Timbang", href: "/counter-timbang" },
-    { name: "Counter Inventori", href: "/counter-inventori" },
-    { name: "Keuangan", href: "/keuangan" },
-  ]
-
-  // Add Panitia page for admin
-  if (session?.user?.role === Role.ADMIN) {
-    navItems.push({ name: "Panitia", href: "/panitia" })
-  }
+  const navItems = useMemo(() => {
+    const items = [
+      // { name: "Pemesanan", href: "/qurban/pemesanan" }
+    ]
+    if (session?.user?.role !== Role.MEMBER) {
+      items.push({ name: "Dashboard", href: "/dashboard" })
+    }
+    return items
+  }, [session])
 
   const getInitials = (name: string | null | undefined) => {
     if (!name) return "U"
@@ -62,36 +58,63 @@ export default function Header() {
   }
 
   return (
-    <header className="border-b">
+    <header className="fixed w-full z-50 bg-secondary/80 top-0 border-b backdrop-blur-sm border-green-100">
       <div className="container mx-auto flex h-16 items-center px-4 sm:px-6">
         <div className="mr-8 flex items-center">
-          <Link href="/" className="flex items-center">
-            <span className="text-xl font-bold">Qurban 1446 H</span>
+          <Link href="/qurban" className="flex items-center">
+            <span className="text-xl font-bold text-green-600">Go Qurban {moment().iYear()} H</span>
           </Link>
         </div>
-        <nav className="flex-1 flex items-center space-x-1 md:space-x-4 overflow-x-auto">
-          {navItems.map((item) => {
-            const isAccessible =
-              status !== "authenticated" || accessiblePages.includes(item.href.replace("/", "")) || item.href === "/"
 
-            return isAccessible ? (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "text-sm font-medium transition-colors hover:text-primary whitespace-nowrap",
-                  pathname === item.href ? "text-foreground font-semibold" : "text-muted-foreground",
-                )}
-              >
-                {item.name}
+        <nav className="flex-1 flex items-center space-x-8 md:space-x-4 overflow-x-auto">
+            <div className="hidden md:flex space-x-8">
+              <Link href="#home" className="text-primary font-semibold uppercase hover:text-green-700 transition-colors">
+                Home
               </Link>
-            ) : null
-          })}
+              <Link href="#menu" className="text-primary font-semibold uppercase hover:text-green-700 transition-colors">
+                Hewan
+              </Link>
+              <Link
+                href="#testimoni"
+                className="text-primary font-semibold uppercase hover:text-green-700 transition-colors"
+              >
+                Dalil
+              </Link>
+            </div>
+            { status === "authenticated" && 
+              <Link
+                href={`qurban/konfirmasi/${session.user?.id}`}
+                className="text-primary font-semibold uppercase hover:text-green-700 transition-colors"
+              >
+                Konfirmasi Pembayaran
+              </Link>}
+            {navItems.map((item) => {
+              const slug = item.href.startsWith("/") ? item.href.slice(1) : item.href
+              const isAccessible =
+                status === "authenticated" &&
+                (accessiblePages.includes(slug) || item.href === "/")
+
+              return isAccessible ? (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "font-semibold uppercase hover:text-green-700 transition-colors whitespace-nowrap", // hover:text-primary
+                    pathname === item.href
+                      ? "text-foreground font-semibold"
+                      : "text-primary"
+                  )}
+                >
+                  {item.name}
+                </Link>
+              ) : null
+            })}
         </nav>
+
         <div className="ml-auto flex items-center space-x-4">
           <ModeToggle />
 
-          {status === "authenticated" && session.user ? (
+          {status === "authenticated" && session?.user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -115,7 +138,7 @@ export default function Header() {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
-                  <Link href="/profile">Profile Settings</Link>
+                  <Link href="/qurban/profile">Profile Settings</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })}>

@@ -14,6 +14,7 @@
     ],
     "skipLibCheck": true, // Often enabled for speed in large projects, but consider disabling for stricter checks.
     "strict": true, // Essential for strong type safety
+    "strictNullChecks": true,
     "forceConsistentCasingInFileNames": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true, // Often enabled with esModuleInterop

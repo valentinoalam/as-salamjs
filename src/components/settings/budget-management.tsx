@@ -75,7 +75,7 @@ export function BudgetManagement() {
         // In a real application, you would fetch from API
         // const [budgetsResponse, categoriesResponse] = await Promise.all([
         //   fetch('/api/budgets'),
-        //   fetch('/api/categories?type=PENGELUARAN')
+        //   fetch('/api/keuangan/categories?type=PENGELUARAN')
         // ]);
         
         // if (budgetsResponse.ok && categoriesResponse.ok) {

@@ -6,6 +6,10 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  experimental: {
+    workerThreads: false,
+    cpus: 2 // Limit CPU usage
+  },
   typescript: {
     ignoreBuildErrors: true,
   },

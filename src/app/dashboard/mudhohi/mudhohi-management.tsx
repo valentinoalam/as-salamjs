@@ -1,8 +1,8 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
+import { z } from "zod"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,59 +19,94 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { PaymentStatus, CaraBayar } from "@prisma/client"
-import { getMudhohiList, updatePaymentStatus, createMudhohi } from "../../../services/mudhohi"
+import { 
+  createMudhohi,
+  getMudhohiList, 
+  updatePaymentStatus, 
+  // createMudhohi 
+} from "@/services/mudhohi"
 import { exportToExcel } from "@/lib/excel"
-import { CheckCircle, XCircle, Clock, AlertCircle, Search, Plus, RefreshCw, Download } from "lucide-react"
-import QurbanForm from "@/components/qurban/form-pemesanan-qurban"
+import { CheckCircle, XCircle, Clock, AlertCircle, Search, Plus, RefreshCw, Download, HandCoins, ListPlus } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import type { TipeHewan } from "@/types/keuangan"
+import type { AdminQurbanFormValues } from "@/lib/zod/qurban-form"
+import { AdminQurbanForm } from "@/components/qurban/trx-admin/admin-qurban-form"
+import Link from "next/link"
 
-type MudhohiStats = {
-  totalMudhohi: number
-  totalHewan: number
-  statusCounts: {
-    BELUM_BAYAR: number
-    MENUNGGU_KONFIRMASI: number
-    LUNAS: number
-    BATAL: number
-  }
-}
+// Zod Schemas
+const PaymentStatusEnum = z.nativeEnum(PaymentStatus)
+const CaraBayarEnum = z.nativeEnum(CaraBayar)
 
-type Mudhohi = {
-  id: string
-  nama_pengqurban: string | null
-  nama_peruntukan: string | null
-  pesan_khusus: string | null
-  keterangan: string | null
-  potong_sendiri: boolean
-  ambil_daging: boolean | null
-  mengambilDaging: boolean
-  dash_code: string
-  createdAt: Date
-  payment: {
-    id: string
-    cara_bayar: CaraBayar
-    paymentStatus: PaymentStatus
-    dibayarkan: number
-    urlTandaBukti: string | null
-    kodeResi: string | null
-  } | null
-  hewan: {
-    id: string
-    hewanId: string
-    tipeId: number
-    status: string
-    slaughtered: boolean
-    tipe: {
-      nama: string
-      icon: string | null
-    }
-  }[]
-  user: {
-    name: string | null
-    email: string | null
-  }
-}
+const PaymentSchema = z.object({
+  id: z.string(),
+  cara_bayar: CaraBayarEnum,
+  paymentStatus: PaymentStatusEnum,
+  dibayarkan: z.number().min(0),
+  urlTandaBukti: z.string().nullable(),
+  kodeResi: z.string().nullable(),
+})
+
+const HewanTipeSchema = z.object({
+  nama: z.string(),
+  icon: z.string().nullable(),
+})
+
+const HewanSchema = z.object({
+  id: z.string(),
+  hewanId: z.string(),
+  tipeId: z.number(),
+  status: z.string(),
+  slaughtered: z.boolean(),
+  tipe: HewanTipeSchema,
+})
+
+const UserSchema = z.object({
+  name: z.string().nullable(),
+  email: z.string().email().nullable(),
+})
+
+const MudhohiSchema = z.object({
+  id: z.string(),
+  nama_pengqurban: z.string().nullable(),
+  nama_peruntukan: z.string().nullable(),
+  pesan_khusus: z.string().nullable(),
+  keterangan: z.string().nullable(),
+  potong_sendiri: z.boolean(),
+  ambil_daging: z.boolean().nullable(),
+  mengambilDaging: z.boolean(),
+  dash_code: z.string(),
+  createdAt: z.date(),
+  payment: PaymentSchema.nullable(),
+  hewan: z.array(HewanSchema),
+  user: UserSchema,
+})
+
+const MudhohiStatsSchema = z.object({
+  totalMudhohi: z.number().min(0),
+  totalHewan: z.number().min(0),
+  statusCounts: z.object({
+    BELUM_BAYAR: z.number().min(0),
+    MENUNGGU_KONFIRMASI: z.number().min(0),
+    LUNAS: z.number().min(0),
+    BATAL: z.number().min(0),
+  }),
+})
+
+const PaymentConfirmationSchema = z.object({
+  kodeResi: z.string().min(1, "Kode resi harus diisi"),
+  amount: z.number().min(1, "Jumlah pembayaran harus lebih dari 0"),
+})
+
+const SearchFilterSchema = z.object({
+  searchTerm: z.string(),
+  statusFilter: z.union([PaymentStatusEnum, z.literal("ALL")]),
+})
+
+// Types
+type MudhohiStats = z.infer<typeof MudhohiStatsSchema>
+type Mudhohi = z.infer<typeof MudhohiSchema>
+type PaymentConfirmation = z.infer<typeof PaymentConfirmationSchema>
+type SearchFilter = z.infer<typeof SearchFilterSchema>
 
 interface MudhohiManagementProps {
   initialStats: MudhohiStats
@@ -79,43 +114,90 @@ interface MudhohiManagementProps {
   tipeHewan: TipeHewan[]
 }
 
+interface PaymentUpdateParams {
+  mudhohiId: string
+  newStatus: PaymentStatus
+  amount?: number
+  kodeResi?: string
+}
+
+interface ApiResponse<T = unknown> {
+  success: boolean
+  data?: T
+  error?: string
+  mudhohiId?: string
+}
+
 export default function MudhohiManagement({ 
   initialStats, 
   initialMudhohi, 
   tipeHewan 
 }: MudhohiManagementProps) {
-  const [stats, setStats] = useState<MudhohiStats>(initialStats)
-  const [mudhohi, setMudhohi] = useState<Mudhohi[]>(initialMudhohi)
-  const [loading, setLoading] = useState(false)
-  const [searchTerm, setSearchTerm] = useState("")
+  // Validate initial props
+  const validatedStats = MudhohiStatsSchema.parse(initialStats)
+  const validatedMudhohi = z.array(MudhohiSchema).parse(initialMudhohi)
+
+  const [stats, setStats] = useState<MudhohiStats>(validatedStats)
+  const [mudhohi, setMudhohi] = useState<Mudhohi[]>(validatedMudhohi)
+  const [loading, setLoading] = useState<boolean>(false)
+  const [searchTerm, setSearchTerm] = useState<string>("")
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | "ALL">("ALL")
-  const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [addDialogOpen, setAddDialogOpen] = useState<boolean>(false)
 
-  // Now, add a state for kodeResi
+  // Payment confirmation state
   const [kodeResi, setKodeResi] = useState<string>("")
-
-  // Add a dialog state for payment confirmation
-  const [confirmPaymentDialogOpen, setConfirmPaymentDialogOpen] = useState(false)
+  const [confirmPaymentDialogOpen, setConfirmPaymentDialogOpen] = useState<boolean>(false)
   const [selectedMudhohiId, setSelectedMudhohiId] = useState<string | null>(null)
   const [confirmPaymentAmount, setConfirmPaymentAmount] = useState<number>(0)
   
-  // Add a function to handle payment confirmation dialog
-  const openConfirmPaymentDialog = (mudhohiId: string, currentAmount: number) => {
+  // Validation errors state
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+
+  const validatePaymentConfirmation = (data: PaymentConfirmation): boolean => {
+    try {
+      PaymentConfirmationSchema.parse(data)
+      setValidationErrors({})
+      return true
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const errors: Record<string, string> = {}
+        error.errors.forEach((err) => {
+          if (err.path.length > 0) {
+            errors[err.path[0] as string] = err.message
+          }
+        })
+        setValidationErrors(errors)
+      }
+      return false
+    }
+  }
+
+  const validateSearchFilter = (data: SearchFilter): boolean => {
+    try {
+      SearchFilterSchema.parse(data)
+      return true
+    } catch (error) {
+      console.error("Invalid search filter:", error)
+      return false
+    }
+  }
+
+  const openConfirmPaymentDialog = (mudhohiId: string, currentAmount: number): void => {
     setSelectedMudhohiId(mudhohiId)
     setConfirmPaymentAmount(currentAmount)
     setKodeResi("")
+    setValidationErrors({})
     setConfirmPaymentDialogOpen(true)
   }
 
-  // Update the handleUpdatePaymentStatus function to include kodeResi
-  const handleUpdatePaymentStatus = async (
-    mudhohiId: string,
-    newStatus: PaymentStatus,
-    amount?: number,
-    kodeResi?: string,
-  ) => {
+  const handleUpdatePaymentStatus = async ({
+    mudhohiId,
+    newStatus,
+    amount,
+    kodeResi,
+  }: PaymentUpdateParams): Promise<void> => {
     try {
-      const result = await updatePaymentStatus(mudhohiId, newStatus, amount, kodeResi)
+      const result: ApiResponse = await updatePaymentStatus(mudhohiId, newStatus, kodeResi, amount)
 
       if (result.success) {
         toast({
@@ -129,19 +211,19 @@ export default function MudhohiManagement({
             m.id === mudhohiId
               ? {
                   ...m,
-                  payment: {
-                    ...m.payment!,
+                  payment: m.payment ? {
+                    ...m.payment,
                     paymentStatus: newStatus,
-                    dibayarkan: amount || m.payment?.dibayarkan || 0,
-                    kodeResi: kodeResi || m.payment?.kodeResi || null,
-                  },
+                    dibayarkan: amount || m.payment.dibayarkan,
+                    kodeResi: kodeResi || m.payment.kodeResi,
+                  } : null,
                 }
               : m,
           ),
         )
 
         // Refresh data to get updated stats
-        refreshData()
+        await refreshData()
       } else {
         throw new Error(result.error || "Failed to update payment status")
       }
@@ -149,30 +231,56 @@ export default function MudhohiManagement({
       console.error("Error updating payment status:", error)
       toast({
         title: "Error",
-        description: "Failed to update payment status. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update payment status. Please try again.",
         variant: "destructive",
       })
     }
   }
   
-  // Add a function to handle payment confirmation submission
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = (): void => {
+    const isValid = validatePaymentConfirmation({
+      kodeResi: kodeResi.trim(),
+      amount: confirmPaymentAmount,
+    })
+
+    if (!isValid) {
+      toast({
+        title: "Validation Error",
+        description: "Please fix the validation errors before confirming payment.",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (selectedMudhohiId) {
-      handleUpdatePaymentStatus(selectedMudhohiId, PaymentStatus.LUNAS, confirmPaymentAmount, kodeResi || undefined)
+      handleUpdatePaymentStatus({
+        mudhohiId: selectedMudhohiId,
+        newStatus: PaymentStatus.LUNAS,
+        amount: confirmPaymentAmount,
+        kodeResi: kodeResi.trim() || undefined,
+      })
       setConfirmPaymentDialogOpen(false)
       setSelectedMudhohiId(null)
     }
   }
-  const refreshData = async () => {
+
+  const refreshData = async (): Promise<void> => {
     setLoading(true)
     try {
-      const data = await getMudhohiList(statusFilter === "ALL" ? undefined : statusFilter)
-      setMudhohi(data)
+      const data: Mudhohi[] = await getMudhohiList(statusFilter === "ALL" ? undefined : statusFilter)
+      const validatedData = z.array(MudhohiSchema).parse(data)
+      setMudhohi(validatedData)
+      
       // Recalculate stats
-      const newStats = {
-        ...stats,
-        totalMudhohi: data.length,
-        totalHewan: data.reduce((acc, curr) => acc + curr.hewan.length, 0),
+      const newStats: MudhohiStats = {
+        totalMudhohi: validatedData.length,
+        totalHewan: validatedData.reduce((acc, curr) => acc + curr.hewan.length, 0),
+        statusCounts: {
+          BELUM_BAYAR: validatedData.filter(m => m.payment?.paymentStatus === PaymentStatus.BELUM_BAYAR).length,
+          MENUNGGU_KONFIRMASI: validatedData.filter(m => m.payment?.paymentStatus === PaymentStatus.MENUNGGU_KONFIRMASI).length,
+          LUNAS: validatedData.filter(m => m.payment?.paymentStatus === PaymentStatus.LUNAS).length,
+          BATAL: validatedData.filter(m => m.payment?.paymentStatus === PaymentStatus.BATAL).length,
+        },
       }
       setStats(newStats)
     } catch (error) {
@@ -187,12 +295,16 @@ export default function MudhohiManagement({
     }
   }
 
-  const handleFilterChange = async (status: PaymentStatus | "ALL") => {
+  const handleFilterChange = async (status: PaymentStatus | "ALL"): Promise<void> => {
+    const isValid = validateSearchFilter({ searchTerm, statusFilter: status })
+    if (!isValid) return
+
     setStatusFilter(status)
     setLoading(true)
     try {
-      const data = await getMudhohiList(status === "ALL" ? undefined : status)
-      setMudhohi(data)
+      const data: Mudhohi[] = await getMudhohiList(status === "ALL" ? undefined : status)
+      const validatedData = z.array(MudhohiSchema).parse(data)
+      setMudhohi(validatedData)
     } catch (error) {
       console.error("Error filtering data:", error)
       toast({
@@ -205,11 +317,18 @@ export default function MudhohiManagement({
     }
   }
 
-  const handleSearch = async () => {
+  const handleSearch = async (): Promise<void> => {
+    const isValid = validateSearchFilter({ searchTerm, statusFilter })
+    if (!isValid) return
+
     setLoading(true)
     try {
-      const data = await getMudhohiList(statusFilter === "ALL" ? undefined : statusFilter, searchTerm)
-      setMudhohi(data)
+      const data: Mudhohi[] = await getMudhohiList(
+        statusFilter === "ALL" ? undefined : statusFilter, 
+        searchTerm.trim()
+      )
+      const validatedData = z.array(MudhohiSchema).parse(data)
+      setMudhohi(validatedData)
     } catch (error) {
       console.error("Error searching data:", error)
       toast({
@@ -222,107 +341,102 @@ export default function MudhohiManagement({
     }
   }
 
-  const handleSubmitMudhohi = async (formData: any) => {
+  const handleSubmitMudhohi = async (data: AdminQurbanFormValues): Promise<ApiResponse> => {
     try {
-      // Transform the form data to match the expected format
-      const transformedData = {
-        nama_pengqurban: formData.nama_pengqurban,
-        nama_peruntukan: formData.nama_peruntukan || "",
-        email: formData.email,
-        phone: formData.phone,
-        pesan_khusus: formData.pesan_khusus || "",
-        keterangan: formData.keterangan || "",
-        potong_sendiri: formData.potong_sendiri,
-        mengambilDaging: formData.mengambilDaging,
-        tipeHewanId: Number.parseInt(formData.tipeHewanId),
-        quantity: formData.quantity,
-        isKolektif: formData.isKolektif,
-        cara_bayar: formData.cara_bayar,
-        paymentStatus: formData.paymentStatus,
-        dibayarkan: formData.dibayarkan,
-        kodeResi: "",
-      }
-
-      const result = await createMudhohi(transformedData)
+      const result: ApiResponse = await createMudhohi({
+          ...data,
+          tipeHewanId: Number.parseInt(data.tipeHewanId),
+        })
 
       if (result.success) {
-        // Close dialog and refresh data
         setAddDialogOpen(false)
-        refreshData()
+        await refreshData()
+        
+        toast({
+          title: "Success",
+          description: "Pengqurban berhasil ditambahkan.",
+        })
         
         return { success: true, mudhohiId: result.mudhohiId }
       } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to add pengqurban",
+          variant: "destructive",
+        })
         return { success: false, error: result.error || "Failed to add pengqurban" }
       }
     } catch (error) {
       console.error("Error adding pengqurban:", error)
-      return { success: false, error: "Failed to add pengqurban. Please try again." }
+      const errorMessage = "Failed to add pengqurban. Please try again."
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      })
+      return { success: false, error: errorMessage }
     }
   }
 
-  const getStatusLabel = (status: PaymentStatus) => {
-    switch (status) {
-      case PaymentStatus.BELUM_BAYAR:
-        return "Belum Bayar"
-      case PaymentStatus.MENUNGGU_KONFIRMASI:
-        return "Menunggu Konfirmasi"
-      case PaymentStatus.LUNAS:
-        return "Lunas"
-      case PaymentStatus.BATAL:
-        return "Batal"
-      default:
-        return status
+  const getStatusLabel = (status: PaymentStatus): string => {
+    const statusLabels: Record<PaymentStatus, string> = {
+      [PaymentStatus.BELUM_BAYAR]: "Belum Bayar",
+      [PaymentStatus.DOWN_PAYMENT]: "Down Payment",
+      [PaymentStatus.MENUNGGU_KONFIRMASI]: "Menunggu Konfirmasi",
+      [PaymentStatus.LUNAS]: "Lunas",
+      [PaymentStatus.BATAL]: "Batal",
     }
+    return statusLabels[status] || status
   }
 
-  const getStatusIcon = (status: PaymentStatus) => {
-    switch (status) {
-      case PaymentStatus.BELUM_BAYAR:
-        return <AlertCircle className="h-5 w-5 text-yellow-500" />
-      case PaymentStatus.MENUNGGU_KONFIRMASI:
-        return <Clock className="h-5 w-5 text-blue-500" />
-      case PaymentStatus.LUNAS:
-        return <CheckCircle className="h-5 w-5 text-green-500" />
-      case PaymentStatus.BATAL:
-        return <XCircle className="h-5 w-5 text-red-500" />
-      default:
-        return null
+  const getStatusIcon = (status: PaymentStatus): React.ReactElement | null => {
+    const iconMap: Record<PaymentStatus, React.ReactElement> = {
+      [PaymentStatus.BELUM_BAYAR]: <AlertCircle className="h-5 w-5 text-yellow-500" />,
+      [PaymentStatus.DOWN_PAYMENT]: <HandCoins  className="h-5 w-5 text-blue-500" />,
+      [PaymentStatus.MENUNGGU_KONFIRMASI]: <Clock className="h-5 w-5 text-blue-500" />,
+      [PaymentStatus.LUNAS]: <CheckCircle className="h-5 w-5 text-green-500" />,
+      [PaymentStatus.BATAL]: <XCircle className="h-5 w-5 text-red-500" />,
     }
+    return iconMap[status] || null
   }
 
-  const getStatusBadge = (status: PaymentStatus) => {
-    switch (status) {
-      case PaymentStatus.BELUM_BAYAR:
-        return (
-          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">
-            Belum Bayar
-          </Badge>
-        )
-      case PaymentStatus.MENUNGGU_KONFIRMASI:
-        return (
-          <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
-            Menunggu Konfirmasi
-          </Badge>
-        )
-      case PaymentStatus.LUNAS:
-        return (
-          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
-            Lunas
-          </Badge>
-        )
-      case PaymentStatus.BATAL:
-        return (
-          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300">
-            Batal
-          </Badge>
-        )
-      default:
-        return <Badge variant="outline">{status}</Badge>
+  const getStatusBadge = (status: PaymentStatus): React.ReactElement => {
+    const badgeConfig: Record<PaymentStatus, { className: string; label: string }> = {
+      [PaymentStatus.BELUM_BAYAR]: {
+        className: "bg-yellow-100 text-yellow-800 border-yellow-300",
+        label: "Belum Bayar",
+      },
+      [PaymentStatus.DOWN_PAYMENT]: {
+        className: "bg-cyan-100 text-cyan-800 border-cyan-300",
+        label: "Down Payment",
+      },
+      [PaymentStatus.MENUNGGU_KONFIRMASI]: {
+        className: "bg-blue-100 text-blue-800 border-blue-300",
+        label: "Menunggu Konfirmasi",
+      },
+      [PaymentStatus.LUNAS]: {
+        className: "bg-green-100 text-green-800 border-green-300",
+        label: "Lunas",
+      },
+      [PaymentStatus.BATAL]: {
+        className: "bg-red-100 text-red-800 border-red-300",
+        label: "Batal",
+      },
     }
+
+    const config = badgeConfig[status]
+    return (
+      <Badge variant="outline" className={config.className}>
+        <div className="flex items-center gap-1">
+          {getStatusIcon(status)}
+          {config.label}
+        </div>
+      </Badge>
+    )
   }
 
-  const filteredMudhohi = mudhohi.filter((m) => {
-    if (searchTerm) {
+  const filteredMudhohi: Mudhohi[] = mudhohi.filter((m) => {
+    if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase()
       return (
         (m.nama_pengqurban && m.nama_pengqurban.toLowerCase().includes(searchLower)) ||
@@ -334,23 +448,44 @@ export default function MudhohiManagement({
     return true
   })
 
-  const handleExportToExcel = () => {
-    const data = filteredMudhohi.map((m) => ({
-      ID: m.id,
-      "Dash Code": m.dash_code,
-      "Nama Pengqurban": m.nama_pengqurban || "-",
-      "Nama Peruntukan": m.nama_peruntukan || "-",
-      Email: m.user.email || "-",
-      "Status Pembayaran": m.payment ? getStatusLabel(m.payment.paymentStatus) : "-",
-      "Metode Pembayaran": m.payment ? (m.payment.cara_bayar === CaraBayar.TRANSFER ? "Transfer" : "Tunai") : "-",
-      "Jumlah Dibayarkan": m.payment ? m.payment.dibayarkan : 0,
-      Hewan: m.hewan.map((h) => `${h.tipe.nama} #${h.hewanId}`).join(", "),
-      "Ambil Daging": m.mengambilDaging ? "Ya" : "Tidak",
-      "Saksikan Penyembelihan": m.potong_sendiri ? "Ya" : "Tidak",
-      "Tanggal Daftar": new Date(m.createdAt).toLocaleDateString(),
-    }))
+  const handleExportToExcel = (): void => {
+    try {
+      const data = filteredMudhohi.map((m) => ({
+        ID: m.id,
+        "Dash Code": m.dash_code,
+        "Nama Pengqurban": m.nama_pengqurban || "-",
+        "Nama Peruntukan": m.nama_peruntukan || "-",
+        Email: m.user.email || "-",
+        "Status Pembayaran": m.payment ? getStatusLabel(m.payment.paymentStatus) : "-",
+        "Metode Pembayaran": m.payment ? (m.payment.cara_bayar === CaraBayar.TRANSFER ? "Transfer" : "Tunai") : "-",
+        "Jumlah Dibayarkan": m.payment ? m.payment.dibayarkan : 0,
+        "Kode Resi": m.payment?.kodeResi || "-",
+        Hewan: m.hewan.map((h) => `${h.tipe.nama} #${h.hewanId}`).join(", "),
+        "Ambil Daging": m.mengambilDaging ? "Ya" : "Tidak",
+        "Saksikan Penyembelihan": m.potong_sendiri ? "Ya" : "Tidak",
+        "Tanggal Daftar": new Date(m.createdAt).toLocaleDateString("id-ID"),
+      }))
 
-    exportToExcel(data, "pengqurban_data")
+      exportToExcel(data, "pengqurban_data")
+      
+      toast({
+        title: "Export Successful",
+        description: "Data berhasil diekspor ke Excel.",
+      })
+    } catch (error) {
+      console.error("Error exporting to Excel:", error)
+      toast({
+        title: "Export Failed",
+        description: "Gagal mengekspor data ke Excel.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const resetFilters = (): void => {
+    setSearchTerm("")
+    setStatusFilter("ALL")
+    refreshData()
   }
 
   return (
@@ -375,7 +510,10 @@ export default function MudhohiManagement({
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xl">Lunas</CardTitle>
+            <CardTitle className="text-xl flex items-center gap-2">
+              {getStatusIcon(PaymentStatus.LUNAS)}
+              Lunas
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-green-600">{stats.statusCounts.LUNAS}</div>
@@ -383,7 +521,10 @@ export default function MudhohiManagement({
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xl">Belum Bayar</CardTitle>
+            <CardTitle className="text-xl flex items-center gap-2">
+              {getStatusIcon(PaymentStatus.BELUM_BAYAR)}
+              Belum Bayar
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-yellow-600">{stats.statusCounts.BELUM_BAYAR}</div>
@@ -412,10 +553,30 @@ export default function MudhohiManagement({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">All Status</SelectItem>
-              <SelectItem value={PaymentStatus.BELUM_BAYAR}>Belum Bayar</SelectItem>
-              <SelectItem value={PaymentStatus.MENUNGGU_KONFIRMASI}>Menunggu Konfirmasi</SelectItem>
-              <SelectItem value={PaymentStatus.LUNAS}>Lunas</SelectItem>
-              <SelectItem value={PaymentStatus.BATAL}>Batal</SelectItem>
+              <SelectItem value={PaymentStatus.BELUM_BAYAR}>
+                <div className="flex items-center gap-2">
+                  {getStatusIcon(PaymentStatus.BELUM_BAYAR)}
+                  Belum Bayar
+                </div>
+              </SelectItem>
+              <SelectItem value={PaymentStatus.MENUNGGU_KONFIRMASI}>
+                <div className="flex items-center gap-2">
+                  {getStatusIcon(PaymentStatus.MENUNGGU_KONFIRMASI)}
+                  Menunggu Konfirmasi
+                </div>
+              </SelectItem>
+              <SelectItem value={PaymentStatus.LUNAS}>
+                <div className="flex items-center gap-2">
+                  {getStatusIcon(PaymentStatus.LUNAS)}
+                  Lunas
+                </div>
+              </SelectItem>
+              <SelectItem value={PaymentStatus.BATAL}>
+                <div className="flex items-center gap-2">
+                  {getStatusIcon(PaymentStatus.BATAL)}
+                  Batal
+                </div>
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -428,11 +589,17 @@ export default function MudhohiManagement({
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
+          <Button className="w-full md:w-auto">
+            <Link className="inline-flex" href="/dashboard/mudhohi/mudhohi-batch-form">
+              <ListPlus className="h-4 w-4 mr-2" />
+              Batch Input
+            </Link>
+          </Button>
           <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
             <DialogTrigger asChild>
               <Button className="w-full md:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
-                Tambah Mudhohi
+                <span className="hidden md:inline-flex">Tambah Mudhohi</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden p-0">
@@ -443,11 +610,10 @@ export default function MudhohiManagement({
                 </DialogDescription>
               </DialogHeader>
               <div className="px-6 pb-6 max-h-[calc(95vh-120px)] overflow-y-auto">
-                <QurbanForm
+                <AdminQurbanForm
                   tipeHewan={tipeHewan}
                   onSubmit={handleSubmitMudhohi}
                   onCancel={() => setAddDialogOpen(false)}
-                  mode="admin"
                 />
               </div>
             </DialogContent>
@@ -498,7 +664,7 @@ export default function MudhohiManagement({
                     <div className="space-y-2">
                       <div className="text-sm">
                         <span className="font-medium">Tanggal Daftar:</span>{" "}
-                        {new Date(m.createdAt).toLocaleDateString()}
+                        {new Date(m.createdAt).toLocaleDateString("id-ID")}
                       </div>
                       {m.payment && (
                         <>
@@ -523,11 +689,11 @@ export default function MudhohiManagement({
                             <Button
                               size="sm"
                               onClick={() =>
-                                handleUpdatePaymentStatus(
-                                  m.id,
-                                  PaymentStatus.MENUNGGU_KONFIRMASI,
-                                  m.payment?.dibayarkan,
-                                )
+                                handleUpdatePaymentStatus({
+                                  mudhohiId: m.id,
+                                  newStatus: PaymentStatus.MENUNGGU_KONFIRMASI,
+                                  amount: m.payment?.dibayarkan,
+                                })
                               }
                             >
                               Konfirmasi Pembayaran
@@ -535,7 +701,10 @@ export default function MudhohiManagement({
                             <Button
                               size="sm"
                               variant="destructive"
-                              onClick={() => handleUpdatePaymentStatus(m.id, PaymentStatus.BATAL)}
+                              onClick={() => handleUpdatePaymentStatus({
+                                mudhohiId: m.id,
+                                newStatus: PaymentStatus.BATAL
+                              })}
                             >
                               Batalkan
                             </Button>
@@ -552,7 +721,10 @@ export default function MudhohiManagement({
                             <Button
                               size="sm"
                               variant="destructive"
-                              onClick={() => handleUpdatePaymentStatus(m.id, PaymentStatus.BATAL)}
+                              onClick={() => handleUpdatePaymentStatus({
+                                mudhohiId: m.id,
+                                newStatus: PaymentStatus.BATAL
+                              })}
                             >
                               Tolak Pembayaran
                             </Button>
@@ -562,7 +734,10 @@ export default function MudhohiManagement({
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleUpdatePaymentStatus(m.id, PaymentStatus.BELUM_BAYAR)}
+                            onClick={() => handleUpdatePaymentStatus({
+                                mudhohiId: m.id,
+                                newStatus: PaymentStatus.BELUM_BAYAR
+                              })}
                           >
                             Batalkan Konfirmasi
                           </Button>
@@ -571,7 +746,10 @@ export default function MudhohiManagement({
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleUpdatePaymentStatus(m.id, PaymentStatus.BELUM_BAYAR)}
+                            onClick={() => handleUpdatePaymentStatus({
+                              mudhohiId: m.id,
+                              newStatus: PaymentStatus.BELUM_BAYAR
+                            })}
                           >
                             Aktifkan Kembali
                           </Button>
@@ -586,17 +764,14 @@ export default function MudhohiManagement({
         ) : (
           <Card>
             <CardContent className="flex flex-col items-center justify-center p-6">
-              <p className="text-muted-foreground mb-4">No pengqurban found with the current filters.</p>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSearchTerm("")
-                  setStatusFilter("ALL")
-                  refreshData()
-                }}
-              >
-                Reset Filters
-              </Button>
+              <p className="text-muted-foreground mb-4">
+                {loading ? "Loading..." : "No pengqurban found with the current filters."}
+              </p>
+              {!loading && (
+                <Button variant="outline" onClick={resetFilters}>
+                  Reset Filters
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}
@@ -615,9 +790,19 @@ export default function MudhohiManagement({
               <Input
                 id="kodeResi"
                 value={kodeResi}
-                onChange={(e) => setKodeResi(e.target.value)}
+                onChange={(e) => {
+                  setKodeResi(e.target.value)
+                  // Clear validation error when user starts typing
+                  if (validationErrors.kodeResi) {
+                    setValidationErrors(prev => ({ ...prev, kodeResi: "" }))
+                  }
+                }}
                 placeholder="Masukkan kode resi pembayaran"
+                className={validationErrors.kodeResi ? "border-red-500" : ""}
               />
+              {validationErrors.kodeResi && (
+                <p className="text-sm text-red-500">{validationErrors.kodeResi}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="amount">Jumlah Dibayarkan</Label>
@@ -625,15 +810,36 @@ export default function MudhohiManagement({
                 id="amount"
                 type="number"
                 value={confirmPaymentAmount}
-                onChange={(e) => setConfirmPaymentAmount(Number(e.target.value))}
+                onChange={(e) => {
+                  const value = Number(e.target.value)
+                  setConfirmPaymentAmount(value)
+                  // Clear validation error when user starts typing
+                  if (validationErrors.amount) {
+                    setValidationErrors(prev => ({ ...prev, amount: "" }))
+                  }
+                }}
+                placeholder="Masukkan jumlah pembayaran"
+                min="1"
+                className={validationErrors.amount ? "border-red-500" : ""}
               />
+              {validationErrors.amount && (
+                <p className="text-sm text-red-500">{validationErrors.amount}</p>
+              )}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmPaymentDialogOpen(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setConfirmPaymentDialogOpen(false)
+                setValidationErrors({})
+              }}
+            >
               Batal
             </Button>
-            <Button onClick={handleConfirmPayment}>Konfirmasi Pembayaran</Button>
+            <Button onClick={handleConfirmPayment} disabled={loading}>
+              {loading ? "Processing..." : "Konfirmasi Pembayaran"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

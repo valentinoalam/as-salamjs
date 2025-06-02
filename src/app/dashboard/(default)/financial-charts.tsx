@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import dynamic from 'next/dynamic';
@@ -26,8 +26,9 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart"
 import type { QurbanSalesStats } from'@/types/keuangan';
-import moment from 'moment';
 import { getMudhohiProgress } from '@/services/mudhohi';
+import { Skeleton } from '@/components/ui/skeleton';
+import { RecentTransactions } from '@/components/dashboard/summaries/recent-transactions';
 
 // Dynamically import all chart components with SSR disabled
 const AreaChart = dynamic(
@@ -64,9 +65,9 @@ export default function FinancialCharts({
     fetchData();
 
   }, []);
-  useEffect(()=> console.log(areaChartData), [areaChartData])
+
   const COLORS = ['#0F766E', '#14b8a6', '#2dd4bf'];
-  const pieChartData = salesReport.perTipeHewan.map((tipe: { nama: any; totalAmount: any; }, index) => ({
+  const pieChartData = salesReport.perTipeHewan.map((tipe: { nama: string; totalAmount: number; }, index) => ({
     name: tipe.nama,
     value: tipe.totalAmount,
     fill: COLORS[index]
@@ -115,7 +116,7 @@ export default function FinancialCharts({
     }, {} satisfies ChartConfig
   );
   const areaChartConfig = {
-    jumlah: {
+    total: {
       label: "Jumlah Pekurban",
       color: "#0F766E", // Using shadcn's primary-600 color
     },
@@ -131,6 +132,7 @@ export default function FinancialCharts({
     <Tabs defaultValue="overview" className="space-y-4">
       <TabsList>
         <TabsTrigger value="overview">Ikhtisar</TabsTrigger>
+        <TabsTrigger value="transactions">Transaksi Terbaru</TabsTrigger>
         <TabsTrigger value="distributions">Distribusi</TabsTrigger>
         <TabsTrigger value="animals">Hewan</TabsTrigger>
       </TabsList>
@@ -138,7 +140,7 @@ export default function FinancialCharts({
       <TabsContent value="overview" className="space-y-4">
         <Card>
           <CardHeader>
-            <CardTitle>Jumlah Pekurban</CardTitle>
+            <CardTitle className='inline-flex'><TrendingUp />Jumlah Pekurban </CardTitle>
             <CardDescription>
               Jumlah pendaftaran pekurban hingga hari H
             </CardDescription>
@@ -149,23 +151,33 @@ export default function FinancialCharts({
               <AreaChart
                 accessibilityLayer
                 data={areaChartData}
+                width={730} height={250}
                 margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
                 className="h-[300px]"
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis
                   dataKey="date"
-                  tickLine={false}
+                  tickLine={true}
                   axisLine={false}
+                  interval="preserveStart"
+                  // type="number"
+                  // scale="time"
+                  padding={{ left: 5, right: 5 }}
                   tickMargin={8}
+                  tick={{
+                    dy: 10,
+                    dx: -10,
+                    fontSize: 12
+                  }}
                   angle={45}
-                  tickFormatter={(value) => value}
+                  tickFormatter={(value) => value.slice(0,6)}
                 />
                 <YAxis/>
                 <ChartTooltip
                   cursor={false}
                   content={<ChartTooltipContent indicator="line" />}
-                  formatter={(value: number) => [`${value} pekurban`, 'Jumlah']}
+                  formatter={(value: number) => [`${value} pekurban`]}
                   contentStyle={{
                     backgroundColor: 'hsl(var(--card))',
                     borderColor: 'hsl(var(--border))',
@@ -173,7 +185,7 @@ export default function FinancialCharts({
                 />
                 <Area
                   type="monotone"
-                  dataKey="jumlah"
+                  dataKey={(d) => isNaN(d.total) ? 0 : d.total}
                   fill="#0F766E"
                   stroke="var(--color-desktop)"
                   fillOpacity={0.3}
@@ -185,7 +197,13 @@ export default function FinancialCharts({
           </CardContent>
         </Card>
       </TabsContent>
-      
+      <TabsContent value="transactions" className="space-y-4">
+        {/* Recent Transactions with Qurban Sales */}
+        <Suspense fallback={<Skeleton className="h-[400px] w-full" />}>
+          <RecentTransactions 
+          />
+        </Suspense>
+      </TabsContent>
       <TabsContent value="distributions" className="space-y-4">
         <Card>
           <CardHeader>
@@ -330,8 +348,4 @@ export default function FinancialCharts({
       </TabsContent>
     </Tabs>
   );
-}
-
-function data(prevState: null): null {
-  throw new Error('Function not implemented.');
 }

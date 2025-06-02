@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect, useCallback } from "react"
 import { Clock, Loader2 } from "lucide-react"
-import { IconShubuh, IconSuruq, IconDhuha, IconDhuhur, IconAshar, IconMagrib, IconIsya } from "@/components/icons/pray-time-icons"
+import { IconShubuh, IconSuruq, IconDhuha, IconDhuhur, IconAshar, IconMagrib, IconIsya } from "@/components/layout/icons/pray-time-icons"
 import { CityAutocomplete } from "@/components/layout/city-autocomplete"
 import { Drawer, DrawerClose, DrawerContent, DrawerFooter, DrawerHeader, DrawerOverlay, DrawerTrigger } from '@/components/ui/drawer';
 import { Button } from "../ui/button"

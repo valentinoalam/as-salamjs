@@ -1,4 +1,12 @@
-import type { TransactionType } from "@prisma/client";
+import type { JenisHewan, TransactionType } from "@prisma/client";
+
+export enum PaymentStatus {
+  BELUM_BAYAR = "BELUM_BAYAR",
+  DOWN_PAYMENT = "DOWN_PAYMENT",
+  MENUNGGU_KONFIRMASI = "MENUNGGU_KONFIRMASI",
+  LUNAS = "LUNAS",
+  BATAL = "BATAL",
+}
 
 export type perHewanSalesStat = {
   tipeHewanId: number;
@@ -7,9 +15,11 @@ export type perHewanSalesStat = {
   harga: number;
   count: number;
   totalAmount: number;
+  currentAmount: number;
 }
 
 export type QurbanSalesStats = {
+  currentIncome: number
   totalSales: number
   totalCount: number
   perTipeHewan: perHewanSalesStat[]
@@ -37,14 +47,24 @@ export interface TransactionDetail {
   paymentStatus: string //"PAID" | "PENDING"
 }
 
+type TipeHewanImage = {
+  id: string
+  url: string
+  alt: string
+}
+
 export type TipeHewan = {
   id: number
   nama: string
   icon: string | null
+  target?: number
   harga: number
   hargaKolektif?: number | null
   note?: string | null
-  jenis?: string
+  jenis: JenisHewan
+}
+export interface TipeHewanWithImages extends TipeHewan {
+  images: TipeHewanImage[]
 }
 export interface DataPoint {
   name: string;
@@ -105,7 +125,6 @@ export interface Transaction {
   categoryId: number
   category: Category
   date: Date
-  receiptUrl: Image[]
   createdBy: string
   createdAt: Date
   updatedAt: Date

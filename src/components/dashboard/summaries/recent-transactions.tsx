@@ -35,7 +35,13 @@ interface Transaction {
     url: string;
   }[];
 }
-
+  // qurbanSales={salesReport.perTipeHewan.map((t: { tipeHewanId: any; totalSales: any; nama: any; }) => ({
+  //   id: `qurban-${t.tipeHewanId}`,
+  //   amount: t.totalSales,
+  //   description: `Penjualan ${t.nama}`,
+  //   date: new Date(),
+  //   type: 'PEMASUKAN'
+  // }))}
 export function RecentTransactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);

@@ -14,9 +14,10 @@ import type {
   ProcessedData,
   CategoryFormValues,
   TransactionFormValues,
-  BudgetFormValues
+  BudgetFormValues,
+  perHewanSalesStat
 } from '@/types/keuangan'
-import { createBudget, createCategory, createQueryOptions, createTransaction, deleteBudget, deleteCategory, deleteTransaction, fetchBudgets, fetchCategories, fetchLatestTransactions, fetchQurbanSalesStats, fetchTransactions, fetchTransactionStats, fetchWeeklyAnimalSales, QUERY_KEYS, updateBudget, updateCategory, uploadReceipt, useOptimizedMutation, type ApiResponse, type DataQuery } from '@/lib/tanstack-query/keuangan'
+import { createBudget, createCategory, createQueryOptions, createTransaction, deleteBudget, deleteCategory, deleteTransaction, fetchBudgets, fetchCategories, fetchQurbanSalesStats, fetchTransactions, fetchTransactionStats, fetchWeeklyAnimalSales, QUERY_KEYS, updateBudget, updateCategory, uploadReceipt, useOptimizedMutation, type ApiResponse, type DataQuery } from '@/lib/tanstack-query/keuangan'
 
 // Enhanced Transaction type for combined data
 interface CombinedTransaction extends Transaction {
@@ -175,9 +176,9 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
     // Create transactions for each TipeHewan with sales
     const qurbanTransactions: CombinedTransaction[] = qurbanSales.perTipeHewan
       .filter((tipe: { count: number }) => tipe.count > 0)
-      .map((tipe: { tipeHewanId: any; totalAmount: any; nama: any }) => ({
+      .map((tipe: perHewanSalesStat) => ({
         id: `qurban-${tipe.tipeHewanId}`,
-        amount: tipe.totalAmount,
+        amount: tipe.currentAmount,
         description: `Penjualan ${tipe.nama}`,
         type: TransactionType.PEMASUKAN,
         categoryId: qurbanCategory?.id || -1,

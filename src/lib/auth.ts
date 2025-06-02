@@ -39,10 +39,12 @@ export async function hasAccess(page: string): Promise<boolean> {
       return user.role === Role.PETUGAS_PENYEMBELIHAN
     case "progres-sembelih":
       return user.role === Role.PETUGAS_PENYEMBELIHAN
-    case "pemesanan":
-      return user.role === Role.PETUGAS_PENDAFTARAN
+    case "dashboard":
+      return user.role !== Role.MEMBER
     case "keuangan":
       return user.role === Role.PETUGAS_KEUANGAN
+    case "transactions":
+    return user.role === Role.PETUGAS_KEUANGAN
     case "mudhohi":
       return user.role === Role.PETUGAS_PENDAFTARAN
     case "panitia":

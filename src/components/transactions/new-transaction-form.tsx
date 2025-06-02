@@ -17,7 +17,6 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -41,9 +40,9 @@ import { toast } from "@/hooks/use-toast";
 import { ArrowUpDown, Calendar as CalendarIcon } from "lucide-react";
 
 interface Category {
-  id: string;
+  id: number; // Changed from string to number to match schema
   name: string;
-  type: string;
+  type: TransactionType; // Changed to use the enum type
 }
 
 const formSchema = z.object({
@@ -51,7 +50,7 @@ const formSchema = z.object({
   amount: z.coerce.number().positive("Jumlah harus lebih dari 0"),
   date: z.date(),
   description: z.string().min(3, "Deskripsi minimal 3 karakter"),
-  categoryId: z.string().min(1, "Kategori harus dipilih"),
+  categoryId: z.coerce.number().min(1, "Kategori harus dipilih"), // Changed to number
   images: z.array(z.string().url()).optional(),
 });
 
@@ -69,7 +68,7 @@ export function NewTransactionForm() {
       amount: 0,
       date: new Date(),
       description: "",
-      categoryId: "",
+      categoryId: 0, // Changed to number
       images: [],
     },
   });
@@ -80,26 +79,13 @@ export function NewTransactionForm() {
     // Fetch categories
     const fetchCategories = async () => {
       try {
-        const response = await fetch('/api/categories');
+        const response = await fetch('/api/keuangan/categories');
         if (response.ok) {
           const data = await response.json();
           setCategories(data);
         }
       } catch (error) {
         console.error('Failed to fetch categories:', error);
-        // Mock data
-        setCategories([
-          { id: '1', name: 'Pembelian Hewan Qurban - Sapi', type: 'EXPENSE' },
-          { id: '2', name: 'Biaya Distribusi Daging', type: 'EXPENSE' },
-          { id: '3', name: 'Donasi Qurban', type: 'INCOME' },
-          { id: '4', name: 'Biaya Pemotongan & Pengulitan', type: 'EXPENSE' },
-          { id: '5', name: 'Belanja Bumbu & Bahan Masakan', type: 'EXPENSE' },
-          { id: '6', name: 'Sedekah Idul Adha', type: 'INCOME' },
-          { id: '7', name: 'Penjualan Kulit Hewan', type: 'INCOME' },
-          { id: '8', name: 'Lain-lain (Pemasukan)', type: 'INCOME' },
-          { id: '9', name: 'Sewa Alat', type: 'EXPENSE' },
-          { id: '10', name: 'Lain-lain (Pengeluaran)', type: 'EXPENSE' },
-        ]);
       }
     };
     
@@ -108,7 +94,7 @@ export function NewTransactionForm() {
   
   // Reset category when transaction type changes
   useEffect(() => {
-    form.setValue("categoryId", "");
+    form.setValue("categoryId", 0); // Reset to 0 instead of empty string
   }, [transactionType, form]);
   
   const onSubmit = async (values: FormValues) => {
@@ -116,21 +102,20 @@ export function NewTransactionForm() {
     values.images = uploadedImages;
     
     try {
-      // In a real application, you would send this to your API
-      // const response = await fetch('/api/transactions', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(values),
-      // });
+      const response = await fetch('/api/keuangan/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
       
-      // if (!response.ok) throw new Error('Failed to create transaction');
+      if (!response.ok) throw new Error('Failed to create transaction');
       
       toast({
         title: "Transaksi berhasil dibuat",
         description: "Transaksi baru telah berhasil dicatat.",
       });
       
-      router.push('/transactions');
+      router.push('/dashboard/transactions');
     } catch (error) {
       console.error('Failed to create transaction:', error);
       toast({
@@ -161,7 +146,7 @@ export function NewTransactionForm() {
                           "rounded-r-none flex-1 border-r-0",
                           field.value === TransactionType.PEMASUKAN && "bg-green-100 dark:bg-green-900 border-green-200 dark:border-green-800"
                         )}
-                        onClick={() => field.onChange(TransactionType.PENGELUARAN)}
+                        onClick={() => field.onChange(TransactionType.PEMASUKAN)} // Fixed: was calling PENGELUARAN
                       >
                         <ArrowUpDown className="h-4 w-4 mr-2 text-green-500" />
                         Pemasukan
@@ -250,7 +235,10 @@ export function NewTransactionForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Kategori</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select 
+                      onValueChange={(value) => field.onChange(parseInt(value))} // Convert string to number
+                      value={field.value ? field.value.toString() : ""} // Convert number to string for display
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Pilih kategori" />
@@ -260,7 +248,7 @@ export function NewTransactionForm() {
                         {categories
                           .filter(category => category.type === transactionType)
                           .map(category => (
-                            <SelectItem key={category.id} value={category.id}>
+                            <SelectItem key={category.id} value={category.id.toString()}>
                               {category.name}
                             </SelectItem>
                           ))}
