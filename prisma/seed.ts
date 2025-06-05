@@ -226,11 +226,11 @@ async function main() {
 
   // Create Distribution categories
   const distributionCategories = [
-    { id: "dist1", category: "Pengqurban Sapi", target: 100 },
-    { id: "dist2", category: "Pengqurban Domba", target: 150 },
-    { id: "dist3", category: "Panitia", target: 50 },
-    { id: "dist4", category: "RT RW", target: 200 },
-    { id: "dist5", category: "Lembaga", target: 100 },
+    { id: "dist1", kategori: "Pengqurban Sapi", target: 100 },
+    { id: "dist2", kategori: "Pengqurban Domba", target: 150 },
+    { id: "dist3", kategori: "Panitia", target: 50 },
+    { id: "dist4", kategori: "RT RW", target: 200 },
+    { id: "dist5", kategori: "Lembaga", target: 100 },
   ]
 
   for (const category of distributionCategories) {
