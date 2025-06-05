@@ -8,7 +8,7 @@
     "devo": "next dev",
     "build": "next build",
     "lint": "next lint",
-    "start": "pm2 start ecosystem.config.js",
+    "start": "pm2 start ecosystem.config.cjs",
     "deploy": "npm run build && npm start",
     "deploy-prod": "pnpm build && pnpm start",
     "vercel-build": "pnpm prisma:generate && pnpm build",
