@@ -13,7 +13,7 @@ import { LogOut, Settings, User } from 'lucide-react';
 import Link from 'next/link';
 
 export function UserNav() {
-  const { data: session } = useSession();
+  const { data: session } = useSession({ required: false });
 
   if (!session?.user) {
     return null;

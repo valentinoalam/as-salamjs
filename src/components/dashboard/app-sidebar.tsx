@@ -107,7 +107,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           if (item.items) {
             // For groups with sub-items, filter accessible sub-items
             const accessibleItems = item.items.filter((subItem) => {
-              const slug = subItem.url.startsWith("/") ? subItem.url.slice(1) : subItem.url
+              const slug = subItem.url.startsWith("/dashboard/") ? subItem.url.slice(1) : subItem.url
               const isAccessible =
                 (accessiblePages.includes(slug) || subItem.url === "/")
               return isAccessible

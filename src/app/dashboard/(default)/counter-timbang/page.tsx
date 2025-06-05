@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client"
 
 import { useState, useEffect } from "react"
@@ -11,11 +10,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
 import { Counter, JenisHewan } from "@prisma/client"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useQurban, type ProdukHewan } from "@/contexts/qurban-context"
+import { useQurban } from "@/contexts/qurban-context"
 import { ConnectionStatus } from "@/components/connection-status"
 import { exportToExcel } from "@/lib/excel"
-import { Download } from "lucide-react"
+import { Download, Minus, Plus } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import type { ProdukHewan, ShipmentProduct } from "@/types/qurban"
 
 export default function CounterTimbangPage() {
   const { 
@@ -45,8 +45,8 @@ export default function CounterTimbangPage() {
     }
     return acc;
   }, {});
-  const [note, setNote] = useState("")
-  const [operation, setOperation] = useState<"add" | "decrease">("add")
+  // const [note, setNote] = useState("")
+  // const [operation, setOperation] = useState<"menambahkan" | "memindahkan" | "mengkoreksi">("menambahkan")
   const [showProductHistory, setShowProductHistory] = useState(false)
   const [selectedProductForHistory, setSelectedProductForHistory] = useState<number | null>(null)
   const [selectedProduct, setSelectedProduct] = useState<number>(produkDaging[0]?.id || 0)
@@ -54,7 +54,7 @@ export default function CounterTimbangPage() {
   const [counters, setCounters] = useState<Record<number, number>>({})
   const [history, setHistory] = useState<Array<{ text: string; time: string }>>([])
   // Shipping state
-  const [shipmentProducts, setShipmentProducts] = useState<{ produkId: number; jumlah: number }[]>([])
+  const [shipmentProducts, setShipmentProducts] = useState<ShipmentProduct[]>([])
   const [shipmentNote, setShipmentNote] = useState("")
   const [isCreatingShipment, setIsCreatingShipment] = useState(false)
 
@@ -66,8 +66,9 @@ export default function CounterTimbangPage() {
         initialCounters[product.id] = 0
       })
       setCounters(initialCounters)
-      // setSelectedProduct(produkDaging[0]?.id || 0)
+      setSelectedProduct(produkDaging[0]?.id || 0)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Update selected product when products change
@@ -100,30 +101,34 @@ export default function CounterTimbangPage() {
       // Update local counter
       setCounters((prev) => ({
         ...prev,
-        [selectedProduct]: prev[selectedProduct] + quantity,
+        [selectedProduct]: (prev[selectedProduct] || 0) + quantity,
       }))
 
       // Add to history
       const currentTime = new Date().toLocaleTimeString()
       setHistory((prev) => [
         {
-          text: `🔵➕ ${quantity} to ${getProductName(selectedProduct)}`,
+          text: `🔵➕ ${quantity} ${getProductName(selectedProduct)}`,
           time: currentTime,
         },
         ...prev.slice(0, 19), // Keep only last 20 items
       ])
 
       // Use context method to update product
-      updateProduct({
+      await updateProduct({
         productId: selectedProduct,
-        operation: "add",
+        operation: "menambahkan",
         place: Counter.PENYEMBELIHAN,
         value: quantity,
-        note: "Added from counter timbang"
+        note: "Penambahan dari timbangan"
       })
-
+      
+      toast({
+        title: "Success",
+        description: `${quantity} ${selectedProduct} ditambah ke counter`,
+      })
       // Reset quantity
-      setQuantity(1)
+      setQuantity(0)
     } catch (error) {
       console.error("Error adding product:", error)
       toast({
@@ -132,38 +137,6 @@ export default function CounterTimbangPage() {
         variant: "destructive",
       })
     }
-  }
-  const handleUpdateProduct = async () => {
-    if (!selectedProduct || quantity <= 0) return
-
-    try {
-      await updateProduct({
-        productId: selectedProduct,
-        operation,
-        place: Counter.PENYEMBELIHAN,
-        value: quantity,
-        note,
-      })
-
-      // Reset form
-      setQuantity(1)
-      setNote("")
-      toast({
-        title: "Success",
-        description: `Product ${operation === "add" ? "added to" : "removed from"} inventory`,
-      })
-    } catch (error) {
-      console.error("Error updating product:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update product",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleRemoveFromShipment = (produkId: number) => {
-    setShipmentProducts(shipmentProducts.filter((p) => p.produkId !== produkId))
   }
 
   // const handleDecreaseProduct = async (id: number) => {
@@ -184,10 +157,10 @@ export default function CounterTimbangPage() {
   //       ...prev.slice(0, 19), // Keep only last 20 items
   //     ])
 
-  //     // Use context method to decrease product
+  //     // Use context method to memindahkan product
   //     updateProduct({
   //       productId: id,
-  //       operation: "decrease",
+  //       operation: "memindahkan",
   //       place: Counter.PENYEMBELIHAN,
   //       value: 1,
   //       note: "Decreased from counter timbang"
@@ -196,13 +169,68 @@ export default function CounterTimbangPage() {
   //     console.error("Error decreasing product:", error)
   //     toast({
   //       title: "Error",
-  //       description: "Failed to decrease product. Please try again.",
+  //       description: "Failed to memindahkan product. Please try again.",
   //       variant: "destructive",
   //     })
   //   }
   // }
 
   // Shipping functions
+  const handleCreateShipment = async () => {
+    if (shipmentProducts.length === 0) {
+      toast({
+        title: "Empty shipment",
+        description: "Please add at least one product to the shipment",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsCreatingShipment(true)
+
+    try {
+       // First update products with "memindahkan" operation
+      for (const item of shipmentProducts) {
+        await updateProduct({
+          productId: item.produkId,
+          operation: "memindahkan",
+          place: Counter.PENYEMBELIHAN,
+          value: item.jumlah,
+          note: `Dipindahkan ke inventori: ${shipmentNote}`
+        })
+
+        // Add to history with "-" symbol
+        const currentTime = new Date().toLocaleTimeString()
+        setHistory((prev) => [
+          {
+            text: `🔴➖${item.jumlah} ${getProductName(item.produkId)}`,
+            time: currentTime,
+          },
+          ...prev.slice(0, 19),
+        ])
+      }
+      // Use context method to create shipment
+      await createShipment(shipmentProducts, shipmentNote)
+
+      toast({
+        title: "Pengiriman dicatat",
+        description: "Pengiriman Produk dapat segera dikirim ke inventori",
+      })
+
+      // Reset shipment form
+      setShipmentProducts([])
+      setShipmentNote("")
+    } catch (error) {
+      console.error("Error creating shipment:", error)
+      toast({
+        title: "Error",
+        description: "Gagal mencatat pengiriman. Coba lagi.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsCreatingShipment(false)
+    }
+  }
   const handleAddToShipment = (produkId: number, jumlah: number) => {
     const product = getProductById(produkId)
     if (!product) return
@@ -229,7 +257,14 @@ export default function CounterTimbangPage() {
       setShipmentProducts(updatedProducts)
     } else {
       // Add new product
-      setShipmentProducts([...shipmentProducts, { produkId, jumlah }])
+      setShipmentProducts([...shipmentProducts, {
+        produkId, jumlah,
+        id: 0,
+        produk: {
+          id: 0,
+          nama: ""
+        }
+      }])
     }
 
     toast({
@@ -238,65 +273,9 @@ export default function CounterTimbangPage() {
     })
   }
 
-  const handleAddToShipments = () => {
-    if (!selectedProduct || quantity <= 0) return
-
-    // Check if product already exists in shipment
-    const existingProductIndex = shipmentProducts.findIndex((p) => p.produkId === selectedProduct)
-
-    if (existingProductIndex >= 0) {
-      // Update existing product
-      const updatedProducts = [...shipmentProducts]
-      updatedProducts[existingProductIndex].jumlah += quantity
-      setShipmentProducts(updatedProducts)
-    } else {
-      // Add new product
-      setShipmentProducts([...shipmentProducts, { produkId: selectedProduct, jumlah: quantity }])
-    }
-
-    // Reset form
-    setQuantity(1)
-    toast({
-      title: "Added to shipment",
-      description: `Product added to pending shipment`,
-    })
+  const handleRemoveFromShipment = (produkId: number) => {
+    setShipmentProducts(shipmentProducts.filter((p) => p.produkId !== produkId))
   }
-  const handleCreateShipment = async () => {
-    if (shipmentProducts.length === 0) {
-      toast({
-        title: "Empty shipment",
-        description: "Please add at least one product to the shipment",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsCreatingShipment(true)
-
-    try {
-      // Use context method to create shipment
-      await createShipment(shipmentProducts, shipmentNote)
-
-      toast({
-        title: "Shipment created",
-        description: "The shipment has been created and sent to inventory",
-      })
-
-      // Reset shipment form
-      setShipmentProducts([])
-      setShipmentNote("")
-    } catch (error) {
-      console.error("Error creating shipment:", error)
-      toast({
-        title: "Error",
-        description: "Failed to create shipment. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsCreatingShipment(false)
-    }
-  }
-
   const handleShowProductHistory = (produkId: number) => {
     setSelectedProductForHistory(produkId)
     setShowProductHistory(true)
@@ -311,7 +290,19 @@ export default function CounterTimbangPage() {
       </div>
     )
   }
-
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const renderLogSymbol = (event: string) => {
+    switch(event) {
+      case "menambahkan":
+        return "🔵➕";
+      case "memindahkan":
+        return "🔴➖";
+      case "mengkoreksi":
+        return "🟡✏️";
+      default:
+        return "⚪";
+    }
+  }
   // Show error state if products failed to load
   if (productsQuery.isError) {
     return (
@@ -382,45 +373,111 @@ export default function CounterTimbangPage() {
                   )}
                 </div>
 
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Select Quantity</h3>
-                  <div className="flex items-center space-x-2 mb-4">
-                    <Input
-                      type="number"
-                      value={quantity}
-                      onChange={(e) => handleSetQuantity(e.target.value)}
-                      min={0}
-                      className="w-24"
-                    />
-                    <Button variant="outline" onClick={() => handleAddQuantity(1)}>
-                      +1
+                <div className="space-y-0 bg-gray-50/50 rounded-lg border p-2">
+                  <h3 className="text-lg font-semibold text-gray-800">Select Quantity</h3>
+                  
+                  {/* Main quantity input with +/- controls */}
+                  <div className="flex items-center justify-center space-x-3 py-2 px-4">
+                    {/* Subtract buttons */}
+                    <div className="flex flex-wrap gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleAddQuantity(-10)}
+                        disabled={quantity < 10}
+                        className="h-10 w-10 rounded-full flex-1 min-w-0 bg-red-50 hover:bg-red-100 border-red-200 text-red-700 disabled:opacity-50"
+                      >
+                        -10
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleAddQuantity(-5)}
+                        disabled={quantity < 5}
+                        className="h-10 w-10 rounded-full flex-1 min-w-0 bg-red-50 hover:bg-red-100 border-red-200 text-red-700 disabled:opacity-50"
+                      >
+                        -5
+                      </Button>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      onClick={() => handleAddQuantity(-1)}
+                      disabled={quantity <= 0}
+                      className="h-10 w-10 rounded-full bg-red-50 border-red-200 hover:bg-red-50 hover:border-red-200 disabled:opacity-50"
+                    >
+                      <Minus className="h-4 w-4" />
                     </Button>
-                    <Button variant="outline" onClick={() => handleAddQuantity(5)}>
-                      +5
+                    
+                    <div className="flex items-center space-y-1">
+                      <Input
+                        type="number"
+                        value={quantity}
+                        onChange={(e) => handleSetQuantity(e.target.value)}
+                        min={0}
+                        className="w-20 text-center text-lg font-semibold border-2 focus:border-blue-400"
+                      />
+                      <span className="pl-1 text-xs text-gray-500">Qty</span>
+                    </div>
+                    
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      onClick={() => handleAddQuantity(1)}
+                      className="h-10 w-10 rounded-full bg-green-50 border-green-200 hover:bg-green-50 hover:border-green-200"
+                    >
+                      <Plus className="h-4 w-4" />
                     </Button>
-                    <Button variant="outline" onClick={() => handleAddQuantity(10)}>
-                      +10
+                    {/* Add buttons */}
+                    <div className="flex flex-wrap gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleAddQuantity(5)}
+                        className="h-10 w-10 rounded-full flex-1 min-w-0 bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
+                      >
+                        +5
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleAddQuantity(10)}
+                        className="h-10 w-10 rounded-full flex-1 min-w-0 bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
+                      >
+                        +10
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-5 px-5 justify-between">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setQuantity(0)}
+                      className="w-full text-gray-500 hover:text-gray-700"
+                    >
+                      Reset to 0
+                    </Button>
+                    <Button 
+                      onClick={handleSubmit}  className="w-full"
+                      disabled={!selectedProduct || quantity <= 0}
+                    >
+                      Submit
                     </Button>
                   </div>
-                  <Button 
-                    onClick={handleSubmit} 
-                    className="w-full"
-                    disabled={!selectedProduct || quantity <= 0}
-                  >
-                    Submit
-                  </Button>
-                  <Button variant="outline" onClick={handleExportToExcel} className="w-full md:w-auto">
-                    <Download className="h-4 w-4 mr-2" />
-                    Export
-                  </Button>
+                  
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="mt-4">
-            <CardHeader>
+            <CardHeader className="flex-row gap-8">
               <CardTitle>Produk di Counter Timbang</CardTitle>
+              <Button variant="outline" onClick={handleExportToExcel} className="w-full md:w-auto">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="space-y-8">
@@ -434,6 +491,7 @@ export default function CounterTimbangPage() {
                         <div key={product.id} className="flex flex-col items-center p-4 border rounded-md shadow-sm bg-white">
                           <span className="text-lg mb-2 text-center font-semibold">{product.nama}</span>
                           <span className="text-3xl font-bold text-green-600"> {product.diTimbang}</span>
+                          
                           <div className="flex mt-1 gap-3">
                             <span className="text-xs font-bold">Kumulatif: {product.kumulatif}</span>
                             {product.targetPaket > 0 && (
@@ -441,6 +499,9 @@ export default function CounterTimbangPage() {
                                 Target: {product.targetPaket}
                               </div>
                             )}
+                            <Button size="sm" variant="outline" onClick={() => handleShowProductHistory(product.id)}>
+                              History
+                            </Button>
                           </div>
                           {/* You could add more product details here if needed */}
                         </div>
@@ -454,7 +515,7 @@ export default function CounterTimbangPage() {
 
           <Card className="mt-4">
             <CardHeader>
-              <CardTitle>History Penambahan</CardTitle>
+              <CardTitle>History Penambahan & Pemindahan</CardTitle>
             </CardHeader>
             <CardContent>
               <ul className="space-y-2">
@@ -464,7 +525,7 @@ export default function CounterTimbangPage() {
                   </li>
                 ))}
                 {history.length === 0 && (
-                  <li className="text-sm text-muted-foreground">No history yet</li>
+                  <li className="text-sm text-muted-foreground">Belum ada history</li>
                 )}
               </ul>
             </CardContent>
@@ -565,112 +626,11 @@ export default function CounterTimbangPage() {
         </TabsContent>
       </Tabs>
       
-      <Tabs defaultValue="inventory">
+      <Tabs defaultValue="shipment">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="inventory">Inventory</TabsTrigger>
           <TabsTrigger value="shipment">Shipment</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="inventory">
-          <Card>
-            <CardHeader>
-              <CardTitle>Update Inventory</CardTitle>
-              <CardDescription>Add or remove products from inventory</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="product">Product</Label>
-                    <select
-                      id="product"
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      value={selectedProduct || ""}
-                      onChange={(e) => setSelectedProduct(Number(e.target.value))}
-                    >
-                      <option value="">Select a product</option>
-                      {productsQuery.data.map((product) => (
-                        <option key={product.id} value={product.id}>
-                          {product.nama} ({product.diTimbang} in inventory)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label htmlFor="quantity">Quantity</Label>
-                    <Input
-                      id="quantity"
-                      type="number"
-                      min="1"
-                      value={quantity}
-                      onChange={(e) => setQuantity(Number(e.target.value))}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="operation">Operation</Label>
-                  <select
-                    id="operation"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    value={operation}
-                    onChange={(e) => setOperation(e.target.value as "add" | "decrease")}
-                  >
-                    <option value="add">Add</option>
-                    <option value="decrease">Remove</option>
-                  </select>
-                </div>
-
-                <div>
-                  <Label htmlFor="note">Note</Label>
-                  <Textarea
-                    id="note"
-                    placeholder="Add a note about this operation"
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                  />
-                </div>
-
-                <div className="flex justify-end space-x-2">
-                  <Button variant="outline" onClick={() => setSelectedProduct(0)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleUpdateProduct} disabled={!selectedProduct || quantity <= 0}>
-                    Update Inventory
-                  </Button>
-                  <Button
-                    onClick={handleAddToShipments}
-                    disabled={!selectedProduct || quantity <= 0 || operation !== "add"}
-                  >
-                    Add to Shipment
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="mt-4">
-            <CardHeader>
-              <CardTitle>Current Inventory</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {productsQuery.data.map((product) => (
-                  <div key={product.id} className="flex flex-col items-center p-4 border rounded-md">
-                    <span className="text-lg mb-2">{product.nama}</span>
-                    <span className="text-3xl font-bold">{product.diTimbang}</span>
-                    <div className="mt-2 flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => handleShowProductHistory(product.id)}>
-                        History
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         <TabsContent value="shipment">
           <Card>
@@ -746,10 +706,10 @@ export default function CounterTimbangPage() {
                       <div className="mt-1 flex items-center gap-2">
                         <span
                           className={`px-2 py-1 rounded-full text-xs ${
-                            log.event === "add" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                            log.event === "menambahkan" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
                           }`}
                         >
-                          {log.event === "add" ? "Added" : "Removed"}
+                          {log.event === "menambahkan" ? "➕" : "➖"}
                         </span>
                         <span>{log.value} units</span>
                       </div>
@@ -757,7 +717,7 @@ export default function CounterTimbangPage() {
                     </div>
                   ))
                 ) : (
-                  <div className="text-center p-4">No history available</div>
+                  <div className="text-center p-4">Belum ada catatan</div>
                 )}
               </div>
             </CardContent>
@@ -772,7 +732,7 @@ export default function CounterTimbangPage() {
             <DialogTitle>
               Product History - {productsQuery.data.find((p) => p.id === selectedProductForHistory)?.nama}
             </DialogTitle>
-            <DialogDescription>History of operations for this product</DialogDescription>
+            <DialogDescription>Log riwayat produk ini</DialogDescription>
           </DialogHeader>
 
           <div className="max-h-[60vh] overflow-y-auto space-y-4 my-4">
@@ -783,31 +743,37 @@ export default function CounterTimbangPage() {
                   <div className="flex justify-between">
                     <span
                       className={`px-2 py-1 rounded-full text-xs ${
-                        log.event === "add" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                        log.event === "menambahkan" ? "bg-green-100 text-green-800" : 
+                        log.event === "memindahkan" ? "bg-red-100 text-red-800" : 
+                        "bg-yellow-100 text-yellow-800"
                       }`}
                     >
-                      {log.event === "add" ? "Added" : "Removed"}
+                      {log.event === "menambahkan" ? "🔵➕" : 
+                      log.event === "memindahkan" ? "🔴➖" : 
+                      "✏️"}
                     </span>
-                    <div className="text-sm text-muted-foreground">{new Date(log.timestamp).toLocaleString()}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {new Date(log.timestamp).toLocaleString()}
+                    </div>
                   </div>
                   <div className="mt-2">
-                    <span className="font-medium">Quantity:</span> {log.value} units
+                    <span className="font-medium">Jumlah:</span> {log.value} unit
                   </div>
                   {log.note && (
                     <div className="mt-1">
-                      <span className="font-medium">Note:</span> {log.note}
+                      <span className="font-medium">Catatan:</span> {log.note}
                     </div>
                   )}
                 </div>
               ))}
 
             {productLogs.filter((log) => log.produkId === selectedProductForHistory).length === 0 && (
-              <div className="text-center p-4">No history available for this product</div>
+              <div className="text-center p-4">Tidak ada history untuk produk ini</div>
             )}
           </div>
 
           <DialogFooter>
-            <Button onClick={() => setShowProductHistory(false)}>Close</Button>
+            <Button onClick={() => setShowProductHistory(false)}>Tutup</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

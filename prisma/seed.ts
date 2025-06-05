@@ -19,7 +19,7 @@ async function main() {
   await prisma.tipeHewan.deleteMany({})
   await prisma.produkHewan.deleteMany({})
   await prisma.penerima.deleteMany({})
-  await prisma.distribution.deleteMany({})
+  await prisma.distribusi.deleteMany({})
 
   // Default Categories for INCOME
   const incomeCategories = [
@@ -234,7 +234,7 @@ async function main() {
   ]
 
   for (const category of distributionCategories) {
-    await prisma.distribution.upsert({
+    await prisma.distribusi.upsert({
       where: { id: category.id },
       update: {},
       create: category,
@@ -319,10 +319,10 @@ async function main() {
 
 //   // Create some Penerima
 //   for (let i = 1; i <= 50; i++) {
-//     const distributionId = distributionCategories[i % 5].id
+//     const distribusiId = distributionCategories[i % 5].id
 //     await prisma.penerima.create({
 //       data: {
-//         distributionId,
+//         distribusiId,
 //         noKupon: `KP-${i}`,
 //         receivedBy: `Penerima ${i}`,
 //         institusi: i % 3 === 0 ? `Institusi ${i}` : null,

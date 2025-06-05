@@ -11,6 +11,7 @@ const protectedRoutes = {
   "/dashboard/keuangan": ["ADMIN", "PETUGAS_KEUANGAN"],
   "/dashboard/transactions": ["ADMIN", "PETUGAS_KEUANGAN"],
   "/dashboard/mudhohi": ["ADMIN", "PETUGAS_PENDAFTARAN"],
+  "/dashboard/pengaturan": ["ADMIN", "PETUGAS_PENDAFTARAN"],
 }
 
 export async function middleware(request: NextRequest) {

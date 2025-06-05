@@ -4,7 +4,7 @@ import { addProductLog as dbAddProductLog, createShipment as dbCreateShipment } 
 import { revalidatePath } from "next/cache"
 import type { Counter } from "@prisma/client"
 
-export async function addProductLog(produkId: number, event: string, place: Counter, value: number, note: string) {
+export async function addProductLog(produkId: number, event: "menambahkan" | "memindahkan" | "mengkoreksi", place: Counter, value: number, note: string) {
   try {
     await dbAddProductLog(produkId, event, place, value, note)
     revalidatePath("/counter-timbang")

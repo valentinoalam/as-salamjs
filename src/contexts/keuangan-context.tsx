@@ -1,7 +1,7 @@
 "use client"
 
-import React, { createContext, useContext, useCallback, type ReactNode, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import React, { createContext, useContext, useCallback, type ReactNode, useMemo, useRef, useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { TransactionType } from '@prisma/client'
 import type { 
   Category, 
@@ -19,9 +19,162 @@ import type {
 } from '@/types/keuangan'
 import { createBudget, createCategory, createQueryOptions, createTransaction, deleteBudget, deleteCategory, deleteTransaction, fetchBudgets, fetchCategories, fetchQurbanSalesStats, fetchTransactions, fetchTransactionStats, fetchWeeklyAnimalSales, QUERY_KEYS, updateBudget, updateCategory, uploadReceipt, useOptimizedMutation, type ApiResponse, type DataQuery } from '@/lib/tanstack-query/keuangan'
 
-// Enhanced Transaction type for combined data
+// Cache keys for localStorage
+const CACHE_KEYS = {
+  TRANSACTIONS: 'keuangan_transactions',
+  CATEGORIES: 'keuangan_categories', 
+  BUDGETS: 'keuangan_budgets',
+  STATS: 'keuangan_stats',
+  QURBAN_SALES: 'keuangan_qurban_sales',
+  WEEKLY_SALES: 'keuangan_weekly_sales',
+  PROCESSED_OVERVIEW: 'keuangan_processed_overview',
+  LAST_FETCH: 'keuangan_last_fetch',
+  FILTERS: 'keuangan_filters'
+} as const
+
+// Cache duration in milliseconds (5 minutes for dynamic data, 30 minutes for static data)
+const CACHE_DURATION = {
+  TRANSACTIONS: 5 * 60 * 1000, // 5 minutes
+  CATEGORIES: 30 * 60 * 1000,  // 30 minutes
+  BUDGETS: 10 * 60 * 1000,     // 10 minutes
+  STATS: 5 * 60 * 1000,        // 5 minutes
+  QURBAN_SALES: 5 * 60 * 1000, // 5 minutes
+} as const
+
 interface CombinedTransaction extends Transaction {
   isQurbanTransaction?: boolean
+}
+
+type CacheEntry<T> = {
+  data: T;
+  timestamp: number;
+};
+class CacheManager {
+  private static isClient = typeof window !== 'undefined'
+
+  static get<T>(key: string): CacheEntry<T> | null {
+    if (!this.isClient) return null
+    
+    try {
+      const cached = localStorage.getItem(key);
+      if (!cached) return null;
+
+      const parsed = JSON.parse(cached);
+      return {
+        data: parsed.data as T,
+        timestamp: parsed.timestamp,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  static set<T>(key: string, data: T): void {
+    if (!this.isClient) return
+    try {
+      const cacheItem: CacheEntry<T> = {
+        data,
+        timestamp: Date.now()
+      }
+      localStorage.setItem(key, JSON.stringify(cacheItem))
+    } catch (error) {
+      console.warn('Failed to cache data:', error)
+    }
+  }
+
+  static isValid(timestamp: number, duration: number): boolean {
+    return Date.now() - timestamp < duration
+  }
+
+  static remove(key: string): void {
+    if (!this.isClient) return
+    localStorage.removeItem(key)
+  }
+
+  static clear(): void {
+    if (!this.isClient) return
+    Object.values(CACHE_KEYS).forEach(key => {
+      localStorage.removeItem(key)
+    })
+  }
+}
+
+// Memoized calculation hook
+const useProcessedData = (allTransactions: CombinedTransaction[], categories: Category[]) => {
+  const processingRef = useRef<{
+    transactions: CombinedTransaction[]
+    categories: Category[]
+    result: ProcessedData
+  } | null>(null)
+
+  return useMemo(() => {
+    // Check if we can reuse previous calculation
+    if (processingRef.current && 
+        processingRef.current.transactions === allTransactions &&
+        processingRef.current.categories === categories) {
+      return processingRef.current.result
+    }
+
+    // Check cache first
+    const cached = CacheManager.get<ProcessedData>(CACHE_KEYS.PROCESSED_OVERVIEW)
+    if (cached && CacheManager.isValid(cached.timestamp, 10 * 60 * 1000)) { // 10 min cache
+      processingRef.current = { transactions: allTransactions, categories, result: cached.data }
+      return cached.data
+    }
+
+    // Calculate fresh data
+    const categoryTotals = new Map<string, { pemasukan: number; pengeluaran: number; categoryName: string }>()
+    let totalPemasukan = 0
+    let totalPengeluaran = 0
+
+    allTransactions.forEach(transaction => {
+      const categoryName = transaction.category?.name || 'Unknown'
+      const key = `${transaction.categoryId}-${categoryName}`
+      
+      if (!categoryTotals.has(key)) {
+        categoryTotals.set(key, { pemasukan: 0, pengeluaran: 0, categoryName })
+      }
+      
+      const totals = categoryTotals.get(key)!
+      if (transaction.type === TransactionType.PEMASUKAN) {
+        totals.pemasukan += transaction.amount
+        totalPemasukan += transaction.amount
+      } else {
+        totals.pengeluaran += transaction.amount
+        totalPengeluaran += transaction.amount
+      }
+    })
+
+    const colors = CATEGORY_COLORS
+    const pemasukanData: CategoryDistribution[] = []
+    const pengeluaranData: CategoryDistribution[] = []
+    
+    let colorIndex = 0
+    categoryTotals.forEach(({ pemasukan, pengeluaran, categoryName }) => {
+      const color = colors[colorIndex % colors.length]
+      
+      if (pemasukan > 0) {
+        pemasukanData.push({ name: categoryName, value: pemasukan, color })
+      }
+      if (pengeluaran > 0) {
+        pengeluaranData.push({ name: categoryName, value: pengeluaran, color })
+      }
+      colorIndex++
+    })
+
+    const result: ProcessedData = {
+      pemasukanData: pemasukanData.sort((a, b) => b.value - a.value),
+      pengeluaranData: pengeluaranData.sort((a, b) => b.value - a.value),
+      totalPemasukan,
+      totalPengeluaran
+    }
+
+    // Cache the result
+    CacheManager.set(CACHE_KEYS.PROCESSED_OVERVIEW, result)
+    processingRef.current = { transactions: allTransactions, categories, result }
+    
+    return result
+  }, [allTransactions, categories])
 }
 
 // Category colors for overview data
@@ -79,6 +232,10 @@ interface KeuanganContextType {
   calculateCategoryTotal: (categoryId: number, type: TransactionType) => number
   calculateBudgetUsage: (budgetId: string) => { used: number; percentage: number; remaining: number }
   getMonthlyStats: (year: number, month: number) => { income: number; expense: number; balance: number }
+
+  // Cache management
+  clearCache: () => void
+  refreshData: () => Promise<void>
 }
 
 const KeuanganContext = createContext<KeuanganContextType | undefined>(undefined)
@@ -96,58 +253,121 @@ interface KeuanganProviderProps {
 }
 
 export function KeuanganProvider({ children, initialData }: KeuanganProviderProps) {
+  const queryClient = useQueryClient()
   // Filter state - moved to context for global state management
-  const [searchTerm, setSearchTerm] = React.useState("")
-  const [typeFilter, setTypeFilter] = React.useState<TransactionType | "ALL">("ALL")
-  const [categoryFilter, setCategoryFilter] = React.useState<string>("ALL")
-  const [dateRange, setDateRange] = React.useState<{ from?: Date; to?: Date }>({})
+  // Load filter state from localStorage
+  const [filterState, setFilterState] = React.useState(() => {
+    const cached = CacheManager.get<{
+      searchTerm: string
+      typeFilter: TransactionType | "ALL"
+      categoryFilter: string
+      dateRange: { from?: Date; to?: Date }
+    }>(CACHE_KEYS.FILTERS)
+    
+    return cached?.data || {
+      searchTerm: "",
+      typeFilter: "ALL" as const,
+      categoryFilter: "ALL",
+      dateRange: {}
+    }
+  })
 
+  // Save filters to localStorage when they change
+  useEffect(() => {
+    CacheManager.set(CACHE_KEYS.FILTERS, filterState)
+  }, [filterState])
+
+  // Helper function to get cached data or return initial data
+  const getCachedOrInitial = <T,>(cacheKey: string, initialValue: T | undefined, duration: number): T | undefined => {
+    const cached = CacheManager.get<T>(cacheKey)
+    if (cached && CacheManager.isValid(cached.timestamp, duration)) {
+      return cached.data
+    }
+    return initialValue
+  }
+
+  // Custom query options with caching
+  const createCachedQueryOptions = <T,>(
+    key: readonly unknown[],
+    fetcher: () => Promise<T>,
+    cacheKey: string,
+    cacheDuration: number,
+    initialValue?: T
+  ) => {
+    const cachedData = getCachedOrInitial(cacheKey, initialValue, cacheDuration)
+    
+    return createQueryOptions(
+      key,
+      async () => {
+        const result = await fetcher()
+        CacheManager.set(cacheKey, result)
+        return result
+      },
+      { 
+        initialData: cachedData,
+        staleTime: cacheDuration * 0.8, // 80% of cache duration
+        gcTime: cacheDuration * 2, // Keep in memory for 2x cache duration
+      }
+    )
+  }
   // Data queries
   const statsQuery = useQuery(
-    createQueryOptions(
+    createCachedQueryOptions(
       QUERY_KEYS.stats,
       fetchTransactionStats,
-      { initialData: initialData?.stats }
+      CACHE_KEYS.STATS,
+      CACHE_DURATION.STATS,
+      initialData?.stats
     )
   )
 
   const transactionsQuery = useQuery(
-    createQueryOptions(
+    createCachedQueryOptions(
       QUERY_KEYS.transactions(),
       () => fetchTransactions(),
-      { initialData: initialData?.transactions }
+      CACHE_KEYS.TRANSACTIONS,
+      CACHE_DURATION.TRANSACTIONS,
+      initialData?.transactions
     )
   )
 
   const categoriesQuery = useQuery(
-    createQueryOptions(
+    createCachedQueryOptions(
       QUERY_KEYS.categories,
       fetchCategories,
-      { initialData: initialData?.categories }
+      CACHE_KEYS.CATEGORIES,
+      CACHE_DURATION.CATEGORIES,
+      initialData?.categories
     )
   )
 
   const budgetsQuery = useQuery(
-    createQueryOptions(
+    createCachedQueryOptions(
       QUERY_KEYS.budgets,
       fetchBudgets,
-      { initialData: initialData?.budgets }
+      CACHE_KEYS.BUDGETS,
+      CACHE_DURATION.BUDGETS,
+      initialData?.budgets
     )
   )
 
   const qurbanSalesQuery = useQuery(
-    createQueryOptions(
+    createCachedQueryOptions(
       QUERY_KEYS.qurbanSales,
       fetchQurbanSalesStats,
-      { initialData: initialData?.qurbanSalesStats }
+      CACHE_KEYS.QURBAN_SALES,
+      CACHE_DURATION.QURBAN_SALES,
+      initialData?.qurbanSalesStats
     )
   )
 
   const weeklySalesQuery = useQuery(
-    createQueryOptions(
+    createCachedQueryOptions(
       QUERY_KEYS.weeklySales,
       () => fetchWeeklyAnimalSales(),
-      { initialData: initialData?.weeklyAnimalSales }
+      CACHE_KEYS.WEEKLY_SALES,
+      10 * 60 * 1000, // 10 minutes
+      initialData?.weeklyAnimalSales
     )
   )
   
@@ -200,77 +420,15 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
   }, [transactions, qurbanSales])
 
   // Calculate overview data from allTransactions
-  const overviewData = useMemo((): ProcessedData => {
-    if (!allTransactions || allTransactions.length === 0) {
-      return {
-        pemasukanData: [],
-        pengeluaranData: [],
-        totalPemasukan: 0,
-        totalPengeluaran: 0,
-      }
-    }
-    const totalsByCategoryAndType = new Map<string, number>()
-
-    allTransactions.forEach(transaction => {
-      const categoryName = transaction.category?.name
-      const type = transaction.type
-
-      if (!categoryName || !type) return
-
-      const key = `${type}:${categoryName}`
-      const current = totalsByCategoryAndType.get(key) || 0
-      totalsByCategoryAndType.set(key, current + transaction.amount)
-    })
-
-    const rawData: CategoryDistribution[] = Array.from(totalsByCategoryAndType.entries())
-      .map(([key, value], index) => {
-        const [type, name] = key.split(':')
-        return {
-          name: `${type === 'PENGELUARAN' ? 'Pengeluaran' : 'Pemasukan'} - ${name}`,
-          value,
-          color: CATEGORY_COLORS[index % CATEGORY_COLORS.length],
-        }
-      })
-      .sort((a, b) => b.value - a.value)
-    // Separate income and expense data
-    const pemasukanItems = rawData.filter(item => 
-      item.name.startsWith('Pemasukan'))
-    const pengeluaranItems = rawData.filter(item => 
-      item.name.startsWith('Pengeluaran'))
-
-    // Calculate totals
-    const totalPemasukan = pemasukanItems.reduce((sum, item) => sum + item.value, 0);
-    const totalPengeluaran = pengeluaranItems.reduce((sum, item) => sum + item.value, 0);
-
-    // Format data for charts
-    const pemasukanData = pemasukanItems.map(item => ({
-      name: item.name.replace('Pemasukan - ', ''),
-      value: item.value,
-      fill: item.color,
-    }));
-
-    const pengeluaranData = pengeluaranItems.map(item => ({
-      name: item.name.replace('Pengeluaran - ', ''),
-      value: item.value,
-      fill: item.color,
-    }));
-
-    const pieData = {
-      pemasukanData,
-      pengeluaranData,
-      totalPemasukan,
-      totalPengeluaran,
-    };
-    return pieData
-  }, [allTransactions])
+  const overviewData = useProcessedData(allTransactions, categories || [])
 
   // Apply filters to combined transactions - centralized filtering logic
   const filteredTransactions = useMemo(() => {
     let filtered = [...allTransactions]
 
-    // Search filter
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase()
+    // Apply filters efficiently
+    if (filterState.searchTerm) {
+      const term = filterState.searchTerm.toLowerCase()
       filtered = filtered.filter(t => 
         t.description.toLowerCase().includes(term) ||
         t.category.name.toLowerCase().includes(term) ||
@@ -278,79 +436,120 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
       )
     }
 
-    // Type filter
-    if (typeFilter !== "ALL") {
-      filtered = filtered.filter(t => t.type === typeFilter)
+    if (filterState.typeFilter !== "ALL") {
+      filtered = filtered.filter(t => t.type === filterState.typeFilter)
     }
 
-    // Category filter
-    if (categoryFilter !== "ALL") {
-      const categoryId = parseInt(categoryFilter)
+    if (filterState.categoryFilter !== "ALL") {
+      const categoryId = parseInt(filterState.categoryFilter)
       filtered = filtered.filter(t => t.categoryId === categoryId)
     }
 
-    // Date range filter
-    if (dateRange.from && dateRange.to) {
+    if (filterState.dateRange.from && filterState.dateRange.to) {
       filtered = filtered.filter(t => {
         const transactionDate = new Date(t.date)
-        return transactionDate >= dateRange.from! && transactionDate <= dateRange.to!
+        return transactionDate >= filterState.dateRange.from! && transactionDate <= filterState.dateRange.to!
       })
-    } else if (dateRange.from) {
-      filtered = filtered.filter(t => new Date(t.date) >= dateRange.from!)
+    } else if (filterState.dateRange.from) {
+      filtered = filtered.filter(t => new Date(t.date) >= filterState.dateRange.from!)
     }
 
-    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  }, [allTransactions, searchTerm, typeFilter, categoryFilter, dateRange])
+    return filtered
+  }, [allTransactions, filterState])
 
-  // Reset filters function
+  // Filter setters that update the state object
+  const setSearchTerm = useCallback((term: string) => {
+    setFilterState(prev => ({ ...prev, searchTerm: term }))
+  }, [])
+
+  const setTypeFilter = useCallback((type: TransactionType | "ALL") => {
+    setFilterState(prev => ({ ...prev, typeFilter: type }))
+  }, [])
+
+  const setCategoryFilter = useCallback((categoryId: string) => {
+    setFilterState(prev => ({ ...prev, categoryFilter: categoryId }))
+  }, [])
+
+  const setDateRange = useCallback((range: { from?: Date; to?: Date }) => {
+    setFilterState(prev => ({ ...prev, dateRange: range }))
+  }, [])
+
   const resetFilters = useCallback(() => {
-    setSearchTerm("")
-    setTypeFilter("ALL")
-    setCategoryFilter("ALL")
-    setDateRange({})
+    setFilterState({
+      searchTerm: "",
+      typeFilter: "ALL",
+      categoryFilter: "ALL",
+      dateRange: {}
+    })
   }, [])
 
   // Mutations - updated to invalidate stats instead of overview
   const createTransactionMutation = useOptimizedMutation(
     createTransaction,
-    [QUERY_KEYS.transactions(), QUERY_KEYS.latestTransactions, QUERY_KEYS.stats]
+    [QUERY_KEYS.transactions(), QUERY_KEYS.latestTransactions, QUERY_KEYS.stats],
+    {
+      onSuccess: () => {
+        CacheManager.remove(CACHE_KEYS.TRANSACTIONS)
+        CacheManager.remove(CACHE_KEYS.STATS)
+        CacheManager.remove(CACHE_KEYS.PROCESSED_OVERVIEW)
+      }
+    }
   )
 
   const deleteTransactionMutation = useOptimizedMutation(
     deleteTransaction,
-    [QUERY_KEYS.transactions(), QUERY_KEYS.latestTransactions, QUERY_KEYS.stats]
+    [QUERY_KEYS.transactions(), QUERY_KEYS.latestTransactions, QUERY_KEYS.stats],
+    {
+      onSuccess: () => {
+        CacheManager.remove(CACHE_KEYS.TRANSACTIONS)
+        CacheManager.remove(CACHE_KEYS.STATS)
+        CacheManager.remove(CACHE_KEYS.PROCESSED_OVERVIEW)
+      }
+    }
   )
 
   const uploadReceiptMutation = useOptimizedMutation(uploadReceipt, [])
 
   const createCategoryMutation = useOptimizedMutation(
     createCategory,
-    [QUERY_KEYS.categories]
+    [QUERY_KEYS.categories],
+    { onSuccess: () => CacheManager.remove(CACHE_KEYS.CATEGORIES) }
   )
 
   const updateCategoryMutation = useOptimizedMutation(
     ({ id, data }: { id: number; data: CategoryFormValues }) => updateCategory(id, data),
-    [QUERY_KEYS.categories]
+    [QUERY_KEYS.categories],
+    { onSuccess: () => CacheManager.remove(CACHE_KEYS.CATEGORIES) }
   )
 
   const deleteCategoryMutation = useOptimizedMutation(
     deleteCategory,
-    [QUERY_KEYS.categories, QUERY_KEYS.transactions(), QUERY_KEYS.budgets]
+    [QUERY_KEYS.categories, QUERY_KEYS.transactions(), QUERY_KEYS.budgets],
+    {
+      onSuccess: () => {
+        CacheManager.remove(CACHE_KEYS.CATEGORIES)
+        CacheManager.remove(CACHE_KEYS.TRANSACTIONS)
+        CacheManager.remove(CACHE_KEYS.BUDGETS)
+      }
+    }
   )
 
   const createBudgetMutation = useOptimizedMutation(
     createBudget,
-    [QUERY_KEYS.budgets]
+    [QUERY_KEYS.budgets],
+    { onSuccess: () => CacheManager.remove(CACHE_KEYS.BUDGETS) }
   )
 
   const updateBudgetMutation = useOptimizedMutation(
     ({ id, data }: { id: string; data: BudgetFormValues }) => updateBudget(id, data),
-    [QUERY_KEYS.budgets]
+    [QUERY_KEYS.budgets],
+    { onSuccess: () => CacheManager.remove(CACHE_KEYS.BUDGETS) }
   )
 
   const deleteBudgetMutation = useOptimizedMutation(
     deleteBudget,
-    [QUERY_KEYS.budgets]
+    [QUERY_KEYS.budgets],
+    { onSuccess: () => CacheManager.remove(CACHE_KEYS.BUDGETS) }
   )
 
   // Utility functions - simplified since we use centralized filtering
@@ -370,85 +569,8 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
 
   // Optimized chart data processing using allTransactions
   const processDataForCharts = useCallback((): ProcessedData => {
-    if (!allTransactions || !categories) {
-      return { 
-        pemasukanData: [], 
-        pengeluaranData: [], 
-        totalPemasukan: 0, 
-        totalPengeluaran: 0 
-      }
-    }
-
-    // Create category map for O(1) lookups
-    const categoryMap = new Map(categories.map(c => [c.id, c]))
-    
-    // Process transactions in a single pass
-    const categoryTotals = new Map<string, { 
-      pemasukan: number; 
-      pengeluaran: number; 
-      categoryName: string;
-      categoryId: number;
-    }>()
-    
-    let totalPemasukan = 0
-    let totalPengeluaran = 0
-
-    allTransactions.forEach(transaction => {
-      const category = categoryMap.get(transaction.categoryId) || transaction.category
-      const categoryName = category?.name || 'Unknown'
-      const key = `${transaction.categoryId}-${categoryName}`
-      
-      if (!categoryTotals.has(key)) {
-        categoryTotals.set(key, {
-          pemasukan: 0, 
-          pengeluaran: 0, 
-          categoryName,
-          categoryId: transaction.categoryId
-        })
-      }
-      
-      const totals = categoryTotals.get(key)!
-      if (transaction.type === TransactionType.PEMASUKAN) {
-        totals.pemasukan += transaction.amount
-        totalPemasukan += transaction.amount
-      } else {
-        totals.pengeluaran += transaction.amount
-        totalPengeluaran += transaction.amount
-      }
-    })
-
-    // Generate chart data
-    const colors = [
-      '#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', 
-      '#8dd1e1', '#d084d0', '#87d068', '#ffb347',
-      '#ff9999', '#66b3ff', '#99ff99', '#ffcc99'
-    ]
-    
-    const pemasukanData: Array<{ name: string; value: number; fill: string }> = []
-    const pengeluaranData: Array<{ name: string; value: number; fill: string }> = []
-    
-    let colorIndex = 0
-    categoryTotals.forEach(({ pemasukan, pengeluaran, categoryName }) => {
-      const color = colors[colorIndex % colors.length]
-      
-      if (pemasukan > 0) {
-        pemasukanData.push({ name: categoryName, value: pemasukan, fill: color })
-      }
-      
-      if (pengeluaran > 0) {
-        pengeluaranData.push({ name: categoryName, value: pengeluaran, fill: color })
-      }
-      
-      colorIndex++
-    })
-
-    return {
-      pemasukanData: pemasukanData.sort((a, b) => b.value - a.value),
-      pengeluaranData: pengeluaranData.sort((a, b) => b.value - a.value),
-      totalPemasukan,
-      totalPengeluaran
-    }
-  }, [allTransactions, categories])
+    return overviewData
+  }, [overviewData])
 
   // Lookup functions with useMemo for better performance
   const getCategoryById = useMemo(() => {
@@ -525,6 +647,16 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
     [allTransactions]
   )
 
+  // Cache management functions
+  const clearCache = useCallback(() => {
+    CacheManager.clear()
+    queryClient.clear()
+  }, [queryClient])
+
+  const refreshData = useCallback(async () => {
+    CacheManager.clear()
+    await queryClient.refetchQueries()
+  }, [queryClient])
   const contextValue: KeuanganContextType = {
     // Data queries (removed overviewQuery)
     statsQuery,
@@ -540,10 +672,10 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
     overviewData, // Now calculated from allTransactions
 
     // Filter state and setters
-    searchTerm,
-    typeFilter,
-    categoryFilter,
-    dateRange,
+    searchTerm: filterState.searchTerm,
+    typeFilter: filterState.typeFilter,
+    categoryFilter: filterState.categoryFilter,
+    dateRange: filterState.dateRange,
     setSearchTerm,
     setTypeFilter,
     setCategoryFilter,
@@ -573,6 +705,10 @@ export function KeuanganProvider({ children, initialData }: KeuanganProviderProp
     calculateCategoryTotal,
     calculateBudgetUsage,
     getMonthlyStats,
+
+    // Cache management
+    clearCache,
+    refreshData,
   }
 
   return <KeuanganContext.Provider value={contextValue}>{children}</KeuanganContext.Provider>

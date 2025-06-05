@@ -2,19 +2,19 @@ import { NextResponse } from "next/server"
 import { receiveShipment } from "@/services/qurban"
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
+  const { id } = await params 
   try {
-    const shipmentId = Number.parseInt(params.id)
+    console.log(id)
+    const shipmentId = Number.parseInt(id)
     if (isNaN(shipmentId)) {
       return NextResponse.json({ error: "Invalid shipment ID" }, { status: 400 })
     }
 
-    const body = await request.json()
-    const { products } = body
-
+    const products = await request.json()
     if (!products || !Array.isArray(products)) {
       return NextResponse.json({ error: "Invalid products data" }, { status: 400 })
     }
-
+    console.log(products)
     const result = await receiveShipment(shipmentId, products)
     return NextResponse.json(result)
   } catch (error) {

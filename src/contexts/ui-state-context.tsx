@@ -24,8 +24,8 @@ interface FormState {
   distribusiForm: {
     receivedBy: string
     institusi: string
-    distributionId: string
-    numberOfPackages: number
+    distribusiId: string
+    jumlahPaket: number
   }
   // Add more form states as needed
 }
@@ -64,8 +64,8 @@ const defaultForms: FormState = {
   distribusiForm: {
     receivedBy: "",
     institusi: "",
-    distributionId: "",
-    numberOfPackages: 1,
+    distribusiId: "",
+    jumlahPaket: 1,
   },
 }
 

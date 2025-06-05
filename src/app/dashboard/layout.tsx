@@ -1,23 +1,14 @@
 import { Header } from '@/components/dashboard/header';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/dashboard/app-sidebar';
-import { getServerSession } from 'next-auth';
-import { redirect } from 'next/navigation';
-import { authOptions } from '../api/auth/[...nextauth]/route';
 
 import { Providers } from './providers';
 
-export default async function DashboardLayout({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getServerSession(authOptions)
-
-  if (!session) {
-    redirect("/login")
-  }
-
   return (
     <Providers>
       <SidebarProvider className="flex w-auto h-screen overflow-hidden relative">

@@ -7,14 +7,13 @@ import { getAllTipeHewan } from "@/services/qurban"
 
 export default async function QurbanHome() {
   const tipeHewan = await getAllTipeHewan()
-  console.log(tipeHewan)
   return (
     <>
       {/* Hero Section */}
       <section id="home" className="relative h-screen flex items-center justify-center">
         <div className="absolute inset-0 z-0">
           <Image
-            src="/placeholder.svg?height=800&width=1200"
+            src="/images/hewanQurban/ibnu-al-rasyid-4c28uDHJcN8-unsplash.jpg"
             alt="Ternak Qurban"
             fill
             className="object-cover"
@@ -43,7 +42,7 @@ export default async function QurbanHome() {
       {/* Testimoni Section */}
       <section id="testimoni" className="py-20 text-white relative">
         <div className="absolute inset-0 z-0">
-          <Image src="/placeholder.svg?height=500&width=1200" alt="Quran Background" fill className="object-cover" />
+          <Image src="/images/hewanQurban/StockSnap_SQ99X727RI.jpg" alt="Quran Background" fill className="object-cover" />
           <div className="absolute inset-0 bg-black/60"></div>
         </div>
         <div className="relative z-10 container mx-auto px-4 text-center">

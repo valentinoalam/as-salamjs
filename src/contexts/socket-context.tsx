@@ -137,7 +137,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     const measureLatency = (socketInstance: Socket) => {
       const start = Date.now()
 
-      socketInstance.emit("ping", (response: any) => {
+      socketInstance.emit("ping", () => {
         const duration = Date.now() - start
         setLatency(duration)
       })
@@ -215,6 +215,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       setTransportType("not connected");
       setError(null);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (

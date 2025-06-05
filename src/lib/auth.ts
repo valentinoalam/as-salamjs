@@ -49,7 +49,11 @@ export async function hasAccess(page: string): Promise<boolean> {
       return user.role === Role.PETUGAS_PENDAFTARAN
     case "panitia":
       return false // Only admin can access this page
+    case "pengaturan":
+      return false
     default:
       return true // Public pages
   }
 }
+
+export { authOptions }

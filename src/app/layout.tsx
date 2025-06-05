@@ -4,9 +4,11 @@ import { Inter } from "next/font/google"
 import "@/styles/globals.css"
 import { ThemeProvider } from "@/components/layout/providers/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
-import { NextAuthProvider } from "@/components/layout/providers/auth-provider"
 import { JsonLd } from "@/schemas_org"
 import { generateMetaData } from "@/lib/metadata"
+import { NextAuthProvider } from "@/components/layout/providers/next-auth-provider"
+import { getServerSession } from "next-auth"
+import { authOptions } from "./api/auth/[...nextauth]/route"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -106,11 +108,13 @@ export const viewport: Viewport = {
   // interactiveWidget: 'resizes-visual',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const session = await getServerSession(authOptions)
+  
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -118,7 +122,7 @@ export default function RootLayout({
         <JsonLd schema={mosqueSchema} />
       </head>
       <body className={inter.className}>
-        <NextAuthProvider>
+        <NextAuthProvider session={session}>
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
             {children}
             <Toaster />

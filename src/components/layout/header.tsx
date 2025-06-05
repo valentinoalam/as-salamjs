@@ -67,6 +67,7 @@ export default function Header() {
         </div>
 
         <nav className="flex-1 flex items-center space-x-8 md:space-x-4 overflow-x-auto">
+            { pathname === "/qurban" && (
             <div className="hidden md:flex space-x-8">
               <Link href="#home" className="text-primary font-semibold uppercase hover:text-green-700 transition-colors">
                 Home
@@ -80,7 +81,7 @@ export default function Header() {
               >
                 Dalil
               </Link>
-            </div>
+            </div>)}
             { status === "authenticated" && 
               <Link
                 href={`qurban/konfirmasi/${session.user?.id}`}

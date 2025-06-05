@@ -94,16 +94,8 @@ export interface Category {
 }
 
 export interface ProcessedData {
-  pemasukanData: Array<{
-    name: string;
-    value: number;
-    fill: string;
-  }>;
-  pengeluaranData: Array<{
-    name: string;
-    value: number;
-    fill: string;
-  }>;
+  pemasukanData: CategoryDistribution[];
+  pengeluaranData: CategoryDistribution[];
   totalPemasukan: number;
   totalPengeluaran: number;
 }

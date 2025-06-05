@@ -71,7 +71,7 @@ export default function DashboardPage() {
   }, [shipmentsQuery.data])
 
   // Early return for loading state
-  if (productsQuery.isLoading || sapiQuery.isLoading || dombaQuery.isLoading || qurbanSalesQuery.isLoading) {
+  if (productsQuery.isLoading || qurbanSalesQuery.isLoading) {
     return (
       <div className="space-y-8">
         <div className="text-center p-8">Loading dashboard data...</div>
@@ -275,27 +275,13 @@ const AnimalStatusCard = ({ type, data }: {type: "sapi" | "domba"; data: any}) =
 }
 
 const StatusLegend = () => (
-  //   <div className="p-4 border rounded-lg bg-muted flex gap-6">
-//     <div className="flex items-center gap-2">
-//       <div className="w-3 h-3 bg-green-500 rounded-full" />
-//       <span className="text-sm">Sudah Disembelih</span>
-//     </div>
-//     <div className="flex items-center gap-2">
-//       <div className="w-3 h-3 bg-blue-500 rounded-full" />
-//       <span className="text-sm">Tersedia di Inventori</span>
-//     </div>
-//     <div className="flex items-center gap-2">
-//       <div className="w-3 h-3 bg-purple-500 rounded-full" />
-//       <span className="text-sm">Sudah Diambil</span>
-//     </div>
-//   </div>🐄🐑🦴🔪
-  <div className="mb-4 text-sm text-muted-foreground">
+  <div className="block md:flex gap-6 justify-between border p-2 bg-muted mb-4 text-sm text-muted-foreground">
     <div className="flex items-center gap-2 mb-1">
-      <span className="text-xl">🏷️</span>
+      <span className="text-xl">🐄/🐑</span>
       <span>Belum Disembelih</span>
     </div>
     <div className="flex items-center gap-2 mb-1">
-      <span className="text-xl">🥩✅</span>
+      <span className="text-xl">🥩</span>
       <span>Sudah Disembelih</span>
     </div>
     <div className="flex items-center gap-2">

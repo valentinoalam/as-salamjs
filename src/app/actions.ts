@@ -13,14 +13,14 @@ export async function checkAccess() {
 
   const pages = [
     "dashboard",
-    "qurban/pemesanan",
     "dashboard/progres-sembelih",
     "dashboard/counter-timbang",
     "dashboard/counter-inventori",
     "dashboard/panitia",
     "dashboard/mudhohi",
     "dashboard/keuangan",
-    "dashboard/transactions"
+    "dashboard/transactions",
+    "dashboard/pengaturan"
   ]
 
   const accessiblePages = await Promise.all(

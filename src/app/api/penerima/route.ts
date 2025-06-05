@@ -1,60 +1,95 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getPenerima, createPenerima } from "@/services/qurban"
+// import { getPenerima, createPenerima } from "@/services/qurban"
 import prisma from "@/lib/prisma"
-
+import type { ProdukDiterima } from "@prisma/client"
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
-  const distributionId = searchParams.get("distributionId") || undefined
   const page = Number.parseInt(searchParams.get("page") || "1")
   const pageSize = Number.parseInt(searchParams.get("pageSize") || "10")
 
+  const skip = (page - 1) * pageSize
+
   try {
-    let data
-    if (distributionId) {
-      data = await getPenerima(distributionId)
-    } else {
-      // Manual pagination since we don't have a helper function for this
-      data = await prisma.penerima.findMany({
-        skip: (page - 1) * pageSize,
-        take: pageSize,
+    const [data, total] = await Promise.all([
+      prisma.logDistribusi.findMany({
         include: {
-          category: true,
+          penerima: true,
+          listProduk: {
+            include: {
+              jenisProduk: true,
+            },
+          },
         },
-      })
-    }
-
-    const total = await prisma.penerima.count()
-
-    return NextResponse.json(data, {
-      headers: {
-        "X-Total-Count": total.toString(),
-        "X-Total-Pages": Math.ceil(total / pageSize).toString(),
+        skip,
+        take: pageSize,
+        orderBy: {
+          dibuatPada: "desc",
+        },
+      }),
+      prisma.logDistribusi.count(),
+    ])
+    console.log(data)
+    return NextResponse.json({
+      data,
+      meta: {
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
       },
     })
   } catch (error) {
-    console.error("Error fetching penerima data:", error)
-    return NextResponse.json({ error: "Failed to fetch data" }, { status: 500 })
+    console.error("GET /api/log-distribusi error:", error)
+    return new NextResponse("Internal Server Error", { status: 500 })
   }
 }
 
-export async function POST(request: Request) {
+
+export async function POST(req: NextRequest) {
   try {
-    const body = await request.json()
+    const data = await req.json();
+    
+    const penerima = await prisma.penerima.create({
+      data: {
+        distribusiId: data.distribusiId,
+        noKupon: data.noKupon,
+        diterimaOleh: data.diterimaOleh,
+        nama: data.nama,
+        noIdentitas: data.noIdentitas,
+        alamat: data.alamat,
+        telepon: data.telepon,
+        keterangan: data.keterangan,
+        jenis: data.jenis,
+      }
+    });
 
-    const newPenerima = await createPenerima({
-      distributionId: body.distributionId,
-      noKupon: body.noKupon,
-      receivedBy: body.receivedBy,
-      institusi: body.institusi,
-      noKk: body.noKk,
-      alamat: body.alamat,
-      phone: body.phone,
-      keterangan: body.keterangan,
-    })
+    // Create distribution log
+    await prisma.logDistribusi.create({
+      data: {
+        penerimaId: penerima.id,
+        listProduk: {
+          createMany: {
+            data: data.produkDistribusi.map((item: ProdukDiterima) => ({
+              jenisProdukId: item.jenisProdukId,
+              jumlahPaket: data.produkDistribusi.reduce((sum: number, item: ProdukDiterima) => sum + item.jumlahPaket, 0),
+            })),
+          },
+        },
+      },
+    });
 
-    return NextResponse.json(newPenerima, { status: 201 })
+    // Update distribution realization
+    await prisma.distribusi.update({
+      where: { id: data.distribusiId },
+      data: { realisasi: { increment: 1 } }
+    });
+
+    return NextResponse.json(penerima, { status: 201 });
   } catch (error) {
-    console.error("Error creating penerima:", error)
-    return NextResponse.json({ error: "Failed to create penerima" }, { status: 500 })
+    console.error(error)
+    return NextResponse.json(
+      { error: "Failed to create recipient" },
+      { status: 500 }
+    );
   }
 }

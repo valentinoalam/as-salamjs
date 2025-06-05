@@ -41,9 +41,9 @@ export async function addProductLog(produkId: number, event: string, place: Coun
   }
 }
 
-export async function createDistribusi(penerimaId: string, produkIds: number[], numberOfPackages: number) {
+export async function createDistribusi(penerimaId: string, produkIds: number[], jumlahPaket: number) {
   try {
-    await dbCreateDistribusi(penerimaId, produkIds, numberOfPackages)
+    await dbCreateDistribusi(penerimaId, produkIds, jumlahPaket)
     revalidatePath("/counter-inventori")
     revalidatePath("/")
     return { success: true }

@@ -2,199 +2,25 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
-import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from "react"
 import { useSocket } from "@/contexts/socket-context"
-import type {
-  HewanQurban,
-  HewanStatus,
-  JenisHewan,
-  JenisProduk,
-  ProductLog
+import {
+  JenisDistribusi,
+  type HewanQurban,
+  type HewanStatus,
+  type Mudhohi
 } from "@prisma/client"
 import { 
   useQuery, 
   useMutation, 
   useQueryClient,
-  QueryClientProvider, 
   type UseQueryResult,
-  type UseQueryOptions,
 } from "@tanstack/react-query"
 import { Counter } from "@prisma/client"
 import { toast } from "@/hooks/use-toast"
-import { queryClient, queryKeys } from "@/lib/tanstack-query/qurban"
+import { queryKeys } from "@/lib/tanstack-query/qurban"
 import { useUIState } from "./ui-state-context"
-
-export type ProdukHewan = {
-  id: number
-  nama: string
-  tipeId: number | null
-  berat: number | null
-  avgProdPerHewan: number
-  kumulatif: number
-  targetPaket: number
-  diTimbang: number
-  diInventori: number
-  sdhDiserahkan: number
-  JenisProduk: JenisProduk
-  tipe_hewan?: {
-    id: number
-    nama: string
-    icon: string | null
-    jenis: JenisHewan
-  } | null
-}
-
-// Add ProductLog type
-export type ProductLogWithProduct = ProductLog & {
-  produk: {
-    id: number
-    nama: string
-  }
-}
-// Add shipment types
-export interface ShipmentProduct {
-  produkId: number
-  jumlah: number
-}
-
-export interface Shipment {
-  id: number
-  products: ShipmentProduct[]
-  note?: string
-  createdAt: string
-  status: "pending" | "completed"
-}
-type ErrorLog = {
-  id: number
-  produkId: number
-  event: string
-  note: string
-  timestamp: Date
-  produk: {
-    id: number
-    nama: string
-  }
-}
-
-export type TipeHewan = "sapi" | "domba" 
-// Define pagination configuration type
-interface PaginationConfig {
-  useGroups: boolean
-  itemsPerGroup?: number
-  pageSize: number
-}
-export type PaginationData = 
-  PaginationConfig & {
-      currentPage: number
-      totalPages: number
-      currentGroup?: string
-      totalGroups?: number
-    }
-export interface HewanQuery {
-  data: HewanQurban[]
-  isLoading: boolean
-  isError: boolean
-  refetch: (options?: { page?: number, group?: string }) => Promise<any>
-  pagination: PaginationData
-}
-// Custom hook for determining pagination configuration
-export const usePaginationConfig = (target: number, total: number): PaginationConfig => {
-  return useMemo(() => {
-    if (total > 100) {
-      return { 
-        useGroups: true, 
-        itemsPerGroup: 50,
-        pageSize: 10, 
-      }
-    }
-    if (target <= 100 && total <= 50) return { 
-      useGroups: false, 
-      pageSize: 10,
-    }
-    if (total > 50 && total <= 60) return { 
-      useGroups: false, 
-      pageSize: 15, 
-    }
-    if (total > 60 && total <= 100) return { 
-      useGroups: false, 
-      pageSize: 20,
-    }
-    return { 
-      useGroups: false, 
-      pageSize: 10,
-    }
-  }, [target, total])
-}
-// Define the shape of our context
-interface QurbanContextType {
-   // Data states and loading
-  sapiQuery: HewanQuery 
-  dombaQuery: HewanQuery
-  productsQuery: {
-    data: ProdukHewan[]
-    isLoading: boolean
-    isError: boolean
-    refetch: () => Promise<any>
-  }
-  errorLogsQuery: {
-    data: ErrorLog[]
-    isLoading: boolean
-    isError: boolean
-    refetch: () => Promise<any>
-  }
-  // Product logs query
-  productLogsQuery: {
-    data: ProductLogWithProduct[]
-    isLoading: boolean
-    isError: boolean
-    refetch: (options?: { produkId?: number; place?: Counter }) => Promise<any>
-  }
-  shipmentsQuery: {
-    data: Shipment[]
-    isLoading: boolean
-    isError: boolean
-    refetch: () => Promise<any>
-  }
-  // Pagination metadata
-  meta: {
-    sapi: { total: number; target: number; slaughtered: number }
-    domba: { total: number; target: number; slaughtered: number }
-  }
-
-  // Connection status
-  isConnected: boolean
-
-  // Methods for updating data
-  updateHewan: (data: {
-    hewanId: string
-    status: HewanStatus
-    slaughtered: boolean
-    receivedByMdhohi?: boolean
-    onInventory?: boolean
-    tipeId: number
-  }) => void
-
-  updateProduct: (data: {
-    productId: number
-    operation: "add" | "decrease"
-    place: Counter
-    value: number
-    note?: string
-  }) => void
-
-  // Shipment methods
-  createShipment: (products: ShipmentProduct[], note?: string) => Promise<any | void>
-  
-  // Utility methods
-  getProductById: (id: number) => ProdukHewan | undefined
-  getProductsByType: (type: "daging" | "all") => ProdukHewan[]
-  getProductLogsByPlace: (place: Counter) => ProductLogWithProduct[]
-  getProductLogsByProduct: (produkId: number) => ProductLogWithProduct[]
-}
-
-type QueryWithToastOptions<TData, TError> = UseQueryOptions<TData, TError> & {
-  errorMessage?: string
-}
+import { getPaginationConfig, getValidCacheData, setCachedData, type Distribusi, type ErrorLog, type HewanQurbanResponse, type LogDistribusi, type Penerima, type ProductLogWithProduct, type ProdukHewan, type QueryWithToastOptions, type QurbanContextType, type Shipment, type ShipmentProduct, type TipeHewan } from "@/types/qurban"
 
 export function useQueryWithToast<TData = unknown, TError = Error>(
   options: QueryWithToastOptions<TData, TError>
@@ -221,20 +47,8 @@ export function useQueryWithToast<TData = unknown, TError = Error>(
 // Create the context
 const QurbanContext = createContext<QurbanContextType | undefined>(undefined)
 
-// Wrapper component to provide the QueryClient
-export function QurbanProviderWrapper({ children }: { children: ReactNode }) {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <QurbanProvider>{children}</QurbanProvider>
-    </QueryClientProvider>
-  )
-}
-
 // Provider component
-export function QurbanProvider({
-  children,
-
-}: {
+export function QurbanProvider({ children }: {
   children: ReactNode
 }) {
   const queryClient = useQueryClient()
@@ -246,7 +60,14 @@ export function QurbanProvider({
   
   // Debounce socket updates to prevent rapid fire updates
   const socketUpdateTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map())
-
+  // Add cleanup in useEffect
+  useEffect(() => {
+    return () => {
+      // Clear all pending timeouts
+      socketUpdateTimeouts.current.forEach(timeout => clearTimeout(timeout))
+      socketUpdateTimeouts.current.clear()
+    }
+  }, [])
   // Fetch functions
   const fetchHewan = async (
     type: TipeHewan, 
@@ -302,7 +123,24 @@ export function QurbanProvider({
       }
     };
   }
-
+  const fetchHewanWithCache = async (
+    type: TipeHewan, 
+    params: { 
+      page?: number
+      pageSize?: number
+      group?: string
+      itemsPerGroup?: number
+      useGroups?: boolean
+      meta?: {total: number; target: number}
+    } = {}
+  ): Promise<HewanQurbanResponse> => {
+    const cacheKey = `hewan-${type}-${params.page || 1}-${params.group || 'all'}`;
+    const cachedData = getValidCacheData<HewanQurbanResponse>(cacheKey);
+    if (cachedData) return cachedData;
+    const result = await fetchHewan(type, params);
+    setCachedData(cacheKey, result);
+    return result;
+  };
   const fetchProducts = async (params: any = {}): Promise<ProdukHewan[]> => {
     const url = `/api/products${params.jenis ? `?jenis=${params.jenis}` : ""}`
     const response = await fetch(url)
@@ -311,6 +149,16 @@ export function QurbanProvider({
     }
     return response.json()
   }
+  // Cache layer for fetchProducts
+  const fetchProductsWithCache = async (params: any = {}): Promise<ProdukHewan[]> => {
+    const cacheKey = 'products';
+    const cachedData = getValidCacheData<ProdukHewan[]>(cacheKey);
+    if (cachedData) return cachedData;
+    
+    const data = await fetchProducts(params);
+    setCachedData(cacheKey, data);
+    return data;
+  };
 
   const fetchProductLogs = async (
     params: { produkId?: number; place?: Counter } = {},
@@ -334,7 +182,7 @@ export function QurbanProvider({
 
     return response.json()
   }
-  
+
   const fetchErrorLogs = async (): Promise<ErrorLog[]> => {
     const response = await fetch("/api/error-logs")
     if (!response.ok) {
@@ -352,7 +200,46 @@ export function QurbanProvider({
   }
 
   const fetchMeta = async (type?: string): Promise<any> => {
-    const response = await fetch(`/api/hewan/meta?jenis=${type}`)
+    const url = `/api/hewan/meta${type ? `?jenis=${type}` : ''}`;
+    const response = await fetch(url)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    return response.json()
+  }
+// Cache layer for fetchMeta
+  const fetchMetaWithCache = async (type?: string): Promise<any> => {
+    const cacheKey = `meta-${type || 'all'}`;
+    // Return cached data if valid
+    const cachedData = getValidCacheData(cacheKey);
+    if (cachedData) return cachedData;
+
+    const data = await fetchMeta(type);
+    setCachedData(cacheKey, data);
+    return data;
+  };
+
+  // Fetch penerima (recipients)
+  const fetchPenerima = async (): Promise<Penerima[]> => {
+    const response = await fetch("/api/penerima")
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    return response.json()
+  }
+
+  // Fetch distribusi (distributions)
+  const fetchDistribusi = async (): Promise<Distribusi[]> => {
+    const response = await fetch("/api/distribusi")
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    return response.json()
+  }
+
+  // Fetch mudhohi (donors who have taken their qurban)
+  const fetchMudhohi = async (): Promise<Mudhohi[]> => {
+    const response = await fetch("/api/mudhohi")
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
@@ -363,7 +250,7 @@ export function QurbanProvider({
   const metaQuery = useQueryWithToast({
     queryKey: queryKeys.meta,
     queryFn: async () => {
-      const metaData = await fetchMeta()
+      const metaData = await fetchMetaWithCache()
       return {
         sapi: { total: metaData.sapi.total || 0, target: metaData.sapi.target || 0, slaughtered: metaData.sapi.slaughtered || 0 },
         domba: { total: metaData.domba.total || 0, target: metaData.domba.target || 0, slaughtered: metaData.domba.slaughtered || 0 },
@@ -374,20 +261,25 @@ export function QurbanProvider({
   })
 
   // Get pagination configs based on meta data
-  const sapiPaginationConfig = usePaginationConfig(
-    metaQuery.data?.sapi.target || 0,
-    metaQuery.data?.sapi.total || 0
-  )
+  const sapiPaginationConfig = useMemo(() => 
+    getPaginationConfig(
+      metaQuery.data?.sapi.target || 0,
+      metaQuery.data?.sapi.total || 0
+    ),
+  [metaQuery.data?.sapi.target, metaQuery.data?.sapi.total]);
     
-  const dombaPaginationConfig = usePaginationConfig(
-    metaQuery.data?.domba.target || 0,
-    metaQuery.data?.domba.total || 0
-  )
+  const dombaPaginationConfig = useMemo(() => 
+    getPaginationConfig(
+      metaQuery.data?.domba.target || 0,
+      metaQuery.data?.domba.total || 0
+    ),
+  [metaQuery.data?.domba.target, metaQuery.data?.domba.total]);
+
 
   // Set up queries
   const sapiQuery = useQueryWithToast({
     queryKey: [...queryKeys.sapi, pagination.sapiPage, pagination.sapiGroup, sapiPaginationConfig],
-    queryFn: async () => await fetchHewan("sapi", { 
+    queryFn: async () => await fetchHewanWithCache("sapi", { 
       page: pagination.sapiPage, 
       pageSize: sapiPaginationConfig.pageSize,
       group: sapiPaginationConfig.useGroups ? pagination.sapiGroup : undefined,
@@ -400,7 +292,7 @@ export function QurbanProvider({
   })
   const dombaQuery = useQueryWithToast({
     queryKey: [...queryKeys.domba, pagination.dombaPage, pagination.dombaGroup, dombaPaginationConfig],
-    queryFn: async () => await fetchHewan("domba", { 
+    queryFn: async () => await fetchHewanWithCache("domba", { 
       page: pagination.dombaPage, 
       pageSize: dombaPaginationConfig.pageSize,
         group: dombaPaginationConfig.useGroups ? pagination.dombaGroup : undefined,
@@ -414,7 +306,7 @@ export function QurbanProvider({
 
   const productsQuery = useQueryWithToast({
     queryKey: queryKeys.products,
-    queryFn: () => fetchProducts(),
+    queryFn: () => fetchProductsWithCache(),
     staleTime: isConnected ? Infinity : 60,
     errorMessage: "Failed to fetch product data. Please try again.",
   })
@@ -441,16 +333,39 @@ export function QurbanProvider({
     errorMessage: "Failed to fetch shipments. Please try again.",
   })
 
+  const penerimaQuery = useQueryWithToast({
+    queryKey: queryKeys.penerima,
+    queryFn: fetchPenerima,
+    staleTime: isConnected ? Infinity : 60,
+    errorMessage: "Failed to fetch penerima data. Please try again.",
+  })
+
+  const distribusiQuery = useQueryWithToast({
+    queryKey: queryKeys.distribusi,
+    queryFn: fetchDistribusi,
+    staleTime: isConnected ? Infinity : 60,
+    errorMessage: "Failed to fetch distribusi data. Please try again.",
+  })
+
+  const mudhohiQuery = useQueryWithToast({
+    queryKey: queryKeys.mudhohi,
+    queryFn: fetchMudhohi,
+    staleTime: isConnected ? Infinity : 60,
+    errorMessage: "Failed to fetch mudhohi data. Please try again.",
+  })
   // Helper function to debounce socket updates
-  const debounceSocketUpdate = (key: string, callback: () => void, delay = 100) => {
-    const existingTimeout = socketUpdateTimeouts.current.get(key)
-    if (existingTimeout) {
-      clearTimeout(existingTimeout)
+  const debounceSocketUpdate = useCallback((key: string, callback: () => void, delay = 100) => {
+    const existingTimeout = socketUpdateTimeouts.current
+    if (existingTimeout.has(key)) {
+      clearTimeout(existingTimeout.get(key)!)
     }
     
-    const timeout = setTimeout(callback, delay)
-    socketUpdateTimeouts.current.set(key, timeout)
-  }
+    const timeout = setTimeout(() => {
+      callback()
+      existingTimeout.delete(key) // Clean up after execution
+    }, delay)
+    existingTimeout.set(key, timeout)
+  }, [])
 
   // Mutations
   const updateHewanMutation = useMutation({
@@ -556,7 +471,10 @@ export function QurbanProvider({
       if (context?.previousData) {
         queryClient.setQueryData(context.queryKey, context.previousData);
       }
-
+       // If it's a critical error, reset everything
+      if (err.message.includes('critical') || err.message.includes('sync')) {
+        resetQueries()
+      }
       toast({
         title: "Error",
         description: err.message,
@@ -569,7 +487,7 @@ export function QurbanProvider({
   const updateProductMutation = useMutation({
     mutationFn: async (data: {
       productId: number
-      operation: "add" | "decrease"
+      operation: "menambahkan" | "memindahkan" | "mengkoreksi"
       place: Counter
       value: number
       note?: string
@@ -577,7 +495,10 @@ export function QurbanProvider({
       if (!data.productId || !data.operation || !data.value) {
         throw new Error("Missing required fields: productId, operation, or value");
       }
-
+      // Validasi operasi
+      if (!["menambahkan", "memindahkan", "mengkoreksi"].includes(data.operation)) {
+        throw new Error("Operasi tidak valid");
+      }
       const response = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -615,20 +536,53 @@ export function QurbanProvider({
           if (product.id === newProductData.productId) {
             const updatedProduct = { ...product }
 
-            if (newProductData.operation === "add") {
-              if (newProductData.place === Counter.PENYEMBELIHAN) {
-                updatedProduct.diTimbang += newProductData.value
-              } else if (newProductData.place === Counter.INVENTORY) {
-                updatedProduct.diInventori += newProductData.value
-              }
-            } else if (newProductData.operation === "decrease") {
-              if (newProductData.place === Counter.PENYEMBELIHAN) {
-                updatedProduct.diTimbang = Math.max(0, updatedProduct.diTimbang - newProductData.value)
-              } else if (newProductData.place === Counter.INVENTORY) {
-                updatedProduct.diInventori = Math.max(0, updatedProduct.diInventori - newProductData.value)
-              }
+            // if (newProductData.operation === "menambahkan") {
+            //   if (newProductData.place === Counter.PENYEMBELIHAN) {
+            //     updatedProduct.diTimbang += newProductData.value
+            //   } else if (newProductData.place === Counter.INVENTORY) {
+            //     updatedProduct.diInventori += newProductData.value
+            //   }
+            // } else if (newProductData.operation === "memindahkan") {
+            //   if (newProductData.place === Counter.PENYEMBELIHAN) {
+            //     updatedProduct.diTimbang = Math.max(0, updatedProduct.diTimbang - newProductData.value)
+            //   } else if (newProductData.place === Counter.INVENTORY) {
+            //     updatedProduct.diInventori = Math.max(0, updatedProduct.diInventori - newProductData.value)
+            //   }
+            // } else if (newProductData.operation === "mengkoreksi") {
+            //   // Handle correction logic
+            //   if (newProductData.place === Counter.PENYEMBELIHAN) {
+            //     updatedProduct.diTimbang = newProductData.value
+            //   } else if (newProductData.place === Counter.INVENTORY) {
+            //     updatedProduct.diInventori = newProductData.value
+            //   }
+            // }
+            // Handle different operation types
+            switch (newProductData.operation) {
+              case "menambahkan":
+                if (newProductData.place === Counter.PENYEMBELIHAN) {
+                  updatedProduct.diTimbang += newProductData.value
+                } else if (newProductData.place === Counter.INVENTORY) {
+                  updatedProduct.diInventori += newProductData.value
+                }
+                break
+                
+              case "memindahkan":
+                if (newProductData.place === Counter.PENYEMBELIHAN) {
+                  updatedProduct.diTimbang = Math.max(0, updatedProduct.diTimbang - newProductData.value)
+                } else if (newProductData.place === Counter.INVENTORY) {
+                  updatedProduct.diInventori = Math.max(0, updatedProduct.diInventori - newProductData.value)
+                }
+                break
+                
+              case "mengkoreksi":
+                // Directly set the value for corrections
+                if (newProductData.place === Counter.PENYEMBELIHAN) {
+                  updatedProduct.diTimbang = newProductData.value
+                } else if (newProductData.place === Counter.INVENTORY) {
+                  updatedProduct.diInventori = newProductData.value
+                }
+                break
             }
-
             return updatedProduct
           }
           return product
@@ -661,9 +615,18 @@ export function QurbanProvider({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || "Failed to create shipment");
+        throw new Error(error.message || "Gagal mencatat pengiriman");
       }
-
+      // Untuk setiap produk dalam shipment, catat operasi "memindahkan"
+      data.products.forEach(({ produkId, jumlah }) => {
+        updateProduct({
+          productId: produkId,
+          operation: "memindahkan",
+          place: Counter.PENYEMBELIHAN,
+          value: jumlah,
+          note: `Dipindahkan ke inventori${data.note ? ` - ${data.note}` : ''}`
+        });
+      });
       const result = await response.json();
 
       if (socket && isConnected) {
@@ -700,180 +663,458 @@ export function QurbanProvider({
       })
     },
   })
+
+  // Add a new mutation for receiving shipments
+  const receiveShipmentMutation = useMutation({
+    mutationFn: async (data: {
+      shipmentId: number
+      receivedProducts: { produkId: number; jumlah: number }[]
+    }) => {
+      const response = await fetch(`/api/shipments/${data.shipmentId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data.receivedProducts),
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || "Failed to receive shipment")
+      }
+      
+      return response.json()
+    },
+    onSuccess: () => {
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: queryKeys.shipments })
+      queryClient.invalidateQueries({ queryKey: queryKeys.products })
+      queryClient.invalidateQueries({ queryKey: queryKeys.productLogs })
+    }
+  })
+// Create distribution
+  const createDistribusiMutation = useMutation({
+    mutationFn: async (data: {
+      kategori: string;
+      target: number;
+    }) => {
+      const response = await fetch("/api/distribusi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to create distribution");
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["distribusi"] });
+    }
+  });
+  
+  // Create recipient
+  const createPenerimaMutation = useMutation({
+    mutationFn: async (data: {
+      distribusiId: string;
+      nama: string;
+      diterimaOleh?: string;
+      noIdentitas?: string;
+      alamat?: string;
+      telepon?: string;
+      keterangan?: string;
+      jenis: JenisDistribusi;
+      noKupon?: string;
+      produkDistribusi: { produkId: number; jumlah: number }[];
+    }) => {
+      const response = await fetch("/api/penerima", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...data,
+          // Convert products to JSON string for storage
+          produkQurban: JSON.stringify(data.produkDistribusi)
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to create recipient");
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["penerima"] });
+    }
+  });
+  const updateMudhohiReceived = useMutation({
+    mutationFn: async ({ hewanId, received }: { 
+      hewanId: string, 
+      received: boolean 
+    }) => {
+      const res = await fetch(`/api/hewan/${hewanId}/received`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ received }),
+      });
+      if (!res.ok) throw new Error("Failed to update mudhohi status");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.penerima })
+    },
+  });
+
+  // Update kupon received status
+  const updateKuponReceivedMutation = useMutation({
+    mutationFn: async ({ penerimaId, diterima }: { 
+      penerimaId: string, 
+      diterima: boolean 
+    }) => {
+      const res = await fetch(`/api/penerima/${penerimaId}/received`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ diterima }),
+      });
+      if (!res.ok) throw new Error("Failed to update kupon status");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.penerima })
+    },
+  });
+  // Update distribution log
+  const updateLogDistribusiMutation = useMutation({
+    mutationFn: async (data: {
+      penerimaId: string;
+      produk: { produkId: number; jumlah: number }[];
+    }) => {
+      const response = await fetch(`/api/penerima/${data.penerimaId}/distribusi`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          produkQurban: JSON.stringify(data.produk)
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to update distribution log");
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["log-distribusi"] });
+    }
+  });
+
+  // ======================== GROUP PROPOSAL MUTATION ========================
+  // const submitGroupProposalMutation = useMutation({
+  //   mutationFn: async (data: {
+  //     distribusiId: string;
+  //     nama: string;
+  //     penanggungJawab: string;
+  //     produkDistribusi: { produkId: number; jumlah: number }[];
+  //     alamat?: string;
+  //     telepon?: string;
+  //     keterangan?: string;
+  //   }) => {
+  //     const response = await fetch("/api/penerima", {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({
+  //         ...data,
+  //         jenis: JenisDistribusi.KELOMPOK,
+  //         noKupon: `GROUP-${Date.now()}` // Generate unique group ID
+  //       }),
+  //     })
+      
+  //     if (!response.ok) {
+  //       const error = await response.json()
+  //       throw new Error(error.message || "Failed to submit group proposal")
+  //     }
+      
+  //     return response.json()
+  //   },
+  //   onSuccess: () => {
+  //     queryClient.invalidateQueries({ queryKey: queryKeys.penerima })
+  //     toast({
+  //       title: "Proposal Submitted!",
+  //       description: "Group proposal submitted successfully",
+  //       variant: "default",
+  //     })
+  //   },
+  //   onError: (err) => {
+  //     toast({
+  //       title: "Error",
+  //       description: err.message || "Failed to submit group proposal. Please try again.",
+  //       variant: "destructive",
+  //     })
+  //   }
+  // })
+  // Add receiveShipment to context value
+  const receiveShipment = async (shipmentId: number, receivedProducts: { produkId: number; jumlah: number }[]) => {
+    return receiveShipmentMutation.mutateAsync({ shipmentId, receivedProducts })
+  }
+
+  const updateMudhohi = (data: { hewanId: string; received: boolean }) =>
+  updateMudhohiReceived.mutate(data)
+
+  const invalidateCache = (key: string) => {
+    localStorage.removeItem(key);
+  };
+
+  // Handle hewan updates from WebSocket
+  const handleHewanUpdate = (data: {
+    hewanId: string
+    status?: HewanStatus
+    slaughtered?: boolean
+    receivedByMdhohi?: boolean
+    onInventory?: boolean
+    tipeId?: number
+  }) => {
+    // Skip if we have a pending mutation for this animal
+    const mutationKey = `${data.hewanId}-${data.status}`
+    if (pendingMutations.current.has(mutationKey)) {
+      console.log(`Skipping socket update for ${data.hewanId} - mutation in progress`)
+      return
+    }
+
+    debounceSocketUpdate(`hewan-${data.hewanId}`, () => {
+      // If slaughtered status changed, invalidate meta to refresh counts
+      if (data.slaughtered !== undefined) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.meta })
+      }
+      if (data.receivedByMdhohi !== undefined) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.penerima })
+      }
+      if (data.tipeId === 1 || !data.tipeId) {
+        const sapiQueryKey = [...queryKeys.sapi, pagination.sapiPage, pagination.sapiGroup, sapiPaginationConfig];
+        queryClient.setQueryData(sapiQueryKey, (old: any) => {
+          if (!old || !old.data) return old;
+          
+          return {
+            ...old,
+            data: old.data.map((item: HewanQurban) =>
+              item.hewanId === data.hewanId
+                ? {
+                    ...item,
+                    ...(data.status && { status: data.status }),
+                    ...(data.slaughtered !== undefined && { slaughtered: data.slaughtered }),
+                    ...(data.receivedByMdhohi !== undefined && { receivedByMdhohi: data.receivedByMdhohi }),
+                    ...(data.onInventory !== undefined && { onInventory: data.onInventory }),
+                  }
+                : item
+            )
+          }
+        })
+      }
+
+      if (data.tipeId === 2 || !data.tipeId) {
+        const dombaQueryKey = [...queryKeys.domba, pagination.dombaPage, pagination.dombaGroup, dombaPaginationConfig];
+        queryClient.setQueryData(dombaQueryKey, (old: any) => {
+          if (!old || !old.data) return old;
+          
+          return {
+            ...old,
+            data: old.data.map((item: HewanQurban) =>
+              item.hewanId === data.hewanId
+                ? {
+                    ...item,
+                    ...(data.status && { status: data.status }),
+                    ...(data.slaughtered !== undefined && { slaughtered: data.slaughtered }),
+                    ...(data.receivedByMdhohi !== undefined && { receivedByMdhohi: data.receivedByMdhohi }),
+                    ...(data.onInventory !== undefined && { onInventory: data.onInventory }),
+                  }
+                : item
+            )
+          }
+        })
+      }
+    })
+  }
+
+  // Handle bulk data updates - only when data actually changes
+  const handleSapiDataUpdate = (data: HewanQurban[]) => {
+    invalidateCache(`hewan-sapi-*`);
+    debounceSocketUpdate('sapi-bulk', () => {
+      const sapiQueryKey = [...queryKeys.sapi, pagination.sapiPage, pagination.sapiGroup, sapiPaginationConfig];
+      
+      // Check if data actually changed before updating
+      const currentData = queryClient.getQueryData(sapiQueryKey) as any
+      if (currentData?.data && JSON.stringify(currentData.data) === JSON.stringify(data)) {
+        return // No changes, skip update
+      }
+
+      queryClient.setQueryData(sapiQueryKey, (old: any) => {
+        return {
+          data: Array.isArray(data) ? data : [],
+          pagination: old?.pagination || {
+            currentPage: pagination.sapiPage,
+            totalPages: Math.ceil((data?.length || 0) / sapiPaginationConfig.pageSize)
+          }
+        }
+      });
+      
+      queryClient.invalidateQueries({ queryKey: queryKeys.meta })
+    }, 200) // Longer debounce for bulk updates
+  }
+
+  const handleDombaDataUpdate = (data: HewanQurban[]) => {
+    invalidateCache(`hewan-domba-*`);
+    debounceSocketUpdate('domba-bulk', () => {
+      const dombaQueryKey = [...queryKeys.domba, pagination.dombaPage, pagination.dombaGroup, dombaPaginationConfig];
+      
+      // Check if data actually changed before updating
+      const currentData = queryClient.getQueryData(dombaQueryKey) as any
+      if (currentData?.data && JSON.stringify(currentData.data) === JSON.stringify(data)) {
+        return // No changes, skip update
+      }
+
+      queryClient.setQueryData(dombaQueryKey, (old: any) => {
+        return {
+          data: Array.isArray(data) ? data : [],
+          pagination: old?.pagination || {
+            currentPage: pagination.dombaPage,
+            totalPages: Math.ceil((data?.length || 0) / dombaPaginationConfig.pageSize)
+          }
+        }
+      });
+      
+      queryClient.invalidateQueries({ queryKey: queryKeys.meta })
+    }, 200)
+  }
+
+  // Handle product updates with change detection
+  const handleProductUpdate = (data: { products: ProdukHewan[] }) => {
+    invalidateCache('products');
+    debounceSocketUpdate('products', () => {
+      const currentData = queryClient.getQueryData(queryKeys.products)
+      if (currentData && JSON.stringify(currentData) === JSON.stringify(data.products)) {
+        return // No changes, skip update
+      }
+
+      queryClient.setQueryData(queryKeys.products, data.products)
+      queryClient.invalidateQueries({ queryKey: queryKeys.productLogs || ["productLogs"] })
+    })
+  }
+
+  // Other socket handlers remain the same but with debouncing
+  const handleErrorLogsUpdate = (data: { errorLogs: ErrorLog[] }) => {
+    debounceSocketUpdate('errorLogs', () => {
+      queryClient.setQueryData(queryKeys.errorLogs, data.errorLogs)
+    })
+  }
+
+  const handleShipmentUpdate = (data: { shipments: Shipment[] }) => {
+    invalidateCache('shipments');
+    debounceSocketUpdate('shipments', () => {
+      queryClient.setQueryData(queryKeys.shipments || ["shipments"], data.shipments)
+    })
+  }  
+  
+  // Handle product logs updates
+  const handleProductLogsUpdate = (data: { productLogs: ProductLogWithProduct[] }) => {
+    debounceSocketUpdate('shipments', () => {
+      queryClient.setQueryData(queryKeys.productLogs || ["productLogs"], data.productLogs)
+    })
+  }
+  const handlePenerimaUpdate = (data: { penerima: Penerima[] }) => {
+    debounceSocketUpdate('penerima', () => {
+      queryClient.setQueryData(queryKeys.penerima, data.penerima)
+    })
+  }
+  const updateKuponReceived = (data: { penerimaId: string; diterima: boolean }) =>
+  updateKuponReceivedMutation.mutate(data)
+
+  const handleMudhohiUpdate = (data: { mudhohi: Mudhohi[] }) => {
+    debounceSocketUpdate('mudhohi', () => {
+      queryClient.setQueryData(queryKeys.mudhohi, data.mudhohi)
+    })
+  }
+
+  // Handle distribusi updates
+  const handleDistribusiUpdate = (data: { distribusi: Distribusi[] }) => {
+    debounceSocketUpdate('distribusi', () => {
+      queryClient.setQueryData(queryKeys.distribusi, data.distribusi)
+    })
+  }
+  const handleReconnect = () => {
+    console.log('Socket reconnected')
+    resetQueries() // Fresh data on reconnect
+  }
+  const socketEventHandlers = useMemo(() => ({
+    'update-hewan': handleHewanUpdate,
+    'update-product': handleProductUpdate,
+    'error-logs': handleErrorLogsUpdate,
+    'shipment-update': handleShipmentUpdate,
+    // 'shipment-received': handleShipmentReceived,
+    'sapi-data-updated': handleSapiDataUpdate,
+    'domba-data-updated': handleDombaDataUpdate,
+    'product-logs-updated': handleProductLogsUpdate,
+    'reconnect': handleReconnect,
+    'update-mudhohi': handleMudhohiUpdate,
+    'update-penerima': handlePenerimaUpdate,
+    'update-distribusi': handleDistribusiUpdate,
+  }), [
+    handleHewanUpdate, 
+    handleProductUpdate, 
+    handleErrorLogsUpdate, 
+    handleShipmentUpdate, 
+    handleSapiDataUpdate,
+    handleDombaDataUpdate,
+    handleProductLogsUpdate,
+    handlePenerimaUpdate, 
+    handleMudhohiUpdate,
+    handleDistribusiUpdate
+  ])
   // Set up socket listeners to update the query cache
   useEffect(() => {
     if (!socket) return
+    Object.entries(socketEventHandlers).forEach(([event, handler]) => {
+      socket.on(event, handler)
+    })
 
-    // Handle hewan updates from WebSocket
-    const handleHewanUpdate = (data: {
-      hewanId: string
-      status?: HewanStatus
-      slaughtered?: boolean
-      receivedByMdhohi?: boolean
-      onInventory?: boolean
-      tipeId?: number
-    }) => {
-      // Skip if we have a pending mutation for this animal
-      const mutationKey = `${data.hewanId}-${data.status}`
-      if (pendingMutations.current.has(mutationKey)) {
-        console.log(`Skipping socket update for ${data.hewanId} - mutation in progress`)
-        return
-      }
-
-      debounceSocketUpdate(`hewan-${data.hewanId}`, () => {
-        // If slaughtered status changed, invalidate meta to refresh counts
-        if (data.slaughtered !== undefined) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.meta })
-        }
-
-        if (data.tipeId === 1 || !data.tipeId) {
-          const sapiQueryKey = [...queryKeys.sapi, pagination.sapiPage, pagination.sapiGroup, sapiPaginationConfig];
-          queryClient.setQueryData(sapiQueryKey, (old: any) => {
-            if (!old || !old.data) return old;
-            
-            return {
-              ...old,
-              data: old.data.map((item: HewanQurban) =>
-                item.hewanId === data.hewanId
-                  ? {
-                      ...item,
-                      ...(data.status && { status: data.status }),
-                      ...(data.slaughtered !== undefined && { slaughtered: data.slaughtered }),
-                      ...(data.receivedByMdhohi !== undefined && { receivedByMdhohi: data.receivedByMdhohi }),
-                      ...(data.onInventory !== undefined && { onInventory: data.onInventory }),
-                    }
-                  : item
-              )
-            }
-          })
-        }
-
-        if (data.tipeId === 2 || !data.tipeId) {
-          const dombaQueryKey = [...queryKeys.domba, pagination.dombaPage, pagination.dombaGroup, dombaPaginationConfig];
-          queryClient.setQueryData(dombaQueryKey, (old: any) => {
-            if (!old || !old.data) return old;
-            
-            return {
-              ...old,
-              data: old.data.map((item: HewanQurban) =>
-                item.hewanId === data.hewanId
-                  ? {
-                      ...item,
-                      ...(data.status && { status: data.status }),
-                      ...(data.slaughtered !== undefined && { slaughtered: data.slaughtered }),
-                      ...(data.receivedByMdhohi !== undefined && { receivedByMdhohi: data.receivedByMdhohi }),
-                      ...(data.onInventory !== undefined && { onInventory: data.onInventory }),
-                    }
-                  : item
-              )
-            }
-          })
-        }
-      })
-    }
-
-    // Handle bulk data updates - only when data actually changes
-    const handleSapiDataUpdate = (data: HewanQurban[]) => {
-      debounceSocketUpdate('sapi-bulk', () => {
-        const sapiQueryKey = [...queryKeys.sapi, pagination.sapiPage, pagination.sapiGroup, sapiPaginationConfig];
-        
-        // Check if data actually changed before updating
-        const currentData = queryClient.getQueryData(sapiQueryKey) as any
-        if (currentData?.data && JSON.stringify(currentData.data) === JSON.stringify(data)) {
-          return // No changes, skip update
-        }
-
-        queryClient.setQueryData(sapiQueryKey, (old: any) => {
-          return {
-            data: Array.isArray(data) ? data : [],
-            pagination: old?.pagination || {
-              currentPage: pagination.sapiPage,
-              totalPages: Math.ceil((data?.length || 0) / sapiPaginationConfig.pageSize)
-            }
-          }
-        });
-        
-        queryClient.invalidateQueries({ queryKey: queryKeys.meta })
-      }, 200) // Longer debounce for bulk updates
-    }
-
-    const handleDombaDataUpdate = (data: HewanQurban[]) => {
-      debounceSocketUpdate('domba-bulk', () => {
-        const dombaQueryKey = [...queryKeys.domba, pagination.dombaPage, pagination.dombaGroup, dombaPaginationConfig];
-        
-        // Check if data actually changed before updating
-        const currentData = queryClient.getQueryData(dombaQueryKey) as any
-        if (currentData?.data && JSON.stringify(currentData.data) === JSON.stringify(data)) {
-          return // No changes, skip update
-        }
-
-        queryClient.setQueryData(dombaQueryKey, (old: any) => {
-          return {
-            data: Array.isArray(data) ? data : [],
-            pagination: old?.pagination || {
-              currentPage: pagination.dombaPage,
-              totalPages: Math.ceil((data?.length || 0) / dombaPaginationConfig.pageSize)
-            }
-          }
-        });
-        
-        queryClient.invalidateQueries({ queryKey: queryKeys.meta })
-      }, 200)
-    }
-
-    // Handle product updates with change detection
-    const handleProductUpdate = (data: { products: ProdukHewan[] }) => {
-      debounceSocketUpdate('products', () => {
-        const currentData = queryClient.getQueryData(queryKeys.products)
-        if (currentData && JSON.stringify(currentData) === JSON.stringify(data.products)) {
-          return // No changes, skip update
-        }
-
-        queryClient.setQueryData(queryKeys.products, data.products)
-        queryClient.invalidateQueries({ queryKey: queryKeys.productLogs || ["productLogs"] })
-      })
-    }
-
-    // Other socket handlers remain the same but with debouncing
-    const handleErrorLogsUpdate = (data: { errorLogs: ErrorLog[] }) => {
-      debounceSocketUpdate('errorLogs', () => {
-        queryClient.setQueryData(queryKeys.errorLogs, data.errorLogs)
-      })
-    }
-
-    const handleShipmentUpdate = (data: { shipments: Shipment[] }) => {
-      debounceSocketUpdate('shipments', () => {
-        queryClient.setQueryData(queryKeys.shipments || ["shipments"], data.shipments)
-      })
-    }  
-    
-    // Handle product logs updates
-    const handleProductLogsUpdate = (data: { productLogs: ProductLogWithProduct[] }) => {
-      debounceSocketUpdate('shipments', () => {
-        queryClient.setQueryData(queryKeys.productLogs || ["productLogs"], data.productLogs)
-      })
-    }
-    // Register socket listeners
-    socket.on("update-hewan", handleHewanUpdate)
-    socket.on("update-product", handleProductUpdate)
-    socket.on("error-logs", handleErrorLogsUpdate)
-    socket.on("shipment-update", handleShipmentUpdate)
-    socket.on("sapi-data-updated", handleSapiDataUpdate)
-    socket.on("domba-data-updated", handleDombaDataUpdate)
-    socket.on("product-logs-updated", handleProductLogsUpdate)
-    // Clean up on unmount
     return () => {
-      socket.off("update-hewan", handleHewanUpdate)
-      socket.off("update-product", handleProductUpdate)
-      socket.off("error-logs", handleErrorLogsUpdate)
-      socket.off("shipment-update", handleShipmentUpdate)
-      socket.off("sapi-data-updated", handleSapiDataUpdate)
-      socket.off("domba-data-updated", handleDombaDataUpdate)
-      socket.off("product-logs-updated", handleProductLogsUpdate)
+      Object.entries(socketEventHandlers).forEach(([event, handler]) => {
+        socket.off(event, handler)
+      })
     }
   }, [socket, queryClient])
 
-  // Utility functions
+  const performanceRef = useRef({
+    renderCount: 0,
+    lastRender: Date.now()
+  })
+
+  useEffect(() => {
+    performanceRef.current.renderCount++
+    performanceRef.current.lastRender = Date.now()
+  })
+  
+// ======================== UTILITY FUNCTIONS ========================
+  // Get penerima by jenis (INDIVIDU/KELOMPOK)
+  const getPenerimaByJenis = (jenis: JenisDistribusi): Penerima[] => {
+    const penerima = penerimaQuery.data
+    if (penerima && penerima.length > 0) return penerima.filter(p => p.jenis === jenis)
+      else return []
+  }
+  // Get group proposals (pending approval)
+  // const getGroupProposals = (): Penerima[] => {
+  //   return penerimaQuery.data?.filter(p => 
+  //     p.jenis === JenisDistribusi.KELOMPOK && !p.sudahMenerima
+  //   ) || []
+  // }
+  // Get available products for group selection
+  const getAvailableProducts = (): ProdukHewan[] => {
+    return productsQuery.data?.filter(product => 
+      product.diInventori > 0
+    ) || []
+  }
+
   const getProductById = (id: number): ProdukHewan | undefined => {
     return productsQuery.data?.find((product) => product.id === id)
   }
@@ -908,7 +1149,7 @@ export function QurbanProvider({
 
   const updateProduct = (data: {
     productId: number
-    operation: "add" | "decrease"
+    operation: "menambahkan" | "memindahkan" | "mengkoreksi"
     place: Counter
     value: number
     note?: string
@@ -919,8 +1160,34 @@ export function QurbanProvider({
   const createShipment = async (products: ShipmentProduct[], note?: string) => {
     return createShipmentMutation.mutateAsync({ products, note })
   }
+
+  const resetQueries = useCallback(() => {
+    queryClient.resetQueries()
+    
+    // Clear all cache data
+    if (typeof window !== 'undefined') {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('hewan-') || key.startsWith('products') || key.startsWith('meta-')) {
+          localStorage.removeItem(key)
+        }
+      })
+    }
+    
+    // Clear pending mutations
+    pendingMutations.current.clear()
+    
+    // Clear socket timeouts
+    socketUpdateTimeouts.current.forEach(timeout => clearTimeout(timeout))
+    socketUpdateTimeouts.current.clear()
+    
+    toast({
+      title: "Data Reset",
+      description: "All data has been refreshed",
+      variant: "default",
+    })
+  }, [queryClient, setPagination])
   // Create context value
-  const contextValue: QurbanContextType = {
+  const contextValue: QurbanContextType = useMemo(() => ({
     sapiQuery: {
       data: sapiQuery.data?.data || [],
       isLoading: sapiQuery.isLoading,
@@ -1004,19 +1271,63 @@ export function QurbanProvider({
       isError: shipmentsQuery.isError,
       refetch: shipmentsQuery.refetch,
     },
+    penerimaQuery: {
+      data: penerimaQuery.data || [],
+      isLoading: penerimaQuery.isLoading,
+      isError: penerimaQuery.isError,
+      refetch: penerimaQuery.refetch,
+    },
+    distribusiQuery: {
+      data: distribusiQuery.data || [],
+      isLoading: distribusiQuery.isLoading,
+      isError: distribusiQuery.isError,
+      refetch: distribusiQuery.refetch,
+    },
+    mudhohiQuery: {
+      data: mudhohiQuery.data || [],
+      isLoading: mudhohiQuery.isLoading,
+      isError: mudhohiQuery.isError,
+      refetch: mudhohiQuery.refetch,
+    },
     meta: metaQuery.data || {
       sapi: { total: 0, target: 0, slaughtered: 0 },
       domba: { total: 0, target: 0, slaughtered: 0 },
     },
+    createDistribusi: (data) => createDistribusiMutation.mutateAsync(data),
+    createPenerima: (data) => createPenerimaMutation.mutateAsync(data),
+    getLogDistribusiByPenerima: (penerimaId) => {
+      const logs = queryClient.getQueryData<LogDistribusi[]>(["log-distribusi"]) || [];
+      return logs.filter(log => log.penerimaId === penerimaId);
+    },
+    updateLogDistribusi: (penerimaId, produk) => 
+      updateLogDistribusiMutation.mutateAsync({ penerimaId, produk }),
+    getPenerimaByJenis,
+    getAvailableProducts,
     isConnected,
+    resetQueries,
     updateHewan,
     updateProduct,
     createShipment,
+    receiveShipment,
     getProductById,
     getProductsByType,
     getProductLogsByPlace,
     getProductLogsByProduct,
-  }
+    updateMudhohi,
+    updateKuponReceived,
+  }), [
+    sapiQuery.data,
+    dombaQuery.data,
+    penerimaQuery.data,
+    distribusiQuery.data,
+    mudhohiQuery.data,
+    productsQuery.data,
+    productLogsQuery.data,
+    errorLogsQuery.data,
+    shipmentsQuery.data,
+    metaQuery.data,
+    resetQueries,
+  ])
   return <QurbanContext.Provider value={contextValue}>{children}</QurbanContext.Provider>
 }
 

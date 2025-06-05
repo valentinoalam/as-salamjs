@@ -31,7 +31,7 @@ type Category = {
 }
 
 type KategoriFormProps = {
-  mode: "add" | "edit" | "delete"
+  mode: "menambahkan" | "edit" | "delete"
   kategori?: Category
   buttonLabel?: string
   buttonVariant?: "default" | "outline" | "secondary" | "ghost" | "destructive" | "link"
@@ -72,7 +72,7 @@ export function KategoriForm({
     setLoading(true)
 
     try {
-      if (mode === "add") {
+      if (mode === "menambahkan") {
         await createCategory(formData as Omit<TransactionCategory, "id">)
         toast.success("Kategori keuangan berhasil ditambahkan")
       } else if (mode === "edit" && kategori) {
@@ -96,7 +96,7 @@ export function KategoriForm({
 
   const getTitle = () => {
     switch (mode) {
-      case "add":
+      case "menambahkan":
         return "Tambah Kategori Keuangan"
       case "edit":
         return "Edit Kategori Keuangan"
@@ -109,7 +109,7 @@ export function KategoriForm({
 
   const getDescription = () => {
     switch (mode) {
-      case "add":
+      case "menambahkan":
         return "Tambahkan kategori keuangan baru untuk pemasukan atau pengeluaran."
       case "edit":
         return "Edit informasi kategori keuangan yang sudah ada."
@@ -124,7 +124,7 @@ export function KategoriForm({
     if (buttonLabel) return buttonLabel
 
     switch (mode) {
-      case "add":
+      case "menambahkan":
         return "Tambah Kategori"
       case "edit":
         return "Edit"
@@ -139,7 +139,7 @@ export function KategoriForm({
     if (buttonIcon) return buttonIcon
 
     switch (mode) {
-      case "add":
+      case "menambahkan":
         return <PlusCircle className="mr-2 h-4 w-4" />
       case "edit":
         return <Pencil className="mr-2 h-4 w-4" />
@@ -218,7 +218,7 @@ export function KategoriForm({
               Batal
             </Button>
             <Button type="submit" variant={mode === "delete" ? "destructive" : "default"} disabled={loading}>
-              {loading ? "Memproses..." : mode === "add" ? "Tambah" : mode === "edit" ? "Simpan" : "Hapus"}
+              {loading ? "Memproses..." : mode === "menambahkan" ? "Tambah" : mode === "edit" ? "Simpan" : "Hapus"}
             </Button>
           </DialogFooter>
         </form>
