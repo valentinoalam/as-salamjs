@@ -8,7 +8,6 @@ import {
   JenisDistribusi,
   type HewanQurban,
   type HewanStatus,
-  type Mudhohi
 } from "@prisma/client"
 import { 
   useQuery, 
@@ -20,7 +19,7 @@ import { Counter } from "@prisma/client"
 import { toast } from "@/hooks/use-toast"
 import { queryKeys } from "@/lib/tanstack-query/qurban"
 import { useUIState } from "./ui-state-context"
-import { getPaginationConfig, getValidCacheData, setCachedData, type Distribusi, type ErrorLog, type HewanQurbanResponse, type LogDistribusi, type Penerima, type ProductLogWithProduct, type ProdukHewan, type QueryWithToastOptions, type QurbanContextType, type Shipment, type ShipmentProduct, type TipeHewan } from "@/types/qurban"
+import { getPaginationConfig, getValidCacheData, setCachedData, type Distribusi, type ErrorLog, type HewanQurbanResponse, type LogDistribusi, type Mudhohi, type Penerima, type ProductLogWithProduct, type ProdukHewan, type QueryWithToastOptions, type QurbanContextType, type Shipment, type ShipmentProduct, type TipeHewan } from "@/types/qurban"
 
 export function useQueryWithToast<TData = unknown, TError = Error>(
   options: QueryWithToastOptions<TData, TError>
@@ -535,27 +534,6 @@ export function QurbanProvider({ children }: {
         return old.map((product) => {
           if (product.id === newProductData.productId) {
             const updatedProduct = { ...product }
-
-            // if (newProductData.operation === "menambahkan") {
-            //   if (newProductData.place === Counter.PENYEMBELIHAN) {
-            //     updatedProduct.diTimbang += newProductData.value
-            //   } else if (newProductData.place === Counter.INVENTORY) {
-            //     updatedProduct.diInventori += newProductData.value
-            //   }
-            // } else if (newProductData.operation === "memindahkan") {
-            //   if (newProductData.place === Counter.PENYEMBELIHAN) {
-            //     updatedProduct.diTimbang = Math.max(0, updatedProduct.diTimbang - newProductData.value)
-            //   } else if (newProductData.place === Counter.INVENTORY) {
-            //     updatedProduct.diInventori = Math.max(0, updatedProduct.diInventori - newProductData.value)
-            //   }
-            // } else if (newProductData.operation === "mengkoreksi") {
-            //   // Handle correction logic
-            //   if (newProductData.place === Counter.PENYEMBELIHAN) {
-            //     updatedProduct.diTimbang = newProductData.value
-            //   } else if (newProductData.place === Counter.INVENTORY) {
-            //     updatedProduct.diInventori = newProductData.value
-            //   }
-            // }
             // Handle different operation types
             switch (newProductData.operation) {
               case "menambahkan":
@@ -690,7 +668,7 @@ export function QurbanProvider({ children }: {
       queryClient.invalidateQueries({ queryKey: queryKeys.productLogs })
     }
   })
-// Create distribution
+  // Create distribution
   const createDistribusiMutation = useMutation({
     mutationFn: async (data: {
       kategori: string;
@@ -725,7 +703,7 @@ export function QurbanProvider({ children }: {
       telepon?: string;
       keterangan?: string;
       jenis: JenisDistribusi;
-      noKupon?: string;
+      kuponId?: string;
       produkDistribusi: { produkId: number; jumlah: number }[];
     }) => {
       const response = await fetch("/api/penerima", {
@@ -785,6 +763,21 @@ export function QurbanProvider({ children }: {
       queryClient.invalidateQueries({ queryKey: queryKeys.penerima })
     },
   });
+  const updateErrorLogNoteMutation = useMutation({
+    mutationFn: async ({ id, note }: { id: number; note: string }) => await updateErrorLogNote({id, note}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['errorLogs'] }) // Adjust key as needed
+      toast({ title: 'Success', description: 'Error note updated' })
+    },
+    onError: (error) => {
+      console.error(error)
+      toast({
+        title: 'Error',
+        description: 'Failed to update note',
+        variant: 'destructive',
+      })
+    },
+  })
   // Update distribution log
   const updateLogDistribusiMutation = useMutation({
     mutationFn: async (data: {
@@ -828,7 +821,7 @@ export function QurbanProvider({ children }: {
   //       body: JSON.stringify({
   //         ...data,
   //         jenis: JenisDistribusi.KELOMPOK,
-  //         noKupon: `GROUP-${Date.now()}` // Generate unique group ID
+  //         kuponId: `GROUP-${Date.now()}` // Generate unique group ID
   //       }),
   //     })
       
@@ -1146,7 +1139,11 @@ export function QurbanProvider({ children }: {
   }) => {
     updateHewanMutation.mutate(data);
   }
-
+  const updateErrorLogNote = (data: {
+    id: number, note: string
+  }) => {
+    updateErrorLogNoteMutation.mutate(data)
+  }
   const updateProduct = (data: {
     productId: number
     operation: "menambahkan" | "memindahkan" | "mengkoreksi"
@@ -1156,7 +1153,7 @@ export function QurbanProvider({ children }: {
   }) => {
     updateProductMutation.mutate(data)
   }
-
+  
   const createShipment = async (products: ShipmentProduct[], note?: string) => {
     return createShipmentMutation.mutateAsync({ products, note })
   }
@@ -1313,6 +1310,7 @@ export function QurbanProvider({ children }: {
     getProductsByType,
     getProductLogsByPlace,
     getProductLogsByProduct,
+    updateErrorLogNote,
     updateMudhohi,
     updateKuponReceived,
   }), [

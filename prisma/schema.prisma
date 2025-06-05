@@ -253,7 +253,9 @@ model ErrorLog {
   id                Int         @id @default(autoincrement())
   produk            ProdukHewan @relation(fields: [produkId], references: [id])
   produkId          Int
-  event             String      // "menambahkan" or "memindahkan"
+  diTimbang         Int      
+  diInventori       Int
+  selesai           Boolean     @default(false)
   note              String
   timestamp         DateTime    @default(now())
 }
@@ -292,10 +294,22 @@ enum JenisDistribusi {
   KELOMPOK
   INDIVIDU
 }
+
+enum StatusKupon {
+  DIBERIKAN
+  ADA
+  TIDAK_KEMBALI
+}
+model Kupon {
+  id             Int       @id @default(autoincrement())
+  kuponId        String?   @unique
+  status   StatusKupon
+  penerima Penerima[]
+}
+
 model Penerima {
   id             String         @id @default(cuid()) @db.Char(36)
   distribusiId   String
-  noKupon        String?
   diterimaOleh   String?        // Nama penerima aktual
   nama           String?        // Bisa individu atau institusi
   noIdentitas    String?
@@ -305,11 +319,13 @@ model Penerima {
   dibuatPada     DateTime       @default(now()) @map("date_created")
   keterangan     String?        @db.VarChar(500)
   waktuTerima    DateTime?
-  sudahMenerima     Boolean        @default(false)
+  sudahMenerima  Boolean        @default(false)
   jenis          JenisDistribusi
   distribusi     Distribusi     @relation("DistribusiKePenerima", fields: [distribusiId], references: [id])
   logDistribusi  LogDistribusi?
-  @@index([noKupon])
+  kupon          Kupon[]
+
+  @@index([jenis, distribusiId,sudahMenerima])
 }
 
 // Financial tracking

@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Minus, User, Users, Search, ShoppingCart, CheckCircle, History } from 'lucide-react';
+import { Plus, Minus, User, Users, Search, CheckCircle, History, UserPlus, Package } from 'lucide-react';
 import { useQurban } from '@/contexts/qurban-context';
 import type { Penerima, ProdukDiterima, ProdukHewan } from '@/types/qurban';
 import { JenisDistribusi } from '@prisma/client';
@@ -27,45 +27,37 @@ const DistributionContentTab = () => {
   } = useQurban()
   const { data:existingRecipients, isLoading, isError} = penerimaQuery
   const availableProducts = getAvailableProducts();
-  console.log(penerimaQuery.data)
   const transactionHistory = useMemo(() => {
+    if (!Array.isArray(penerimaQuery.data) || penerimaQuery.data.length === 0) {
+      return [];
+    }
+
     return penerimaQuery.data
-      ?.filter(p => p.logDistribusi !== null)
+      .filter(p => p.logDistribusi !== null)
       .map(p => ({
         id: p.id,
         penerima: p.nama,
         jenis: p.jenis,
         produk: p.logDistribusi?.listProduk.map(lp => ({
           nama: lp.jenisProduk.nama,
-          jumlah: lp.jumlahPaket
+          jumlah: lp.jumlahPaket,
         })),
         waktu: new Date(p.logDistribusi?.dibuatPada || "").toLocaleString("id-ID"),
-        status: p.logDistribusi?.sudahMenerima ? "Selesai" : "Belum"
-      }))
-  }, [penerimaQuery.data])
-
-  // const [transactionHistory, setTransactionHistory] = useState([
-  //   {
-  //     id: '1',
-  //     penerima: 'Masjid Al-Ikhlas',
-  //     jenis: 'KELOMPOK',
-  //     produk: [{ nama: 'Daging Sapi Premium', jumlah: 5 }],
-  //     waktu: '2024-06-05 10:30',
-  //     status: 'Selesai'
-  //   }
-  // ]);
+        status: p.logDistribusi?.sudahMenerima ? "Selesai" : "Belum",
+      }));
+  }, [penerimaQuery.data]);
 
   // States
   const [selectedRecipient, setSelectedRecipient] = useState<Penerima | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<ProdukDiterima[]>([]);
   const [isQuantityDialogOpen, setIsQuantityDialogOpen] = useState(false);
   const [selectedProductForQuantity, setSelectedProductForQuantity] = useState<ProdukHewan | null>(null);
   const [quantityInput, setQuantityInput] = useState(1);
   const [activeTab, setActiveTab] = useState('distribution');
-
-  // New recipient form data
+  
+  // New recipient dialog states
+  const [isNewRecipientDialogOpen, setIsNewRecipientDialogOpen] = useState(false);
   const [newRecipientData, setNewRecipientData] = useState<Omit<Penerima, 'id' | 'distribusiId' | 'logDistribusi' | 'dibuatPada' | 'distribusi'>>({
     nama: '',
     jenis: JenisDistribusi.INDIVIDU,
@@ -76,19 +68,61 @@ const DistributionContentTab = () => {
   });
 
   // Filter recipients based on search
-  const filteredRecipients = existingRecipients.filter(recipient =>
-    recipient.nama!.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    recipient.noKupon!.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredRecipients = useMemo(() => {
+    if (!Array.isArray(existingRecipients) || existingRecipients.length === 0) {
+      return [];
+    }
+    return existingRecipients
+      .filter(recipient =>
+        (recipient.nama ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (recipient.kuponId ?? "").toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .sort((a, b) => (a.nama ?? "").localeCompare(b.nama ?? ""));
+  }, [existingRecipients, searchTerm]);
 
   const handleSelectRecipient = (recipient: Penerima) => {
     setSelectedRecipient(recipient);
-    setIsCreatingNew(false);
   };
 
-  const handleCreateNewRecipient = () => {
-    setIsCreatingNew(true);
-    setSelectedRecipient(null);
+  const handleCreateNewRecipient = async () => {
+    if (!(newRecipientData.nama ?? "").trim()) {
+      alert('Nama penerima harus diisi');
+      return;
+    }
+
+    try {
+      const produkDistribusi = selectedProducts.map(p => ({
+        produkId: p.jenisProdukId,
+        jumlah: p.jumlahPaket,
+      }));
+
+      await createPenerima({
+        distribusiId: distribusiQuery.data?.[0]?.id || "",
+        nama: newRecipientData.nama || '',
+        alamat: newRecipientData.alamat || '',
+        telepon: newRecipientData.telepon || '',
+        noIdentitas: newRecipientData.noIdentitas || '',
+        keterangan: newRecipientData.keterangan || '',
+        jenis: newRecipientData.jenis,
+        produkDistribusi,
+      });
+
+      // Reset form and close dialog
+      setNewRecipientData({
+        nama: '',
+        jenis: JenisDistribusi.INDIVIDU,
+        alamat: '',
+        telepon: '',
+        noIdentitas: '',
+        keterangan: ''
+      });
+      setIsNewRecipientDialogOpen(false);
+      
+      alert("Penerima baru berhasil dibuat!");
+    } catch (err) {
+      alert("Gagal membuat penerima baru");
+      console.error(err);
+    }
   };
 
   const handleProductClick = (product: ProdukHewan) => {
@@ -110,10 +144,10 @@ const DistributionContentTab = () => {
           ...selectedProductForQuantity,
           jumlahPaket: quantityInput,
           logDistribusiId: '',
-          jenisProdukId: 0,
+          jenisProdukId: selectedProductForQuantity.id,
           jenisProduk: {
-            id: 0,
-            nama: '',
+            id: selectedProductForQuantity.id,
+            nama: selectedProductForQuantity.nama,
             tipeId: null,
             berat: null,
             avgProdPerHewan: 0,
@@ -149,8 +183,8 @@ const DistributionContentTab = () => {
     setSelectedProducts(selectedProducts.filter((_, i) => i !== index));
   };
 
-  const handleCompleteTransaction = () => {
-    if (!selectedRecipient && !isCreatingNew) {
+  const handleCompleteTransaction = async () => {
+    if (!selectedRecipient) {
       alert('Pilih penerima terlebih dahulu');
       return;
     }
@@ -159,82 +193,39 @@ const DistributionContentTab = () => {
       alert('Pilih produk yang akan didistribusikan');
       return;
     }
+
     const produkDistribusi = selectedProducts.map(p => ({
       produkId: p.jenisProdukId,
       jumlah: p.jumlahPaket,
     }));
 
-    const recipient = isCreatingNew ? 
-      { nama: newRecipientData.nama, jenis: newRecipientData.jenis } : 
-      selectedRecipient;
-
-    const newTransaction = {
-      id: Date.now().toString(),
-      penerima: recipient!.nama,
-      jenis: recipient!.jenis,
-      produk: selectedProducts.map(p => ({ nama: p.jenisProduk.nama, jumlah: p.jumlahPaket })),
-      waktu: new Date().toLocaleString('id-ID'),
-      status: 'Selesai'
-    };
     try {
-      if (isCreatingNew) {
-        createPenerima({
-          distribusiId: distribusiQuery.data?.[0]?.id || "",
-          nama: newRecipientData.nama || '',
-          alamat: newRecipientData.alamat || '',
-          telepon: newRecipientData.telepon || '',
-          noIdentitas: newRecipientData.noIdentitas || '',
-          keterangan: newRecipientData.keterangan || '',
-          jenis: newRecipientData.jenis,
-          produkDistribusi,
-        });
-      } else if(selectedRecipient) {
-        updateLogDistribusi(selectedRecipient.id, produkDistribusi);
-      }
-
+      await updateLogDistribusi(selectedRecipient.id, produkDistribusi);
+      
       alert("Transaksi distribusi berhasil dicatat!");
 
       // Reset UI states
       setSelectedRecipient(null);
-      setIsCreatingNew(false);
       setSelectedProducts([]);
-      setNewRecipientData({
-        nama: '',
-        jenis: 'INDIVIDU',
-        alamat: '',
-        telepon: '',
-        noIdentitas: '',
-        keterangan: '',
-      });
-
-      // No need to manually update transactionHistory.
-      // React Query will auto-update it from qurban.penerimaQuery.
     } catch (err) {
       alert("Gagal mencatat transaksi");
       console.error(err);
     }
-    // Reset form
-    setSelectedRecipient(null);
-    setIsCreatingNew(false);
-    setSelectedProducts([]);
-    setNewRecipientData({
-      nama: '',
-      jenis: 'INDIVIDU',
-      alamat: '',
-      telepon: '',
-      noIdentitas: '',
-      keterangan: ''
-    });
-
-    alert('Transaksi distribusi berhasil dicatat!');
   };
-
+  
+  if (penerimaQuery.isLoading) {
+    return <div>Loading...</div>
+  }
+  
+  if (penerimaQuery.isError) {
+    return <div>Error loading data</div>
+  }
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="distribution" className="flex items-center gap-2">
-            <ShoppingCart size={16} />
+            <Package size={16} />
             Distribusi Qurban
           </TabsTrigger>
           <TabsTrigger value="history" className="flex items-center gap-2">
@@ -267,56 +258,20 @@ const DistributionContentTab = () => {
                       className="pl-10"
                     />
                   </div>
-                  <Button 
-                    variant="outline" 
-                    onClick={handleCreateNewRecipient}
-                    className="flex items-center gap-2"
-                  >
-                    <Plus size={16} />
-                    Buat Baru
-                  </Button>
-                </div>
-
-                {/* Existing Recipients */}
-                {!isCreatingNew && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto">
-                    {filteredRecipients.map(recipient => (
-                      <div
-                        key={recipient.id}
-                        className={`border rounded-lg p-3 cursor-pointer transition-all ${
-                          selectedRecipient?.id === recipient.id 
-                            ? 'border-blue-500 bg-blue-50' 
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                        onClick={() => handleSelectRecipient(recipient)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-medium">{recipient.nama}</h4>
-                            <p className="text-sm text-gray-600">{recipient.alamat}</p>
-                            <p className="text-sm text-gray-500">Kupon: {recipient.noKupon}</p>
-                          </div>
-                          <Badge variant={recipient.jenis === 'KELOMPOK' ? 'default' : 'secondary'}>
-                            {recipient.jenis === 'KELOMPOK' ? (
-                              <Users size={12} className="mr-1" />
-                            ) : (
-                              <User size={12} className="mr-1" />
-                            )}
-                            {recipient.jenis}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* New Recipient Form */}
-                {isCreatingNew && (
-                  <Card className="border-dashed">
-                    <CardContent className="pt-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Dialog open={isNewRecipientDialogOpen} onOpenChange={setIsNewRecipientDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="flex items-center gap-2">
+                        <UserPlus size={16} />
+                        Buat Penerima Baru
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Buat Penerima Baru</DialogTitle>
+                      </DialogHeader>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
                         <div>
-                          <Label htmlFor="nama">Nama</Label>
+                          <Label htmlFor="nama">Nama *</Label>
                           <Input
                             id="nama"
                             value={newRecipientData.nama || ''}
@@ -381,7 +336,7 @@ const DistributionContentTab = () => {
                             placeholder="KTP/NIK"
                           />
                         </div>
-                        <div>
+                        <div className="md:col-span-2">
                           <Label htmlFor="keterangan">Keterangan</Label>
                           <Textarea
                             id="keterangan"
@@ -394,15 +349,86 @@ const DistributionContentTab = () => {
                           />
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                      <div className="flex gap-2 justify-end">
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setIsNewRecipientDialogOpen(false)}
+                        >
+                          Batal
+                        </Button>
+                        <Button onClick={handleCreateNewRecipient}>
+                          Simpan Penerima
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+
+                {/* Current Selected Recipient */}
+                {selectedRecipient && (
+                  <div className="border-2 border-blue-500 bg-blue-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium text-blue-900">Penerima Terpilih:</h4>
+                        <h3 className="text-lg font-semibold">{selectedRecipient.nama}</h3>
+                        <p className="text-sm text-gray-600">{selectedRecipient.alamat}</p>
+                        <p className="text-sm text-gray-500">Kupon: {selectedRecipient.kuponId}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={selectedRecipient.jenis === 'KELOMPOK' ? 'default' : 'secondary'}>
+                          {selectedRecipient.jenis === 'KELOMPOK' ? (
+                            <Users size={12} className="mr-1" />
+                          ) : (
+                            <User size={12} className="mr-1" />
+                          )}
+                          {selectedRecipient.jenis}
+                        </Badge>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setSelectedRecipient(null)}
+                        >
+                          Ganti
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Recipients List */}
+                {!selectedRecipient && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto">
+                    {filteredRecipients.map(recipient => (
+                      <div
+                        key={recipient.id}
+                        className="border rounded-lg p-3 cursor-pointer transition-all hover:border-blue-300 hover:shadow-sm"
+                        onClick={() => handleSelectRecipient(recipient)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-medium">{recipient.nama}</h4>
+                            <p className="text-sm text-gray-600">{recipient.alamat}</p>
+                            <p className="text-sm text-gray-500">Kupon: {recipient.kuponId}</p>
+                          </div>
+                          <Badge variant={recipient.jenis === 'KELOMPOK' ? 'default' : 'secondary'}>
+                            {recipient.jenis === 'KELOMPOK' ? (
+                              <Users size={12} className="mr-1" />
+                            ) : (
+                              <User size={12} className="mr-1" />
+                            )}
+                            {recipient.jenis}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </CardContent>
           </Card>
 
           {/* Product Selection */}
-          {(selectedRecipient || isCreatingNew) && (
+          {selectedRecipient && (
             <Card>
               <CardHeader>
                 <CardTitle>Pilih Produk</CardTitle>

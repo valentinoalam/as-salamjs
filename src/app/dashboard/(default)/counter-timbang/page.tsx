@@ -103,12 +103,12 @@ export default function CounterTimbangPage() {
         ...prev,
         [selectedProduct]: (prev[selectedProduct] || 0) + quantity,
       }))
-
+      const productName = getProductName(selectedProduct)
       // Add to history
       const currentTime = new Date().toLocaleTimeString()
       setHistory((prev) => [
         {
-          text: `🔵➕ ${quantity} ${getProductName(selectedProduct)}`,
+          text: `🔵➕ ${quantity} ${productName}`,
           time: currentTime,
         },
         ...prev.slice(0, 19), // Keep only last 20 items
@@ -125,7 +125,7 @@ export default function CounterTimbangPage() {
       
       toast({
         title: "Success",
-        description: `${quantity} ${selectedProduct} ditambah ke counter`,
+        description: `${quantity} ${productName} ditambah ke counter`,
       })
       // Reset quantity
       setQuantity(0)

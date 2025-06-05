@@ -1,6 +1,6 @@
 "use server"
 import prisma from "@/lib/prisma";
-import { HewanStatus, Counter, PengirimanStatus, type TipeHewan, type ErrorLog, JenisDistribusi, JenisProduk } from "@prisma/client"
+import { HewanStatus, Counter, PengirimanStatus, type TipeHewan, type ErrorLog, JenisDistribusi, JenisProduk, StatusKupon } from "@prisma/client"
 
 // Helper functions for database operations
 // const calculateOffset = (page: number, pageSize: number, group?: string) => {
@@ -133,7 +133,7 @@ export async function countHewanQurban(type: "sapi" | "domba") {
   })
 }
 
-export async function getPenerima(distribusiId?: string) {
+export async function getPenerima(distribusiId?: string, pagination?: {page: number, pageSize: number}) {
   const includeClause = {
     distribusi: true,
     logDistribusi: {
@@ -147,10 +147,17 @@ export async function getPenerima(distribusiId?: string) {
     },
   };
 
+  const skip = pagination? (pagination.page - 1) * pagination.pageSize : undefined
   if (distribusiId) {
     return await prisma.penerima.findMany({
       where: { distribusiId },
       include: includeClause,
+      
+      orderBy: {
+        dibuatPada: "desc",
+      },
+      skip,
+      take: pagination? pagination.pageSize : undefined,
     })
   }
 
@@ -500,7 +507,9 @@ export async function receiveShipment(
       prisma.errorLog.create({
         data: {
           produkId: d.produkId,
-          event: "shipment_discrepancy",
+          diTimbang: d.expected,
+          diInventori: d.received,
+
           note: `Shipment #${shipmentId}: ${d.message} (Expected: ${d.expected}, Received: ${d.received})`,
         },
       })
@@ -548,12 +557,17 @@ export async function createPenerima(data: {
   telepon?: string;
   keterangan?: string;
   jenis: JenisDistribusi;
-  noKupon?: string;
+  kuponId?: string;
 }) {
-  return prisma.penerima.create({
+  const kupon = await prisma.kupon.findFirst({
+    where: {
+      kuponId: data.kuponId
+    },
+  });
+  if(kupon?.status !== StatusKupon.ADA) throw new Error("Mungkin terjadi duplikasi kupon");
+  return await prisma.penerima.create({
     data: {
       distribusiId: data.distribusiId,
-      noKupon: data.noKupon,
       diterimaOleh: data.diterimaOleh,
       nama: data.nama,
       noIdentitas: data.noIdentitas,
@@ -562,6 +576,11 @@ export async function createPenerima(data: {
       keterangan: data.keterangan,
       jenis: data.jenis,
       sudahMenerima: false,
+      kupon: {
+        connect: {
+          kuponId: data.kuponId
+        }
+      }
     },
   });
 }

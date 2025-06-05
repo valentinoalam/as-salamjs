@@ -118,7 +118,7 @@ export interface LogDistribusi {
 export interface Penerima {
   id: string;
   distribusiId: string;
-  noKupon?: string | null;
+  kuponId?: string | null;
   diterimaOleh?: string | null;
   nama?: string | null;
   noIdentitas?: string | null;
@@ -138,7 +138,9 @@ export interface Penerima {
 export type ErrorLog = {
   id: number
   produkId: number
-  event: string
+  diTimbang: number
+  diInventori: number
+  selesai: boolean
   note: string
   timestamp: Date
   produk: {
@@ -274,6 +276,13 @@ export interface QurbanContextType {
     isError: boolean
     refetch: () => Promise<any>
   },
+  mudhohiQuery: {
+    data: Mudhohi[]
+    isLoading: boolean
+    isError: boolean
+    refetch: () => Promise<any>
+  },
+  
   // Pagination metadata
   meta: {
     sapi: { total: number; target: number; slaughtered: number }
@@ -325,7 +334,7 @@ export interface QurbanContextType {
     telepon?: string;
     keterangan?: string;
     jenis: JenisDistribusi;
-    noKupon?: string;
+    kuponId?: string;
     produkDistribusi: { produkId: number; jumlah: number }[];
   }) => Promise<Penerima>;
   getAvailableProducts: () => ProdukHewan[];
@@ -345,5 +354,5 @@ export interface QurbanContextType {
   // }) => Promise<void>;
   updateKuponReceived: (args: { penerimaId: string; diterima: boolean }) => void;
   updateMudhohi: (args: {hewanId: string, received: boolean}) => void;
-
+  updateErrorLogNote: (args:{ id: number; note: string }) => void;
 }

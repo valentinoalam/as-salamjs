@@ -14,7 +14,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (!products || !Array.isArray(products)) {
       return NextResponse.json({ error: "Invalid products data" }, { status: 400 })
     }
-    console.log(products)
+
     const result = await receiveShipment(shipmentId, products)
     return NextResponse.json(result)
   } catch (error) {

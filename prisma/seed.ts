@@ -323,7 +323,7 @@ async function main() {
 //     await prisma.penerima.create({
 //       data: {
 //         distribusiId,
-//         noKupon: `KP-${i}`,
+//         kuponId: `KP-${i}`,
 //         receivedBy: `Penerima ${i}`,
 //         institusi: i % 3 === 0 ? `Institusi ${i}` : null,
 //         noKk: `KK-${i}`,
