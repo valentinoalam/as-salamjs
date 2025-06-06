@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { toast } from "@/hooks/use-toast"
@@ -45,7 +45,7 @@ export default function PemesananForm({ tipeHewan }: PemesananFormProps) {
     
     return options;
   });
-useEffect(()=>{console.log(tipeHewan)},[tipeHewan])
+
   const handleSubmit = async (data: Omit<UserQurbanFormValues, 'paymentStatus' | 'createdAt'>) => {
     try {
       const response = await fetch("/api/mudhohi", {
