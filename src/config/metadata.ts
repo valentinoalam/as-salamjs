@@ -29,7 +29,7 @@ export const METADATA: MetadataConfig = {
       siteName: 'Masjid As-Salam Jakasampurna',
       images: [
         {
-          url: 'https://as-salamjs.online/images/masjid-as-salam.jpg',
+          url: 'https://as-salamjs.online/images/alquran.jpg',
           width: 1200,
           height: 630,
           alt: 'Masjid As-Salam Jakasampurna Building',
