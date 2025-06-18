@@ -39,6 +39,10 @@ const data = {
           url: "/dashboard/mudhohi",
         },
         {
+          title: "Distribusi",
+          url: "/dashboard/distribusi",
+        },
+        {
           title: "Panitia",
           url: "/dashboard/panitia",
         },

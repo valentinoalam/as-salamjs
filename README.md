@@ -1,7 +1,28 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Tebar Keberkahan Qurban di Masjid Assalam Jakasampurna
 
+Mari laksanakan ibadah Idul Adha Anda dengan berqurban bersama Masjid Assalam Jakasampurna. Insyaa Allah hewan qurban sehat, sesuai syariat, dan ditangani secara amanah.
+
+Pilihan Hewan Qurban:
+
+- Domba: Rp 2.700.000/ekor (berat 23–26 kg)
+- Sapi: Rp 24.150.000/ekor (berat ±300 kg)
+- Patungan Sapi (1/7): Rp 3.450.000 (berat ±300 kg)
+
+Qurban Anda akan kami salurkan kepada yang berhak dengan penuh tanggung jawab dan keikhlasan.
+
+Ayo, raih pahala terbaik di hari istimewa.
+Untuk pendaftaran dan informasi lebih lanjut, hubungi panitia qurban Masjid Assalam Jakasampurna.
 ## Getting Started
+kupon logic
+dashboard mudhohi
+print/export qrcode
+setting - design qrcode
 
+video usecase
+dari sisi pengunjung
+dari sisi petugas
+dari sisi admin
 First, run the development server:
 
 ```bash

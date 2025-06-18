@@ -21,7 +21,7 @@ export default function RootLayout({
       <Toaster />
       {/* Footer */}
       <footer className="py-6 bg-gray-900 text-center text-white">
-        <p className="m-0">Copyright &copy; 2025. <Link href="https://tinokarya.com">TinoKarya</Link></p>
+        <p className="m-0">Copyright &copy; {new Date().getFullYear()}. <Link href="https://tinokarya.com">TinoKarya</Link></p>
       </footer>
     </div>
 

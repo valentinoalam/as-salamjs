@@ -20,11 +20,40 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { LogOut, User } from "lucide-react"
 import moment from 'moment-hijri'
+import { useStores } from "@/hooks/use-stores"
+
 
 export default function Header() {
   const pathname = usePathname()
   const { data: session, status } = useSession()
   const [accessiblePages, setAccessiblePages] = useState<string[]>([])
+  
+  // Get Zustand store state and actions
+  const { 
+    showRegisterButton, 
+    user, 
+    setUser, 
+    setShowRegisterButton 
+  } = useStores().ui
+
+  useEffect(() => {
+    // Update Zustand store when session changes
+    if (status === "authenticated" && session?.user) {
+      setUser({
+        id: session.user.id,
+        name: session.user.name,
+        email: session.user.email,
+        role: session.user.role as Role,
+        urlAvatar: session.user.urlAvatar || null
+      })
+      
+      // Hide register button after login
+      setShowRegisterButton(false)
+    } else if (status === "unauthenticated") {
+      setUser(null)
+      setShowRegisterButton(true)
+    }
+  }, [status, session, setUser, setShowRegisterButton])
 
   useEffect(() => {
     const fetchAccessiblePages = async () => {
@@ -41,11 +70,11 @@ export default function Header() {
     const items = [
       // { name: "Pemesanan", href: "/qurban/pemesanan" }
     ]
-    if (session?.user?.role !== Role.MEMBER) {
+    if (user?.role !== Role.MEMBER) {
       items.push({ name: "Dashboard", href: "/dashboard" })
     }
     return items
-  }, [session])
+  }, [user])
 
   const getInitials = (name: string | null | undefined) => {
     if (!name) return "U"
@@ -84,7 +113,7 @@ export default function Header() {
             </div>)}
             { status === "authenticated" && 
               <Link
-                href={`qurban/konfirmasi/${session.user?.id}`}
+                href={`qurban/konfirmasi/${user?.id}`}
                 className="text-primary font-semibold uppercase hover:text-green-700 transition-colors"
               >
                 Konfirmasi Pembayaran
@@ -100,7 +129,7 @@ export default function Header() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "font-semibold uppercase hover:text-green-700 transition-colors whitespace-nowrap", // hover:text-primary
+                    "font-semibold uppercase hover:text-green-700 transition-colors whitespace-nowrap",
                     pathname === item.href
                       ? "text-foreground font-semibold"
                       : "text-primary"
@@ -115,27 +144,27 @@ export default function Header() {
         <div className="ml-auto flex items-center space-x-4">
           <ModeToggle />
 
-          {status === "authenticated" && session?.user ? (
+          {status === "authenticated" && user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={session.user.urlAvatar || undefined} alt={session.user.name || "User"} />
-                    <AvatarFallback>{getInitials(session.user.name)}</AvatarFallback>
+                    <AvatarImage src={user.urlAvatar || undefined} alt={user.name || "User"} />
+                    <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{session.user.name}</p>
-                    <p className="text-xs leading-none text-muted-foreground">{session.user.email}</p>
+                    <p className="text-sm font-medium leading-none">{user.name}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
                   <User className="mr-2 h-4 w-4" />
-                  <span>Role: {session.user.role?.replace("_", " ")}</span>
+                  <span>Role: {user.role?.replace("_", " ")}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
@@ -149,9 +178,16 @@ export default function Header() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button asChild variant="outline" size="sm">
-              <Link href="/login">Login</Link>
-            </Button>
+            <div className="flex gap-2">
+              {showRegisterButton && (
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/register">Register</Link>
+                </Button>
+              )}
+              <Button asChild variant="default" size="sm">
+                <Link href="/login">Login</Link>
+              </Button>
+            </div>
           )}
         </div>
       </div>

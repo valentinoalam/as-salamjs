@@ -1,12 +1,28 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { z } from "zod"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator 
+} from "@/components/ui/dropdown-menu"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 import { toast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -22,111 +38,18 @@ import { PaymentStatus, CaraBayar } from "@prisma/client"
 import { 
   createMudhohi,
   getMudhohiList, 
+  updateMudhohi, 
   updatePaymentStatus, 
-  // createMudhohi 
 } from "@/services/mudhohi"
 import { exportToExcel } from "@/lib/excel"
-import { CheckCircle, XCircle, Clock, AlertCircle, Search, Plus, RefreshCw, Download, HandCoins, ListPlus } from "lucide-react"
+import { MoreHorizontal, CreditCard, Edit, Eye, CheckCircle, XCircle, Clock, AlertCircle, Search, Plus, RefreshCw, Download, HandCoins, ListPlus, Calendar, Hash, Mail, User, MessageSquare } from "lucide-react"
 import { Label } from "@/components/ui/label"
-import type { TipeHewan } from "@/types/keuangan"
 import type { AdminQurbanFormValues } from "@/lib/zod/qurban-form"
 import { AdminQurbanForm } from "@/components/qurban/trx-admin/admin-qurban-form"
 import Link from "next/link"
-
-// Zod Schemas
-const PaymentStatusEnum = z.nativeEnum(PaymentStatus)
-const CaraBayarEnum = z.nativeEnum(CaraBayar)
-
-const PaymentSchema = z.object({
-  id: z.string(),
-  cara_bayar: CaraBayarEnum,
-  paymentStatus: PaymentStatusEnum,
-  dibayarkan: z.number().min(0),
-  urlTandaBukti: z.string().nullable(),
-  kodeResi: z.string().nullable(),
-})
-
-const HewanTipeSchema = z.object({
-  nama: z.string(),
-  icon: z.string().nullable(),
-})
-
-const HewanSchema = z.object({
-  id: z.string(),
-  hewanId: z.string(),
-  tipeId: z.number(),
-  status: z.string(),
-  slaughtered: z.boolean(),
-  tipe: HewanTipeSchema,
-})
-
-const UserSchema = z.object({
-  name: z.string().nullable(),
-  email: z.string().email().nullable(),
-})
-
-const MudhohiSchema = z.object({
-  id: z.string(),
-  nama_pengqurban: z.string().nullable(),
-  nama_peruntukan: z.string().nullable(),
-  pesan_khusus: z.string().nullable(),
-  keterangan: z.string().nullable(),
-  potong_sendiri: z.boolean(),
-  ambil_daging: z.boolean().nullable(),
-  mengambilDaging: z.boolean(),
-  dash_code: z.string(),
-  createdAt: z.date(),
-  payment: PaymentSchema.nullable(),
-  hewan: z.array(HewanSchema),
-  user: UserSchema,
-})
-
-const MudhohiStatsSchema = z.object({
-  totalMudhohi: z.number().min(0),
-  totalHewan: z.number().min(0),
-  statusCounts: z.object({
-    BELUM_BAYAR: z.number().min(0),
-    MENUNGGU_KONFIRMASI: z.number().min(0),
-    LUNAS: z.number().min(0),
-    BATAL: z.number().min(0),
-  }),
-})
-
-const PaymentConfirmationSchema = z.object({
-  kodeResi: z.string().min(1, "Kode resi harus diisi"),
-  amount: z.number().min(1, "Jumlah pembayaran harus lebih dari 0"),
-})
-
-const SearchFilterSchema = z.object({
-  searchTerm: z.string(),
-  statusFilter: z.union([PaymentStatusEnum, z.literal("ALL")]),
-})
-
-// Types
-type MudhohiStats = z.infer<typeof MudhohiStatsSchema>
-type Mudhohi = z.infer<typeof MudhohiSchema>
-type PaymentConfirmation = z.infer<typeof PaymentConfirmationSchema>
-type SearchFilter = z.infer<typeof SearchFilterSchema>
-
-interface MudhohiManagementProps {
-  initialStats: MudhohiStats
-  initialMudhohi: Mudhohi[]
-  tipeHewan: TipeHewan[]
-}
-
-interface PaymentUpdateParams {
-  mudhohiId: string
-  newStatus: PaymentStatus
-  amount?: number
-  kodeResi?: string
-}
-
-interface ApiResponse<T = unknown> {
-  success: boolean
-  data?: T
-  error?: string
-  mudhohiId?: string
-}
+import { type MudhohiManagementProps, MudhohiStatsSchema, MudhohiSchema, type MudhohiStats, type PaymentConfirmation, PaymentConfirmationSchema, type SearchFilter, SearchFilterSchema, type PaymentUpdateParams, type ApiResponse, type Mudhohi, type MudhohiEdit, MudhohiEditSchema } from "@/types/mudhohi"
+import { getMudhohiById } from "@/app/qurban/konfirmasi/[id]/actions"
+import { formatAngkaManual, formatDate } from "@/lib/formatters"
 
 export default function MudhohiManagement({ 
   initialStats, 
@@ -136,7 +59,9 @@ export default function MudhohiManagement({
   // Validate initial props
   const validatedStats = MudhohiStatsSchema.parse(initialStats)
   const validatedMudhohi = z.array(MudhohiSchema).parse(initialMudhohi)
-
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10); // Fixed items per page
   const [stats, setStats] = useState<MudhohiStats>(validatedStats)
   const [mudhohi, setMudhohi] = useState<Mudhohi[]>(validatedMudhohi)
   const [loading, setLoading] = useState<boolean>(false)
@@ -145,11 +70,41 @@ export default function MudhohiManagement({
   const [addDialogOpen, setAddDialogOpen] = useState<boolean>(false)
 
   // Payment confirmation state
+  const [paymentData, setPaymentData] = useState<PaymentConfirmation>({
+    kodeResi: "",
+    amount: 0,
+    cara_bayar: CaraBayar.TRANSFER,
+  })
   const [kodeResi, setKodeResi] = useState<string>("")
   const [confirmPaymentDialogOpen, setConfirmPaymentDialogOpen] = useState<boolean>(false)
   const [selectedMudhohiId, setSelectedMudhohiId] = useState<string | null>(null)
   const [confirmPaymentAmount, setConfirmPaymentAmount] = useState<number>(0)
   
+  // Edit mudhohi state
+  const [editMudhohiData, setEditMudhohiData] = useState<MudhohiEdit>({
+    nama_pengqurban: "",
+    nama_peruntukan: "",
+    pesan_khusus: "",
+    keterangan: "",
+    potong_sendiri: false,
+    ambil_daging: false,
+  })
+  const [editMudhohiDialogOpen, setEditMudhohiDialogOpen] = useState<boolean>(false)
+  
+  
+  // Quick payment state
+  const [quickPaymentDialogOpen, setQuickPaymentDialogOpen] = useState<boolean>(false)
+  const [quickPaymentData, setQuickPaymentData] = useState<PaymentConfirmation>({
+    kodeResi: "",
+    amount: 0,
+    cara_bayar: CaraBayar.TUNAI,
+  })
+  
+  // View details state
+  const [viewDetailsSheetOpen, setViewDetailsSheetOpen] = useState<boolean>(false)
+  const [selectedMudhohi, setSelectedMudhohi] = useState<Mudhohi | null>(null)
+  
+
   // Validation errors state
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
 
@@ -171,7 +126,24 @@ export default function MudhohiManagement({
       return false
     }
   }
-
+  const validateMudhohiEdit = (data: MudhohiEdit): boolean => {
+    try {
+      MudhohiEditSchema.parse(data)
+      setValidationErrors({})
+      return true
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const errors: Record<string, string> = {}
+        error.errors.forEach((err) => {
+          if (err.path.length > 0) {
+            errors[err.path[0] as string] = err.message
+          }
+        })
+        setValidationErrors(errors)
+      }
+      return false
+    }
+  }
   const validateSearchFilter = (data: SearchFilter): boolean => {
     try {
       SearchFilterSchema.parse(data)
@@ -179,6 +151,37 @@ export default function MudhohiManagement({
     } catch (error) {
       console.error("Invalid search filter:", error)
       return false
+    }
+  }
+
+  // Open edit dialog and load mudhohi data
+  const openEditMudhohiDialog = async (mudhohiId: string): Promise<void> => {
+    try {
+      setLoading(true)
+      const mudhohi = await getMudhohiById(mudhohiId)
+      
+      if (mudhohi) {
+        setEditMudhohiData({
+          nama_pengqurban: mudhohi.nama_pengqurban || "",
+          nama_peruntukan: mudhohi.nama_peruntukan || "",
+          pesan_khusus: mudhohi.pesan_khusus || "",
+          keterangan: mudhohi.keterangan || "",
+          potong_sendiri: mudhohi.potong_sendiri,
+          ambil_daging: mudhohi.ambil_daging || false,
+        })
+        setSelectedMudhohiId(mudhohiId)
+        setValidationErrors({})
+        setEditMudhohiDialogOpen(true)
+      }
+    } catch (error) {
+      console.error("Error loading mudhohi data:", error)
+      toast({
+        title: "Error",
+        description: "Gagal memuat data mudhohi",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -190,19 +193,100 @@ export default function MudhohiManagement({
     setConfirmPaymentDialogOpen(true)
   }
 
+  // Open quick payment dialog for direct cash payments
+  const openQuickPaymentDialog = (mudhohiId: string): void => {
+    setSelectedMudhohiId(mudhohiId)
+    setQuickPaymentData({
+      kodeResi: "",
+      amount: 0,
+      cara_bayar: CaraBayar.TUNAI,
+    })
+    setValidationErrors({})
+    setQuickPaymentDialogOpen(true)
+  }
+
+  // Open view details sheet
+  const openViewDetailsSheet = (mudhohi: Mudhohi): void => {
+    setSelectedMudhohi(mudhohi)
+    setViewDetailsSheetOpen(true)
+  }
+
+  // Handle edit mudhohi submit
+  const handleEditMudhohiSubmit = async (): Promise<void> => {
+    if (!selectedMudhohiId) return
+
+    const isValid = validateMudhohiEdit(editMudhohiData)
+    if (!isValid) {
+      toast({
+        title: "Validation Error",
+        description: "Silakan perbaiki kesalahan validasi sebelum menyimpan.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      setLoading(true)
+      const result = await updateMudhohi(selectedMudhohiId, editMudhohiData)
+
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: "Data mudhohi berhasil diperbarui.",
+        })
+
+        // Update mudhohi in the list
+        setMudhohi((prev) =>
+          prev.map((m) =>
+            m.id === selectedMudhohiId
+              ? {
+                  ...m,
+                  ...editMudhohiData,
+                }
+              : m,
+          ),
+        )
+
+        setEditMudhohiDialogOpen(false)
+        setSelectedMudhohiId(null)
+      } else {
+        throw new Error(result.error || "Failed to update mudhohi")
+      }
+    } catch (error) {
+      console.error("Error updating mudhohi:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Gagal memperbarui data mudhohi",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Handle payment status update
   const handleUpdatePaymentStatus = async ({
     mudhohiId,
     newStatus,
     amount,
     kodeResi,
+    caraBayar = CaraBayar.TUNAI,
   }: PaymentUpdateParams): Promise<void> => {
     try {
-      const result: ApiResponse = await updatePaymentStatus(mudhohiId, newStatus, kodeResi, amount)
+      const result: ApiResponse = await updatePaymentStatus(
+        mudhohiId, 
+        {
+          status:newStatus, 
+          kodeResi, 
+          dibayarkan:amount,
+          caraBayar
+        }
+      )
 
       if (result.success) {
         toast({
           title: "Status Updated",
-          description: `Payment status has been updated to ${getStatusLabel(newStatus)}.`,
+          description: `Status pembayaran berhasil diperbarui ke ${getStatusLabel(newStatus)}.`,
         })
 
         // Update the mudhohi in the list
@@ -216,6 +300,7 @@ export default function MudhohiManagement({
                     paymentStatus: newStatus,
                     dibayarkan: amount || m.payment.dibayarkan,
                     kodeResi: kodeResi || m.payment.kodeResi,
+                    cara_bayar: caraBayar || m.payment.cara_bayar,
                   } : null,
                 }
               : m,
@@ -231,22 +316,20 @@ export default function MudhohiManagement({
       console.error("Error updating payment status:", error)
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update payment status. Please try again.",
+        description: error instanceof Error ? error.message : "Gagal memperbarui status pembayaran",
         variant: "destructive",
       })
     }
   }
   
+  // Handle confirm payment from app
   const handleConfirmPayment = (): void => {
-    const isValid = validatePaymentConfirmation({
-      kodeResi: kodeResi.trim(),
-      amount: confirmPaymentAmount,
-    })
+    const isValid = validatePaymentConfirmation(paymentData)
 
     if (!isValid) {
       toast({
         title: "Validation Error",
-        description: "Please fix the validation errors before confirming payment.",
+        description: "Silakan perbaiki kesalahan validasi sebelum konfirmasi.",
         variant: "destructive",
       })
       return
@@ -256,10 +339,37 @@ export default function MudhohiManagement({
       handleUpdatePaymentStatus({
         mudhohiId: selectedMudhohiId,
         newStatus: PaymentStatus.LUNAS,
-        amount: confirmPaymentAmount,
-        kodeResi: kodeResi.trim() || undefined,
+        amount: paymentData.amount,
+        kodeResi: paymentData.kodeResi || undefined,
+        caraBayar: paymentData.cara_bayar,
       })
       setConfirmPaymentDialogOpen(false)
+      setSelectedMudhohiId(null)
+    }
+  }
+
+  // Handle quick payment (direct payment to admin)
+  const handleQuickPayment = (): void => {
+    const isValid = validatePaymentConfirmation(quickPaymentData)
+
+    if (!isValid) {
+      toast({
+        title: "Validation Error",
+        description: "Silakan perbaiki kesalahan validasi sebelum konfirmasi.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (selectedMudhohiId) {
+      handleUpdatePaymentStatus({
+        mudhohiId: selectedMudhohiId,
+        newStatus: PaymentStatus.LUNAS,
+        amount: quickPaymentData.amount,
+        kodeResi: quickPaymentData.kodeResi || `CASH-${Date.now()}`,
+        caraBayar: quickPaymentData.cara_bayar,
+      })
+      setQuickPaymentDialogOpen(false)
       setSelectedMudhohiId(null)
     }
   }
@@ -345,6 +455,7 @@ export default function MudhohiManagement({
     try {
       const result: ApiResponse = await createMudhohi({
           ...data,
+          jatahPengqurban: data.jatahPengqurban?.map(p=>Number.parseInt(p)),
           tipeHewanId: Number.parseInt(data.tipeHewanId),
         })
 
@@ -361,10 +472,10 @@ export default function MudhohiManagement({
       } else {
         toast({
           title: "Error",
-          description: result.error || "Failed to add pengqurban",
+          description: result.error || "Gagal menambahkan data pengqurban. Silahkan coba lagi nanti.",
           variant: "destructive",
         })
-        return { success: false, error: result.error || "Failed to add pengqurban" }
+        return { success: false, error: result.error || "Gagal menambahkan data pengqurban" }
       }
     } catch (error) {
       console.error("Error adding pengqurban:", error)
@@ -461,7 +572,7 @@ export default function MudhohiManagement({
         "Jumlah Dibayarkan": m.payment ? m.payment.dibayarkan : 0,
         "Kode Resi": m.payment?.kodeResi || "-",
         Hewan: m.hewan.map((h) => `${h.tipe.nama} #${h.hewanId}`).join(", "),
-        "Ambil Daging": m.mengambilDaging ? "Ya" : "Tidak",
+        "Ambil Daging": m.ambil_daging ? "Ya" : "Tidak",
         "Saksikan Penyembelihan": m.potong_sendiri ? "Ya" : "Tidak",
         "Tanggal Daftar": new Date(m.createdAt).toLocaleDateString("id-ID"),
       }))
@@ -488,10 +599,27 @@ export default function MudhohiManagement({
     refreshData()
   }
 
+  // Calculate pagination values
+  const totalPages = Math.ceil(filteredMudhohi.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentMudhohi = filteredMudhohi.slice(indexOfFirstItem, indexOfLastItem);
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
+
   return (
     <div className="space-y-8">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-xl">Total Pengqurban</CardTitle>
@@ -559,6 +687,12 @@ export default function MudhohiManagement({
                   Belum Bayar
                 </div>
               </SelectItem>
+              <SelectItem value={PaymentStatus.DOWN_PAYMENT}>
+                <div className="flex items-center gap-2">
+                  {getStatusIcon(PaymentStatus.DOWN_PAYMENT)}
+                  Down Payment
+                </div>
+              </SelectItem>
               <SelectItem value={PaymentStatus.MENUNGGU_KONFIRMASI}>
                 <div className="flex items-center gap-2">
                   {getStatusIcon(PaymentStatus.MENUNGGU_KONFIRMASI)}
@@ -590,9 +724,9 @@ export default function MudhohiManagement({
             Export
           </Button>
           <Button className="w-full md:w-auto">
-            <Link className="inline-flex" href="/dashboard/mudhohi/mudhohi-batch-form">
+            <Link className="inline-flex" href="/dashboard/mudhohi/mudhohi-bulk-form">
               <ListPlus className="h-4 w-4 mr-2" />
-              Batch Input
+              Bulk Input
             </Link>
           </Button>
           <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
@@ -623,138 +757,273 @@ export default function MudhohiManagement({
 
       {/* Mudhohi List */}
       <div className="space-y-4">
-        {filteredMudhohi.length > 0 ? (
-          filteredMudhohi.map((m) => (
+        {currentMudhohi.length > 0 ? (
+          currentMudhohi.map((m) => (
             <Card key={m.id} className="overflow-hidden">
-              <CardContent className="p-0">
-                <div className="p-6">
-                  <div className="flex flex-col md:flex-row justify-between gap-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-semibold">{m.nama_pengqurban || "Unnamed"}</h3>
-                        {m.payment && getStatusBadge(m.payment.paymentStatus)}
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {m.nama_peruntukan ? `Untuk: ${m.nama_peruntukan}` : ""}
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row justify-between gap-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold">{m.nama_pengqurban || "Unnamed"}</h3>
+                      {m.payment && (
+                        <div className="bg-gray-50 rounded-lg text-sm">
+                          <p className="font-semibold">
+                            <span className="font-medium">Total: </span>
+                            Rp {formatAngkaManual(m.payment.totalAmount || 0)}
+                          </p>
+                        </div>
+                      )}
+                      {m.payment && getStatusBadge(m.payment.paymentStatus)}
+                    </div>
+                    {m.nama_peruntukan && (
+                      <p className="text-sm text-gray-600 flex items-center gap-1">
+                        <User className="w-3 h-3" />
+                        Untuk: {m.nama_peruntukan}
                       </p>
-                      <p className="text-sm">
+                    )}
+                    
+                    <div className="space-y-1 text-sm">
+                      <div className="flex items-center gap-1 text-gray-700">
+                        <Hash className="w-3 h-3" />
                         <span className="font-medium">Kode:</span> {m.dash_code}
-                      </p>
-                      <p className="text-sm">
+                      </div>
+                      <div className="flex items-center gap-1 text-gray-700">
+                        <Mail className="w-3 h-3" />
                         <span className="font-medium">Email:</span> {m.user.email || "-"}
-                      </p>
-                      <div className="flex flex-wrap gap-2 mt-2">
+                      </div>
+                      <div className="flex items-center gap-1 text-gray-700">
+                        <Calendar className="w-3 h-3" />
+                        <span className="font-medium">Tanggal:</span> {new Date(m.createdAt).toLocaleDateString("id-ID")}
+                      </div>
+                      <div className="flex flex-wrap gap-1">
                         {m.hewan.map((h) => (
-                          <Badge key={h.id} variant="secondary">
+                          <Badge key={h.id} variant="secondary" className="text-xs">
                             {h.tipe.icon} {h.tipe.nama} #{h.hewanId}
                           </Badge>
                         ))}
                       </div>
-                      {m.mengambilDaging && (
-                        <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">
-                          Ambil Daging
-                        </Badge>
-                      )}
-                      {m.potong_sendiri && (
-                        <Badge variant="outline" className="bg-teal-100 text-teal-800 border-teal-300">
-                          Saksikan Penyembelihan
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-sm">
-                        <span className="font-medium">Tanggal Daftar:</span>{" "}
-                        {new Date(m.createdAt).toLocaleDateString("id-ID")}
+                      <div className="flex flex-wrap gap-1">
+                        {m.ambil_daging && (
+                          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs">
+                            Ambil Daging
+                          </Badge>
+                        )}
+                        {m.potong_sendiri && (
+                          <Badge variant="outline" className="bg-teal-50 text-teal-700 border-teal-200 text-xs">
+                            Saksikan Penyembelihan
+                          </Badge>
+                        )}
                       </div>
-                      {m.payment && (
-                        <>
-                          <div className="text-sm">
-                            <span className="font-medium">Metode Pembayaran:</span>{" "}
-                            {m.payment.cara_bayar === CaraBayar.TRANSFER ? "Transfer" : "Tunai"}
-                          </div>
-                          <div className="text-sm">
-                            <span className="font-medium">Dibayarkan:</span> Rp{" "}
-                            {m.payment.dibayarkan.toLocaleString("id-ID")}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1 text-gray-800 font-medium">
+                      <MessageSquare className="w-4 h-4" />
+                      Pesan & Keterangan
+                    </div>
+                    {m.pesan_khusus && (
+                      <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                        <div className="text-xs font-medium text-blue-700 mb-1">Pesan Khusus:</div>
+                        <div className="text-sm text-blue-800">{m.pesan_khusus}</div>
+                      </div>
+                    )}
+                    
+                    {m.keterangan && (
+                      <div className="bg-amber-50 p-3 rounded-lg border border-amber-100">
+                        <div className="text-xs font-medium text-amber-700 mb-1">Keterangan:</div>
+                        <div className="text-sm text-amber-800">{m.keterangan}</div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-sm">
+                      <span className="font-medium">Tertanggal:</span>{" "}
+                      {formatDate(new Date(m.payment?.updatedAt || m.createdAt))}
+                    </div>
+                    {m.payment && (
+                      <>
+                        <div className="flex justify-between text-sm space-x-4 items-baseline">
+                          <div className="space-x-2">
+                            <span className="font-medium text-gray-600">Metode:</span>
+                            <span className="font-mono">{m.payment.cara_bayar === CaraBayar.TRANSFER ? "Transfer" : "Tunai"}</span>
                           </div>
                           {m.payment.kodeResi && (
-                            <div className="text-sm">
-                              <span className="font-medium">Kode Resi:</span> {m.payment.kodeResi}
-                            </div>
-                          )}
-                        </>
+                              <div className="flex justify-start items-baseline space-x-2">
+                                <span className="text-gray-600">Kode Resi:</span>
+                                <span className="font-mono font-medium text-xs">{m.payment.kodeResi}</span>
+                              </div>
+                            )}
+                        </div>
+                        
+                        <div className="flex justify-between text-sm space-x-4 items-baseline">
+                          <div className="space-x-2">
+                            <span className="text-muted-foreground">Jumlah:</span>
+                            <span className="font-medium">{m.payment.quantity || m.hewan.length}</span>
+                          </div>
+                          <div className="space-x-2">
+                            <span className="text-muted-foreground">Tipe:</span>
+                            <span className="font-medium">{m.payment.isKolektif ? "Kolektif" : "Perhewan"}</span>
+                          </div>
+                        </div>
+                        <div className="text-sm">
+                          <span className="font-medium">Dibayarkan:</span> Rp{" "}
+                          {formatAngkaManual(m.payment.dibayarkan)} <span className="text-muted-foreground ml-1 text-xs">dari</span>
+                          <span className="text-muted-foreground ml-1">
+                            Rp {formatAngkaManual(m.payment.totalAmount || 0)}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    <div className="flex items-center gap-2 mt-4">
+                      {/* Primary action based on payment status */}
+                      {m.payment?.paymentStatus === PaymentStatus.BELUM_BAYAR && (
+                        <Button
+                          size="sm"
+                          onClick={() => openQuickPaymentDialog(m.id)}
+                          className="flex items-center gap-1"
+                        >
+                          <CreditCard className="w-3 h-3" />
+                          Bayar Langsung
+                        </Button>
                       )}
-                      <div className="flex flex-wrap gap-2 mt-4">
-                        {m.payment?.paymentStatus === PaymentStatus.BELUM_BAYAR && (
-                          <>
-                            <Button
-                              size="sm"
-                              onClick={() =>
-                                handleUpdatePaymentStatus({
+                      
+                      {m.payment?.paymentStatus === PaymentStatus.DOWN_PAYMENT && (
+                        <Button
+                          size="sm"
+                          onClick={() => openConfirmPaymentDialog(m.id, m.payment?.dibayarkan || 0)}
+                          className="flex items-center gap-1"
+                        >
+                          <CheckCircle className="w-3 h-3" />
+                          Selesaikan
+                        </Button>
+                      )}
+                      
+                      {m.payment?.paymentStatus === PaymentStatus.MENUNGGU_KONFIRMASI && (
+                        <Button
+                          size="sm"
+                          onClick={() => openConfirmPaymentDialog(m.id, m.payment?.dibayarkan || 0)}
+                          className="flex items-center gap-1"
+                        >
+                          <CheckCircle className="w-3 h-3" />
+                          Terima
+                        </Button>
+                      )}
+                      
+                      {m.payment?.paymentStatus === PaymentStatus.LUNAS && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleUpdatePaymentStatus({
+                            mudhohiId: m.id,
+                            newStatus: PaymentStatus.BELUM_BAYAR,
+                            caraBayar: "TRANSFER"
+                          })}
+                          className="flex items-center gap-1"
+                        >
+                          <XCircle className="w-3 h-3" />
+                          Batalkan
+                        </Button>
+                      )}
+                      
+                      {m.payment?.paymentStatus === PaymentStatus.BATAL && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleUpdatePaymentStatus({
+                            mudhohiId: m.id,
+                            newStatus: PaymentStatus.BELUM_BAYAR,
+                            caraBayar: "TRANSFER"
+                          })}
+                          className="flex items-center gap-1"
+                        >
+                          <CheckCircle className="w-3 h-3" />
+                          Aktifkan
+                        </Button>
+                      )}
+
+                      {/* Secondary actions in dropdown */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm" className="px-2">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          {/* Payment-specific secondary actions */}
+                          {m.payment?.paymentStatus === PaymentStatus.BELUM_BAYAR && (
+                            <>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleUpdatePaymentStatus({
+                                    mudhohiId: m.id,
+                                    newStatus: PaymentStatus.MENUNGGU_KONFIRMASI,
+                                    amount: m.payment?.dibayarkan,
+                                    caraBayar: "TRANSFER"
+                                  })
+                                }
+                              >
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                Konfirmasi Pembayaran
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleUpdatePaymentStatus({
                                   mudhohiId: m.id,
-                                  newStatus: PaymentStatus.MENUNGGU_KONFIRMASI,
-                                  amount: m.payment?.dibayarkan,
-                                })
-                              }
-                            >
-                              Konfirmasi Pembayaran
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleUpdatePaymentStatus({
-                                mudhohiId: m.id,
-                                newStatus: PaymentStatus.BATAL
-                              })}
-                            >
-                              Batalkan
-                            </Button>
-                          </>
-                        )}
-                        {m.payment?.paymentStatus === PaymentStatus.MENUNGGU_KONFIRMASI && (
-                          <>
-                            <Button
-                              size="sm"
-                              onClick={() => openConfirmPaymentDialog(m.id, m.payment?.dibayarkan || 0)}
-                            >
-                              Terima Pembayaran
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleUpdatePaymentStatus({
-                                mudhohiId: m.id,
-                                newStatus: PaymentStatus.BATAL
-                              })}
-                            >
-                              Tolak Pembayaran
-                            </Button>
-                          </>
-                        )}
-                        {m.payment?.paymentStatus === PaymentStatus.LUNAS && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleUpdatePaymentStatus({
-                                mudhohiId: m.id,
-                                newStatus: PaymentStatus.BELUM_BAYAR
-                              })}
+                                  newStatus: PaymentStatus.BATAL,
+                                  caraBayar: "TRANSFER"
+                                })}
+                                className="text-destructive"
+                              >
+                                <XCircle className="w-4 h-4 mr-2" />
+                                Batalkan
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
+                          
+                          {m.payment?.paymentStatus === PaymentStatus.DOWN_PAYMENT && (
+                            <>
+                              <DropdownMenuItem
+                                onClick={() => openQuickPaymentDialog(m.id)}
+                              >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Tambah Pembayaran
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
+                          
+                          {m.payment?.paymentStatus === PaymentStatus.MENUNGGU_KONFIRMASI && (
+                            <>
+                              <DropdownMenuItem
+                                onClick={() => handleUpdatePaymentStatus({
+                                  mudhohiId: m.id,
+                                  newStatus: PaymentStatus.BATAL,
+                                  caraBayar: "TRANSFER"
+                                })}
+                                className="text-destructive"
+                              >
+                                <XCircle className="w-4 h-4 mr-2" />
+                                Tolak Pembayaran
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
+                          
+                          {/* Common actions */}
+                          <DropdownMenuItem
+                            onClick={() => openEditMudhohiDialog(m.id)}
                           >
-                            Batalkan Konfirmasi
-                          </Button>
-                        )}
-                        {m.payment?.paymentStatus === PaymentStatus.BATAL && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleUpdatePaymentStatus({
-                              mudhohiId: m.id,
-                              newStatus: PaymentStatus.BELUM_BAYAR
-                            })}
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => openViewDetailsSheet(m)}
                           >
-                            Aktifkan Kembali
-                          </Button>
-                        )}
-                      </div>
+                            <Eye className="w-4 h-4 mr-2" />
+                            Detail
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 </div>
@@ -776,7 +1045,53 @@ export default function MudhohiManagement({
           </Card>
         )}
       </div>
-      
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handlePageChange(currentPage - 1);
+                }}
+                aria-disabled={currentPage <= 1}
+                tabIndex={currentPage === 1?  -1 : undefined}
+              />
+            </PaginationItem>
+            
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <PaginationItem key={page}>
+                <PaginationLink
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handlePageChange(page);
+                  }}
+                  isActive={page === currentPage}
+                >
+                  {page}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+            <PaginationItem>
+              <PaginationEllipsis />
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationNext
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handlePageChange(currentPage + 1);
+                }}
+                aria-disabled={currentPage >= totalPages}
+                tabIndex={currentPage === totalPages ? -1 : undefined}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
       {/* Payment Confirmation Dialog */}
       <Dialog open={confirmPaymentDialogOpen} onOpenChange={setConfirmPaymentDialogOpen}>
         <DialogContent>
@@ -784,6 +1099,35 @@ export default function MudhohiManagement({
             <DialogTitle>Konfirmasi Pembayaran</DialogTitle>
             <DialogDescription>Masukkan kode resi dan konfirmasi pembayaran.</DialogDescription>
           </DialogHeader>
+          {/* NEW: Payment Summary Section */}
+          {selectedMudhohiId && (
+            <div className="border rounded-lg p-4 bg-gray-50">
+              <h4 className="font-medium mb-2">Detail Pesanan</h4>
+              {(() => {
+                const mudhohiItem = mudhohi.find(m => m.id === selectedMudhohiId);
+                if (!mudhohiItem || !mudhohiItem.payment) return null;
+                
+                return (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="font-medium">Jumlah Hewan:</span>
+                      <p>{mudhohiItem.payment.quantity || mudhohiItem.hewan.length}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Tipe:</span>
+                      <p>{mudhohiItem.payment.isKolektif ? "Kolektif" : "Perorangan"}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="font-medium">Total Pembayaran:</span>
+                      <p className="font-semibold">
+                        Rp {mudhohiItem.payment.totalAmount?.toLocaleString("id-ID") || "0"}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="kodeResi">Kode Resi</Label>
@@ -792,7 +1136,7 @@ export default function MudhohiManagement({
                 value={kodeResi}
                 onChange={(e) => {
                   setKodeResi(e.target.value)
-                  // Clear validation error when user starts typing
+                  setPaymentData(prev => ({ ...prev, kodeResi: e.target.value }))
                   if (validationErrors.kodeResi) {
                     setValidationErrors(prev => ({ ...prev, kodeResi: "" }))
                   }
@@ -813,7 +1157,7 @@ export default function MudhohiManagement({
                 onChange={(e) => {
                   const value = Number(e.target.value)
                   setConfirmPaymentAmount(value)
-                  // Clear validation error when user starts typing
+                  setPaymentData(prev => ({ ...prev, amount: value }))
                   if (validationErrors.amount) {
                     setValidationErrors(prev => ({ ...prev, amount: "" }))
                   }
@@ -826,6 +1170,7 @@ export default function MudhohiManagement({
                 <p className="text-sm text-red-500">{validationErrors.amount}</p>
               )}
             </div>
+            
           </div>
           <DialogFooter>
             <Button 
@@ -843,6 +1188,367 @@ export default function MudhohiManagement({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Quick Payment Dialog */}
+      <Dialog open={quickPaymentDialogOpen} onOpenChange={setQuickPaymentDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Pembayaran Langsung</DialogTitle>
+            <DialogDescription>Proses pembayaran langsung kepada admin.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="quickAmount">Jumlah Pembayaran</Label>
+              <Input
+                id="quickAmount"
+                type="number"
+                value={quickPaymentData.amount}
+                onChange={(e) => {
+                  const value = Number(e.target.value)
+                  setQuickPaymentData(prev => ({ ...prev, amount: value }))
+                  if (validationErrors.amount) {
+                    setValidationErrors(prev => ({ ...prev, amount: "" }))
+                  }
+                }}
+                placeholder="Masukkan jumlah pembayaran"
+                min="1"
+                className={validationErrors.amount ? "border-red-500" : ""}
+              />
+              {validationErrors.amount && (
+                <p className="text-sm text-red-500">{validationErrors.amount}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="quickCaraBayar">Cara Bayar</Label>
+              <Select
+                value={quickPaymentData.cara_bayar}
+                onValueChange={(value) => setQuickPaymentData(prev => ({ ...prev, cara_bayar: value as CaraBayar }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih cara bayar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={CaraBayar.TUNAI}>Tunai</SelectItem>
+                  <SelectItem value={CaraBayar.TRANSFER}>Transfer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="quickKodeResi">Kode Resi (Optional)</Label>
+              <Input
+                id="quickKodeResi"
+                value={quickPaymentData.kodeResi}
+                onChange={(e) => {
+                  setQuickPaymentData(prev => ({ ...prev, kodeResi: e.target.value }))
+                  if (validationErrors.kodeResi) {
+                    setValidationErrors(prev => ({ ...prev, kodeResi: "" }))
+                  }
+                }}
+                placeholder="Masukkan kode resi (opsional)"
+                className={validationErrors.kodeResi ? "border-red-500" : ""}
+              />
+              {validationErrors.kodeResi && (
+                <p className="text-sm text-red-500">{validationErrors.kodeResi}</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setQuickPaymentDialogOpen(false)
+                setValidationErrors({})
+              }}
+            >
+              Batal
+            </Button>
+            <Button onClick={handleQuickPayment} disabled={loading}>
+              {loading ? "Processing..." : "Proses Pembayaran"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Mudhohi Dialog */}
+      <Dialog open={editMudhohiDialogOpen} onOpenChange={setEditMudhohiDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Data Mudhohi</DialogTitle>
+            <DialogDescription>
+              Ubah informasi pengqurban sesuai kebutuhan.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="editNamaPengqurban">Nama Pengqurban</Label>
+              <Input
+                id="editNamaPengqurban"
+                value={editMudhohiData.nama_pengqurban}
+                onChange={(e) => {
+                  setEditMudhohiData(prev => ({ ...prev, nama_pengqurban: e.target.value }))
+                  if (validationErrors.nama_pengqurban) {
+                    setValidationErrors(prev => ({ ...prev, nama_pengqurban: "" }))
+                  }
+                }}
+                placeholder="Masukkan nama pengqurban"
+                className={validationErrors.nama_pengqurban ? "border-red-500" : ""}
+              />
+              {validationErrors.nama_pengqurban && (
+                <p className="text-sm text-red-500">{validationErrors.nama_pengqurban}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editNamaPeruntukan">Nama Peruntukan</Label>
+              <Input
+                id="editNamaPeruntukan"
+                value={editMudhohiData.nama_peruntukan}
+                onChange={(e) => {
+                  setEditMudhohiData(prev => ({ ...prev, nama_peruntukan: e.target.value }))
+                  if (validationErrors.nama_peruntukan) {
+                    setValidationErrors(prev => ({ ...prev, nama_peruntukan: "" }))
+                  }
+                }}
+                placeholder="Masukkan nama peruntukan"
+                className={validationErrors.nama_peruntukan ? "border-red-500" : ""}
+              />
+              {validationErrors.nama_peruntukan && (
+                <p className="text-sm text-red-500">{validationErrors.nama_peruntukan}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editPesanKhusus">Pesan Khusus</Label>
+              <Input
+                id="editPesanKhusus"
+                value={editMudhohiData.pesan_khusus}
+                onChange={(e) => {
+                  setEditMudhohiData(prev => ({ ...prev, pesan_khusus: e.target.value }))
+                  if (validationErrors.pesan_khusus) {
+                    setValidationErrors(prev => ({ ...prev, pesan_khusus: "" }))
+                  }
+                }}
+                placeholder="Masukkan pesan khusus"
+                className={validationErrors.pesan_khusus ? "border-red-500" : ""}
+              />
+              {validationErrors.pesan_khusus && (
+                <p className="text-sm text-red-500">{validationErrors.pesan_khusus}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editKeterangan">Keterangan</Label>
+              <Input
+                id="editKeterangan"
+                value={editMudhohiData.keterangan}
+                onChange={(e) => {
+                  setEditMudhohiData(prev => ({ ...prev, keterangan: e.target.value }))
+                  if (validationErrors.keterangan) {
+                    setValidationErrors(prev => ({ ...prev, keterangan: "" }))
+                  }
+                }}
+                placeholder="Masukkan keterangan"
+                className={validationErrors.keterangan ? "border-red-500" : ""}
+              />
+              {validationErrors.keterangan && (
+                <p className="text-sm text-red-500">{validationErrors.keterangan}</p>
+              )}
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="editPotongSendiri"
+                checked={editMudhohiData.potong_sendiri}
+                onChange={(e) => {
+                  setEditMudhohiData(prev => ({ ...prev, potong_sendiri: e.target.checked }))
+                }}
+                className="h-4 w-4"
+              />
+              <Label htmlFor="editPotongSendiri">Saksikan Penyembelihan</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="editMengambilDaging"
+                checked={editMudhohiData.ambil_daging}
+                onChange={(e) => {
+                  setEditMudhohiData(prev => ({ ...prev, ambil_daging: e.target.checked }))
+                }}
+                className="h-4 w-4"
+              />
+              <Label htmlFor="editMengambilDaging">Mengambil Daging</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setEditMudhohiDialogOpen(false)
+                setValidationErrors({})
+              }}
+            >
+              Batal
+            </Button>
+            <Button onClick={handleEditMudhohiSubmit} disabled={loading}>
+              {loading ? "Menyimpan..." : "Simpan Perubahan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Details Sheet */}
+      <Dialog open={viewDetailsSheetOpen} onOpenChange={setViewDetailsSheetOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detail Pengqurban</DialogTitle>
+            <DialogDescription>
+              Informasi lengkap tentang pengqurban yang dipilih.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedMudhohi && (
+            <div className="space-y-6 py-4">
+              {/* Basic Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-lg">Informasi Pengqurban</h4>
+                  <div className="space-y-2">
+                    <div>
+                      <span className="font-medium">Nama Pengqurban:</span>
+                      <p className="text-muted-foreground">{selectedMudhohi.nama_pengqurban || "-"}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Nama Peruntukan:</span>
+                      <p className="text-muted-foreground">{selectedMudhohi.nama_peruntukan || "-"}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Kode Dash:</span>
+                      <p className="text-muted-foreground">{selectedMudhohi.dash_code}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Email:</span>
+                      <p className="text-muted-foreground">{selectedMudhohi.user.email || "-"}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Tanggal Pendaftaran:</span>
+                      <p className="text-muted-foreground">
+                        {new Date(selectedMudhohi.createdAt).toLocaleDateString("id-ID", {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-lg">Status & Preferensi</h4>
+                  <div className="space-y-2">
+                    <div>
+                      <span className="font-medium">Status Pembayaran:</span>
+                      <div className="mt-1">
+                        {selectedMudhohi.payment && getStatusBadge(selectedMudhohi.payment.paymentStatus)}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedMudhohi.ambil_daging && (
+                        <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">
+                          Ambil Daging
+                        </Badge>
+                      )}
+                      {selectedMudhohi.potong_sendiri && (
+                        <Badge variant="outline" className="bg-teal-100 text-teal-800 border-teal-300">
+                          Saksikan Penyembelihan
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Information */}
+              {selectedMudhohi.payment && (
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-lg">Informasi Pembayaran</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <span className="font-medium">Metode Pembayaran:</span>
+                      <p className="text-muted-foreground">
+                        {selectedMudhohi.payment.cara_bayar === CaraBayar.TRANSFER ? "Transfer" : "Tunai"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Jumlah Dibayarkan:</span>
+                      <p className="text-muted-foreground">
+                        Rp {selectedMudhohi.payment.dibayarkan.toLocaleString("id-ID")}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Kode Resi:</span>
+                      <p className="text-muted-foreground">
+                        {selectedMudhohi.payment.kodeResi || "-"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Hewan Information */}
+              <div className="space-y-3">
+                <h4 className="font-semibold text-lg">Hewan Qurban</h4>
+                <div className="flex flex-wrap gap-2">
+                  {selectedMudhohi.hewan.map((h) => (
+                    <Badge key={h.id} variant="secondary">
+                      {h.tipe.icon} {h.tipe.nama} #{h.hewanId}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Additional Information */}
+              <div className="space-y-3">
+                <h4 className="font-semibold text-lg">Informasi Tambahan</h4>
+                <div className="space-y-2">
+                  {selectedMudhohi.pesan_khusus && (
+                    <div>
+                      <span className="font-medium">Pesan Khusus:</span>
+                      <p className="text-muted-foreground">{selectedMudhohi.pesan_khusus}</p>
+                    </div>
+                  )}
+                  {selectedMudhohi.keterangan && (
+                    <div>
+                      <span className="font-medium">Keterangan:</span>
+                      <p className="text-muted-foreground">{selectedMudhohi.keterangan}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => openEditMudhohiDialog(selectedMudhohi.id)}
+                >
+                  Edit Data
+                </Button>
+                {selectedMudhohi.payment && (
+                  <Button
+                    variant="outline"
+                    onClick={() => openQuickPaymentDialog(selectedMudhohi.id)}
+                  >
+                    Edit Pembayaran
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  onClick={() => setViewDetailsSheetOpen(false)}
+                >
+                  Tutup
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
-}
+};

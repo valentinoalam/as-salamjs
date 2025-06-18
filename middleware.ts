@@ -5,8 +5,8 @@ import type { NextRequest } from "next/server"
 // List of protected routes and their required roles
 const protectedRoutes = {
   "/dashboard/counter-inventori": ["ADMIN", "PETUGAS_INVENTORY"],
-  "/dashboard/counter-timbang": ["ADMIN", "PETUGAS_PENYEMBELIHAN"],
-  "/dashboard/progres-sembelih": ["ADMIN", "PETUGAS_PENYEMBELIHAN"],
+  "/dashboard/counter-timbang": ["ADMIN", "PETUGAS_TIMBANG"],
+  "/dashboard/progres-sembelih": ["ADMIN", "PETUGAS_TIMBANG"],
   "/dashboard/panitia": ["ADMIN"],
   "/dashboard/keuangan": ["ADMIN", "PETUGAS_KEUANGAN"],
   "/dashboard/transactions": ["ADMIN", "PETUGAS_KEUANGAN"],

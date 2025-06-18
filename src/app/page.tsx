@@ -61,7 +61,7 @@ const featuredLinks = [
 export default function Home() {
   return (
     <main className="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
-      <Card className="max-w-md w-full bg-white rounded-xl shadow-lg overflow-hidden">
+      <Card className="max-w-md w-full bg-white rounded-xl shadow-lg overflow-x-hidden">
         {/* Header */}
         <CardHeader className="relative bg-green-600 p-6 text-center">
           <div className="absolute inset-0 h-full opacity-20  bg-cover bg-[url(/images/cover.jpg)]"></div>

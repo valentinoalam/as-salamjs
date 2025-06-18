@@ -14,13 +14,13 @@ export default async function PengaturanPage() {
   const [tipeHewan, produkHewan] = await Promise.all([getAllTipeHewan(), getAllProdukHewan()])
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="w-full md:container mx-auto py-6">
       <h1 className="text-2xl font-bold mb-6">Pengaturan Sistem</h1>
 
-      <Tabs defaultValue="tipe-hewan" className="w-full">
+      <Tabs defaultValue="tipe-hewan">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="tipe-hewan">Tipe Hewan</TabsTrigger>
-          <TabsTrigger value="produk-hewan">Produk Hewan</TabsTrigger>
+          <TabsTrigger value="produk-hewan" disabled={!tipeHewan}>Produk Hewan</TabsTrigger>
         </TabsList>
         <TabsContent value="tipe-hewan">
           <div className="mt-6">

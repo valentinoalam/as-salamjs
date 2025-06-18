@@ -13,9 +13,10 @@ import FinancialCharts from './financial-charts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { useQurban, type ProdukHewan, type Shipment } from "@/contexts/qurban-context"
+import { useQurban } from "@/contexts/qurban-context"
 import HewanStatusDisplay from "./hewan-status-display"
 import { useKeuangan } from "@/contexts/keuangan-context";
+import type { ProdukHewan, Shipment } from "@/types/qurban";
 
 export default function DashboardPage() {
   const { 
@@ -262,7 +263,7 @@ const AnimalStatusCard = ({ type, data }: {type: "sapi" | "domba"; data: any}) =
         
         <div className="mb-4">
           <div className="flex justify-between text-sm mb-1">
-            <span>Progress Penyembelihan</span>
+            <span>Progress Timbang</span>
             <span>{data.slaughtered}/{data.total}</span>
           </div>
           <Progress value={progressValue} className="h-2" />
@@ -367,7 +368,7 @@ const MeatProductItem = ({ item }:{item:ProdukHewan}) => {
   return (
     <div className="flex flex-col items-center p-4 border rounded-md">
       <span className="text-xl mb-2">
-        {item.tipeId === 1 ? "🐮" : "🐐"} {item.berat}kg
+        {item.JenisHewan === "SAPI" ? "🐮" : "🐐"} {item.berat}kg
       </span>
       <span className="text-3xl font-bold">{item.diTimbang}</span>
       <div className="text-xs mt-1">Target: {item.targetPaket}</div>
@@ -427,16 +428,16 @@ const ShipmentsLogCard = ({ shipments, products, isLoading }: {shipments: Shipme
 
 const ShipmentRow = ({ shipment, products }: {shipment: Shipment; products: ProdukHewan[]}) => {
   const productNames = useMemo(() => 
-    shipment.products.map(p => {
+    shipment.daftarProdukHewan.map(p => {
       const product = products?.find((prod: ProdukHewan) => prod.id === p.produkId)
       return `${product?.nama || 'Unknown'} (${p.jumlah})`
     }).join(', '),
-    [shipment.products, products]
+    [shipment.daftarProdukHewan, products]
   )
 
   const formattedDate = useMemo(() => 
-    new Date(shipment.createdAt).toLocaleDateString('id-ID'),
-    [shipment.createdAt]
+    new Date(shipment.waktuPengiriman).toLocaleDateString('id-ID'),
+    [shipment.waktuPengiriman]
   )
 
   return (
@@ -445,14 +446,14 @@ const ShipmentRow = ({ shipment, products }: {shipment: Shipment; products: Prod
       <td className="p-2">{productNames}</td>
       <td className="p-2">
         <span className={`px-2 py-1 rounded text-xs ${
-          shipment.status === 'completed' 
+          shipment.statusPengiriman === 'DITERIMA' 
             ? 'bg-green-100 text-green-800' 
             : 'bg-yellow-100 text-yellow-800'
         }`}>
-          {shipment.status}
+          {shipment.statusPengiriman}
         </span>
       </td>
-      <td className="p-2">{shipment.note || "-"}</td>
+      {/* <td className="p-2">{shipment.note || "-"}</td> */}
       <td className="p-2">{formattedDate}</td>
     </tr>
   )

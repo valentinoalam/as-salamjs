@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import prisma from "@/lib/prisma"
 import type { JenisHewan, JenisProduk } from "@prisma/client"
 import type { TipeHewanWithImages } from "@/types/keuangan"
+import type { ProdukHewan } from "@/types/qurban"
 
 // TipeHewan actions
 export async function addTipeHewan(data: {
@@ -166,15 +167,6 @@ export async function deleteTipeHewan(id: number) {
       throw new Error("Tidak dapat menghapus tipe hewan yang sedang digunakan oleh hewan qurban")
     }
 
-    // Check if there are any products using this type
-    const productsUsingType = await prisma.produkHewan.count({
-      where: { tipeId: id },
-    })
-
-    if (productsUsingType > 0) {
-      throw new Error("Tidak dapat menghapus tipe hewan yang sedang digunakan oleh produk")
-    }
-
     // Delete associated images
     await prisma.image.deleteMany({
       where: {
@@ -195,12 +187,9 @@ export async function deleteTipeHewan(id: number) {
 }
 
 // ProdukHewan actions
-export async function getAllProdukHewan() {
+export async function getAllProdukHewan(): Promise<ProdukHewan[]> {
   try {
     return await prisma.produkHewan.findMany({
-      include: {
-        tipe_hewan: true,
-      },
       orderBy: { nama: "asc" },
     })
   } catch (error) {
@@ -211,10 +200,11 @@ export async function getAllProdukHewan() {
 
 export async function addProdukHewan(data: {
   nama: string
-  tipeId: number
+  JenisHewan: JenisHewan
   berat?: number | null
   avgProdPerHewan?: number
   JenisProduk: JenisProduk
+  targetPaket?: number
 }) {
   try {
     const result = await prisma.produkHewan.create({
@@ -235,10 +225,9 @@ export async function updateProdukHewan(
   id: number,
   data: {
     nama: string
-    tipeId?: number | null
     berat?: number | null
     avgProdPerHewan?: number
-    JenisProduk?: JenisProduk
+    target?: number
   },
 ) {
   try {

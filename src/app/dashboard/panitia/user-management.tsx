@@ -146,8 +146,8 @@ export default function UserManagement({ initialUsers }: UserManagementProps) {
         return "Petugas Pendaftaran"
       case Role.PETUGAS_INVENTORY:
         return "Petugas Inventory"
-      case Role.PETUGAS_PENYEMBELIHAN:
-        return "Petugas Penyembelihan"
+      case Role.PETUGAS_TIMBANG:
+        return "Petugas Timbang"
       case Role.MEMBER:
         return "Member"
       default:
@@ -226,7 +226,7 @@ export default function UserManagement({ initialUsers }: UserManagementProps) {
                   <SelectItem value={Role.ADMIN}>Admin</SelectItem>
                   <SelectItem value={Role.PETUGAS_PENDAFTARAN}>Petugas Pendaftaran</SelectItem>
                   <SelectItem value={Role.PETUGAS_INVENTORY}>Petugas Inventory</SelectItem>
-                  <SelectItem value={Role.PETUGAS_PENYEMBELIHAN}>Petugas Penyembelihan</SelectItem>
+                  <SelectItem value={Role.PETUGAS_TIMBANG}>Petugas Timbang</SelectItem>
                   <SelectItem value={Role.MEMBER}>Member</SelectItem>
                 </SelectContent>
               </Select>
@@ -268,7 +268,7 @@ export default function UserManagement({ initialUsers }: UserManagementProps) {
                       <SelectItem value={Role.ADMIN}>Admin</SelectItem>
                       <SelectItem value={Role.PETUGAS_PENDAFTARAN}>Petugas Pendaftaran</SelectItem>
                       <SelectItem value={Role.PETUGAS_INVENTORY}>Petugas Inventory</SelectItem>
-                      <SelectItem value={Role.PETUGAS_PENYEMBELIHAN}>Petugas Penyembelihan</SelectItem>
+                      <SelectItem value={Role.PETUGAS_TIMBANG}>Petugas Timbang</SelectItem>
                       <SelectItem value={Role.MEMBER}>Member</SelectItem>
                     </SelectContent>
                   </Select>

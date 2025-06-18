@@ -1,6 +1,6 @@
 "use server"
 import prisma from "@/lib/prisma";
-import { HewanStatus, Counter, PengirimanStatus, type TipeHewan, type ErrorLog, JenisDistribusi, JenisProduk, StatusKupon } from "@prisma/client"
+import { HewanStatus, Counter, PengirimanStatus, type TipeHewan, type ErrorLog, JenisDistribusi, JenisProduk, type Kupon } from "@prisma/client"
 
 // Helper functions for database operations
 // const calculateOffset = (page: number, pageSize: number, group?: string) => {
@@ -73,13 +73,10 @@ export async function getProdukHewan(jenis?: JenisProduk) {
   if (jenis) {
     return await prisma.produkHewan.findMany({
       where: { JenisProduk: jenis },
-      include: { tipe_hewan: true },
     })
   }
 
-  return await prisma.produkHewan.findMany({
-    include: { tipe_hewan: true },
-  })
+  return await prisma.produkHewan.findMany()
 }
 
 export async function getHewanQurban(
@@ -145,6 +142,7 @@ export async function getPenerima(distribusiId?: string, pagination?: {page: num
         },
       },
     },
+    kupon: true,
   };
 
   const skip = pagination? (pagination.page - 1) * pagination.pageSize : undefined
@@ -201,7 +199,7 @@ export async function updateHewanStatus(
   if (slaughtered && !hewan.slaughtered) {
     const nonMeatProducts = await prisma.produkHewan.findMany({
       where: {
-        tipeId: hewan.tipeId,
+        JenisHewan: hewan.tipe.jenis,
         JenisProduk: { not: "DAGING" },
       },
     });
@@ -210,7 +208,7 @@ export async function updateHewanStatus(
       await addProductLog(
         product.id,
         "menambahkan",
-        Counter.PENYEMBELIHAN,
+        Counter.TIMBANG,
         1,
         `Auto-added from slaughter of ${hewan.tipe.nama} #${hewan.hewanId}`
       );
@@ -273,7 +271,7 @@ export async function addProductLog(
 
   switch (event) {
     case "menambahkan":
-      if (place === Counter.PENYEMBELIHAN) {
+      if (place === Counter.TIMBANG) {
         updateData.diTimbang = { increment: value };
         updateData.kumulatif = { increment: value };
       } else if (place === Counter.INVENTORY) {
@@ -282,11 +280,11 @@ export async function addProductLog(
       break;
 
     case "memindahkan":
-      if (place === Counter.PENYEMBELIHAN) {
+      if (place === Counter.TIMBANG) {
         // Validate sufficient inventory
         if (product.diTimbang < value) {
           throw new Error(
-            `Insufficient stock in PENYEMBELIHAN for product ${produkId}`
+            `Insufficient stock in TIMBANG for product ${produkId}`
           );
         }
         updateData.diTimbang = { increment: -value };
@@ -302,7 +300,7 @@ export async function addProductLog(
       break;
 
     case "mengkoreksi":
-      if (place === Counter.PENYEMBELIHAN) {
+      if (place === Counter.TIMBANG) {
         updateData.diTimbang = { set: value };
       } else if (place === Counter.INVENTORY) {
         updateData.diInventori = { set: value };
@@ -337,56 +335,62 @@ export async function addProductLog(
 
 export async function createShipment(products: { produkId: number; jumlah: number }[], catatan?: string) {
   // Create the shipping log
-  const shipment = await prisma.logPutaranPickup.create({
-    data: {
-      statusPengiriman: PengirimanStatus.PENDING,
-      catatan: catatan || null,
-      daftarProdukHewan: {
-        create: products.map((product) => ({
+  const shipment = await prisma.$transaction(async (tx) => {
+    // 1. Create the shipping log
+    const shipment = await tx.logPutaranPickup.create({
+      data: {
+        statusPengiriman: PengirimanStatus.DIKIRIM, // Assuming this maps correctly
+        catatan: catatan || null,
+        daftarProdukHewan: {
+          create: products.map((product) => ({
+            produkId: product.produkId,
+            jumlah: product.jumlah,
+          })),
+        },
+      },
+      include: {
+        daftarProdukHewan: {
+          include: {
+            produk: true, // Include related product details if needed
+          },
+        },
+      },
+    });
+
+    // 2. Prepare all product updates and log creations within the transaction
+    // We use `Promise.all` to execute these concurrently for efficiency within the transaction
+    const productOperations = products.map(async (product) => {
+      // Decrease the diTimbang count for each product
+      await tx.produkHewan.update({
+        where: { id: product.produkId },
+        data: {
+          diTimbang: {
+            decrement: product.jumlah,
+          },
+        },
+      });
+
+      // Add a product log entry
+      await tx.productLog.create({
+        data: {
           produkId: product.produkId,
-          jumlah: product.jumlah,
-        })),
-      },
-    },
-    include: {
-      daftarProdukHewan: {
-        include: {
-          produk: true,
+          event: "memindahkan", // 'moved'
+          place: Counter.TIMBANG, // 'slaughter counter'
+          value: product.jumlah,
+          // Use the `shipment.id` obtained from the first creation
+          note: `Shipped to inventory in batch #${shipment.id}${
+            catatan ? ` - ${catatan}` : ''
+          }`,
         },
-      },
-    },
-  })
+      });
+    });
 
-  // Update the product status to DIKIRIM
-  await prisma.logPutaranPickup.update({
-    where: { id: shipment.id },
-    data: {
-      statusPengiriman: PengirimanStatus.DIKIRIM,
-    },
-  })
+    // Wait for all product-related updates and log creations to complete
+    await Promise.all(productOperations);
 
-  // Decrease the pkgOrigin count for each product
-  for (const product of products) {
-    await prisma.produkHewan.update({
-      where: { id: product.produkId },
-      data: {
-        diTimbang: {
-          decrement: product.jumlah,
-        },
-      },
-    })
-
-    // Add a product log entry
-    await prisma.productLog.create({
-      data: {
-        produkId: product.produkId,
-        event: "memindahkan",
-        place: Counter.PENYEMBELIHAN,
-        value: product.jumlah,
-        note: `Shipped to inventory in batch #${shipment.id}`,
-      },
-    })
-  }
+    // Return the created shipment, or whatever data is needed from the transaction
+    return shipment;
+  });
 
   return shipment
 }
@@ -394,16 +398,12 @@ export async function createShipment(products: { produkId: number; jumlah: numbe
 export async function getPendingShipments() {
   return await prisma.logPutaranPickup.findMany({
     where: {
-      statusPengiriman: PengirimanStatus.PENDING,
+      statusPengiriman: PengirimanStatus.DIKIRIM,
     },
     include: {
       daftarProdukHewan: {
         include: {
-          produk: {
-            include: {
-              tipe_hewan: true,
-            },
-          },
+          produk: true,
         },
       },
     },
@@ -422,11 +422,7 @@ export async function getAllShipments(page = 1, pageSize = 10) {
     include: {
       daftarProdukHewan: {
         include: {
-          produk: {
-            include: {
-              tipe_hewan: true,
-            },
-          },
+          produk: true,
         },
       },
     },
@@ -548,6 +544,7 @@ export async function createDistribusi(data: {
     },
   });
 }
+
 export async function createPenerima(data: {
   distribusiId: string;
   nama: string;
@@ -557,32 +554,86 @@ export async function createPenerima(data: {
   telepon?: string;
   keterangan?: string;
   jenis: JenisDistribusi;
-  kuponId?: string;
+  jumlahKupon?: number; // Parameter opsional untuk jumlah kupon
 }) {
-  const kupon = await prisma.kupon.findFirst({
-    where: {
-      kuponId: data.kuponId
-    },
-  });
-  if(kupon?.status !== StatusKupon.ADA) throw new Error("Mungkin terjadi duplikasi kupon");
-  return await prisma.penerima.create({
-    data: {
-      distribusiId: data.distribusiId,
-      diterimaOleh: data.diterimaOleh,
-      nama: data.nama,
-      noIdentitas: data.noIdentitas,
-      alamat: data.alamat,
-      telepon: data.telepon,
-      keterangan: data.keterangan,
-      jenis: data.jenis,
-      sudahMenerima: false,
-      kupon: {
-        connect: {
-          kuponId: data.kuponId
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // Buat penerima
+      const penerima = await tx.penerima.create({
+        data: {
+          distribusiId: data.distribusiId,
+          diterimaOleh: data.diterimaOleh,
+          nama: data.nama,
+          noIdentitas: data.noIdentitas,
+          alamat: data.alamat,
+          telepon: data.telepon,
+          keterangan: data.keterangan,
+          jenis: data.jenis,
+          sudahMenerima: false,
+        },
+      });
+
+      const assignedKupons: Kupon[] = [];
+
+      // Jika ada jumlahKupon yang diminta, assign kupon
+      if (data.jumlahKupon && data.jumlahKupon > 0) {
+        // Cari kupon yang tersedia
+        const availableKupons = await tx.kupon.findMany({
+          where: { status: "TERSEDIA" },
+          take: data.jumlahKupon,
+          orderBy: { id: 'asc' }
+        });
+
+        if (availableKupons.length < data.jumlahKupon) {
+          // Jika kupon tersedia tidak cukup, buat kupon baru
+          const kuponToCreate = data.jumlahKupon - availableKupons.length;
+          
+          for (let i = 0; i < kuponToCreate; i++) {
+            const newKupon = await tx.kupon.create({
+              data: {
+                status: 'DISALURKAN',
+                penerima: {
+                  connect: { id: penerima.id }
+                }
+              }
+            });
+            assignedKupons.push(newKupon);
+          }
+        }
+
+        // Update kupon yang sudah ada menjadi TERSALURKAN dan connect ke penerima
+        for (const kupon of availableKupons) {
+          const updatedKupon = await tx.kupon.update({
+            where: { id: kupon.id },
+            data: {
+              status: 'DISALURKAN',
+              penerima: {
+                connect: { id: penerima.id }
+              }
+            }
+          });
+          assignedKupons.push(updatedKupon);
         }
       }
-    },
-  });
+
+      return {
+        success: true,
+        penerima,
+        kupons: assignedKupons,
+        message: `Penerima berhasil dibuat${assignedKupons.length > 0 ? ` dengan ${assignedKupons.length} kupon` : ''}`
+      };
+    });
+
+    return result;
+  } catch (error) {
+    console.error("Error creating penerima:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to create penerima",
+      penerima: null,
+      kupons: []
+    };
+  }
 }
 
 export async function updateStatsPenerima({
@@ -593,12 +644,23 @@ export async function updateStatsPenerima({
   produkDistribusi: { produkId: number; jumlah: number }[];
 }) {
   try {
-    // Create log distribusi with product details
-    const {logDistribusi, updatedPenerima} = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
+      // Cek apakah penerima memiliki kupon
+      const penerimaWithKupon = await tx.penerima.findUnique({
+        where: { id: penerimaId },
+        include: {
+          kupon: true
+        }
+      });
+
+      if (!penerimaWithKupon) {
+        throw new Error("Penerima tidak ditemukan");
+      }
+
+      // Create log distribusi with product details
       const logDistribusi = await tx.logDistribusi.create({
         data: {
           penerimaId,
-          // distribusiId,
           listProduk: {
             create: produkDistribusi.map(p => ({
               jenisProdukId: p.produkId,
@@ -608,6 +670,7 @@ export async function updateStatsPenerima({
         },
       });
 
+      // Update penerima status
       const updatedPenerima = await tx.penerima.update({
         where: { id: penerimaId },
         data: {
@@ -616,6 +679,7 @@ export async function updateStatsPenerima({
         },
       });
 
+      // Update produk hewan statistics
       for (const produk of produkDistribusi) {
         await tx.produkHewan.update({
           where: { id: produk.produkId },
@@ -623,30 +687,87 @@ export async function updateStatsPenerima({
         });
       }
 
+      // Update distribusi realisasi
       await tx.distribusi.update({
         where: { id: updatedPenerima.distribusiId },
         data: { realisasi: { increment: 1 } },
       });
 
-      return { logDistribusi, updatedPenerima };
+      let updatedKupons: Kupon[] = [];
+
+      // Jika penerima memiliki kupon, update status kupon
+      if (penerimaWithKupon.kupon.length > 0) {
+        updatedKupons = await Promise.all(
+          penerimaWithKupon.kupon.map(async (kupon) => {
+            // Update status kupon berdasarkan logika bisnis
+            // Misalnya: jika sudah menerima, status menjadi DISALURKAN
+            // atau bisa jadi DISIMPAN/KEMBALI/TIDAK_KEMBALI tergantung kondisi
+            return await tx.kupon.update({
+              where: { id: kupon.id },
+              data: { 
+                status: 'DISALURKAN' // atau status lain sesuai kebutuhan
+              }
+            });
+          })
+        );
+      }
+
+      return { 
+        logDistribusi, 
+        updatedPenerima,
+        updatedKupons,
+        message: `Distribusi berhasil dicatat${updatedKupons.length > 0 ? ` dan ${updatedKupons.length} kupon diupdate` : ''}`
+      };
     });
 
-
-    return {logDistribusi, updatedPenerima};
-    } catch (error) {
+    return result;
+  } catch (error) {
     console.error("Transaction failed:", error);
     throw new Error("Failed to complete distribusi. Please try again.");
+  }
+}
+
+// Fungsi helper untuk mendapatkan informasi kupon penerima
+export async function getPenerimaKuponInfo(penerimaId: string) {
+  try {
+    const penerima = await prisma.penerima.findUnique({
+      where: { id: penerimaId },
+      include: {
+        kupon: {
+          select: {
+            id: true,
+            status: true
+          }
+        }
+      }
+    });
+
+    if (!penerima) {
+      return { success: false, error: "Penerima tidak ditemukan" };
+    }
+
+    return {
+      success: true,
+      penerima: penerima.nama,
+      totalKupon: penerima.kupon.length,
+      kuponDetail: penerima.kupon.map(k => ({
+        id: k.id,
+        status: k.status
+      }))
+    };
+  } catch (error) {
+    console.error("Error getting penerima kupon info:", error);
+    return { 
+      success: false, 
+      error: "Failed to get kupon information" 
+    };
   }
 }
 
 export async function getErrorLogs(): Promise<ErrorLog[]> {
   return await prisma.errorLog.findMany({
     include: {
-      produk: {
-        include: {
-          tipe_hewan: true
-        }
-      },
+      produk: true,
     },
     orderBy: {
       timestamp: "desc",

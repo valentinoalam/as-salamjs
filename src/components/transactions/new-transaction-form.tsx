@@ -35,23 +35,24 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { ImageUploader } from "@/components/transactions/image-uploader";
+import ImageUploader from "@/components/transactions/image-uploader";
 import { toast } from "@/hooks/use-toast";
 import { ArrowUpDown, Calendar as CalendarIcon } from "lucide-react";
-
 interface Category {
   id: number; // Changed from string to number to match schema
   name: string;
   type: TransactionType; // Changed to use the enum type
 }
-
+const fileSchema = z.instanceof(File, {
+  message: "Input must be a File object."
+});
 const formSchema = z.object({
   type: z.enum([TransactionType.PEMASUKAN, TransactionType.PENGELUARAN]),
   amount: z.coerce.number().positive("Jumlah harus lebih dari 0"),
   date: z.date(),
   description: z.string().min(3, "Deskripsi minimal 3 karakter"),
   categoryId: z.coerce.number().min(1, "Kategori harus dipilih"), // Changed to number
-  images: z.array(z.string().url()).optional(),
+  files: z.array(fileSchema).optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -59,8 +60,7 @@ type FormValues = z.infer<typeof formSchema>;
 export function NewTransactionForm() {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
-  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
-  
+  const [uploadedImages, setUploadedImages] = useState<File[]>([]);
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -69,12 +69,12 @@ export function NewTransactionForm() {
       date: new Date(),
       description: "",
       categoryId: 0, // Changed to number
-      images: [],
+      files: [],
     },
   });
   
   const transactionType = form.watch("type");
-  
+
   useEffect(() => {
     // Fetch categories
     const fetchCategories = async () => {
@@ -99,7 +99,7 @@ export function NewTransactionForm() {
   
   const onSubmit = async (values: FormValues) => {
     // Add uploaded images to form values
-    values.images = uploadedImages;
+    values.files = uploadedImages
     
     try {
       const response = await fetch('/api/keuangan/transactions', {
@@ -281,8 +281,7 @@ export function NewTransactionForm() {
               <div className="md:col-span-2">
                 <Label htmlFor="images">Foto Bukti</Label>
                 <ImageUploader
-                  onImagesChange={setUploadedImages}
-                  existingImages={[]}
+                  onFilesChange={setUploadedImages}
                 />
                 <p className="text-sm text-muted-foreground mt-2">
                   Unggah foto struk, kwitansi, atau bukti transaksi lainnya

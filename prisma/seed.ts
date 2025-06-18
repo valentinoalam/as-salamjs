@@ -1,4 +1,4 @@
-import { PrismaClient, JenisProduk, Role, TransactionType } from "@prisma/client"
+import { PrismaClient, JenisProduk, Role, TransactionType, JenisHewan } from "@prisma/client"
 import { hash } from "bcryptjs"
 
 const prisma = new PrismaClient()
@@ -106,19 +106,19 @@ async function main() {
     },
   })
   console.log(petugasInventory)
-  const petugasPenyembelihan = await prisma.user.upsert({
+  const petugasTimbang = await prisma.user.upsert({
     where: { email: "penyembelihan@qurban.org" },
     update: {
       password: staffPassword,
     },
     create: {
       email: "penyembelihan@qurban.org",
-      name: "Petugas Penyembelihan",
-      role: Role.PETUGAS_PENYEMBELIHAN,
+      name: "Petugas Timbang",
+      role: Role.PETUGAS_TIMBANG,
       password: staffPassword,
     },
   })
-  console.log(petugasPenyembelihan)
+  console.log(petugasTimbang)
   // Create TipeHewan
   const sapi = await prisma.tipeHewan.upsert({
     where: { id: 1 },
@@ -161,54 +161,54 @@ async function main() {
     // Sapi products
     {
       nama: "Daging Sapi 1kg",
-      tipeId: 1,
+      JenisHewan: "SAPI" as const,
       berat: 1.0,
       targetPaket: 300,
       JenisProduk: JenisProduk.DAGING,
     },
     {
       nama: "Daging Sapi 5kg",
-      tipeId: 1,
+      JenisHewan: "SAPI" as const,
       berat: 5.0,
       targetPaket: 1454,
       JenisProduk: JenisProduk.DAGING,
     },
     {
       nama: "Kepala Sapi",
-      tipeId: 1,
+      JenisHewan: "SAPI" as const,
       JenisProduk: JenisProduk.KEPALA,
     },
     {
       nama: "Kulit Sapi",
-      tipeId: 1,
+      JenisHewan: "SAPI" as const,
       JenisProduk: JenisProduk.KULIT,
     },
     {
       nama: "Kaki Sapi",
-      tipeId: 1,
+      JenisHewan: "SAPI" as const,
       JenisProduk: JenisProduk.KAKI,
     },
     // Domba products
     {
       nama: "Daging Domba 5kg",
-      tipeId: 2,
+      JenisHewan: JenisHewan.DOMBA,
       berat: 5.0,
       targetPaket: 1476,
       JenisProduk: JenisProduk.DAGING,
     },
     {
       nama: "Kepala Domba",
-      tipeId: 2,
+      JenisHewan: JenisHewan.DOMBA,
       JenisProduk: JenisProduk.KEPALA,
     },
     {
       nama: "Kulit Domba",
-      tipeId: 2,
+      JenisHewan: JenisHewan.DOMBA,
       JenisProduk: JenisProduk.KULIT,
     },
     {
       nama: "Kaki Domba",
-      tipeId: 2,
+      JenisHewan: JenisHewan.DOMBA,
       JenisProduk: JenisProduk.KAKI,
     },
   ]
@@ -248,7 +248,7 @@ async function main() {
 //         nama_peruntukan: `Peruntukan ${i}`,
 //         potong_sendiri: i % 3 === 0,
 //         ambil_daging: i % 2 === 0,
-//         mengambilDaging: i % 2 === 0,
+//         ambil_daging: i % 2 === 0,
 //         dash_code: `DASH-${i}`,
 //         hewan: {
 //           connect: [{ hewanId }],

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
+// import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
 import { Counter, JenisHewan } from "@prisma/client"
@@ -16,6 +16,7 @@ import { exportToExcel } from "@/lib/excel"
 import { Download, Minus, Plus } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { ProdukHewan, ShipmentProduct } from "@/types/qurban"
+import { ShipmentHistory } from "@/components/qurban/shipment-history"
 
 export default function CounterTimbangPage() {
   const { 
@@ -27,7 +28,7 @@ export default function CounterTimbangPage() {
     getProductById,
     getProductLogsByPlace
   } = useQurban()
-  const productLogs = getProductLogsByPlace(Counter.PENYEMBELIHAN)
+  const productLogs = getProductLogsByPlace(Counter.TIMBANG)
   // Filter products for daging (meat) products
   const produkDaging = getProductsByType('daging')
   const allProdukHewan = getProductsByType('all')
@@ -36,8 +37,8 @@ export default function CounterTimbangPage() {
   };
 
   const groupedProducts = allProdukHewan.reduce((acc: GroupedProdukHewan, product) => {
-    if (product.tipe_hewan && product.tipe_hewan.jenis) {
-      const jenisHewan = product.tipe_hewan.jenis;
+    if (product.JenisHewan) {
+      const jenisHewan = product.JenisHewan;
       if (!acc[jenisHewan]) {
         acc[jenisHewan] = [];
       }
@@ -46,7 +47,7 @@ export default function CounterTimbangPage() {
     return acc;
   }, {});
   // const [note, setNote] = useState("")
-  // const [operation, setOperation] = useState<"menambahkan" | "memindahkan" | "mengkoreksi">("menambahkan")
+  // const [event, setOperation] = useState<"menambahkan" | "memindahkan" | "mengkoreksi">("menambahkan")
   const [showProductHistory, setShowProductHistory] = useState(false)
   const [selectedProductForHistory, setSelectedProductForHistory] = useState<number | null>(null)
   const [selectedProduct, setSelectedProduct] = useState<number>(produkDaging[0]?.id || 0)
@@ -57,26 +58,46 @@ export default function CounterTimbangPage() {
   const [shipmentProducts, setShipmentProducts] = useState<ShipmentProduct[]>([])
   const [shipmentNote, setShipmentNote] = useState("")
   const [isCreatingShipment, setIsCreatingShipment] = useState(false)
+  // New state for expandable quantity input
+  const [showQuantityDialog, setShowQuantityDialog] = useState(false)
+  const [selectedProductForShipment, setSelectedProductForShipment] = useState<number | null>(null)
+  const [tempQuantity, setTempQuantity] = useState<number>(0)
+  const [originalAvailable, setOriginalAvailable] = useState<Record<number, number>>({})
 
   // Initialize counters when products load
   useEffect(() => {
     if (produkDaging.length > 0) {
       const initialCounters: Record<number, number> = {}
+      const initialAvailable: Record<number, number> = {}
       produkDaging.forEach((product) => {
         initialCounters[product.id] = 0
+        initialAvailable[product.id] = product.diTimbang
       })
       setCounters(initialCounters)
+      setOriginalAvailable(initialAvailable)
       setSelectedProduct(produkDaging[0]?.id || 0)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
+  
   // Update selected product when products change
   useEffect(() => {
     if (produkDaging.length > 0 && !selectedProduct) {
       setSelectedProduct(produkDaging[0].id)
     }
   }, [produkDaging, selectedProduct])
+
+
+  // Initialize temp available when allProdukHewan changes
+  useEffect(() => {
+    if (allProdukHewan.length > 0) {
+      const initialAvailable: Record<number, number> = {}
+      allProdukHewan.forEach((product) => {
+        initialAvailable[product.id] = product.diTimbang
+      })
+      setOriginalAvailable(initialAvailable)
+    }
+  }, [allProdukHewan])
 
   const getProductName = (id: number) => {
     const product = getProductById(id)
@@ -87,12 +108,12 @@ export default function CounterTimbangPage() {
     setQuantity((prev) => prev + value)
   }
 
-  const handleSetQuantity = (value: string) => {
-    const numValue = Number.parseInt(value)
-    if (!isNaN(numValue) && numValue >= 0) {
-      setQuantity(Math.max(1, numValue))
-    }
-  }
+  // const handleSetQuantity = (value: string) => {
+  //   const numValue = Number.parseInt(value)
+  //   if (!isNaN(numValue) && numValue >= 0) {
+  //     setQuantity(Math.max(1, numValue))
+  //   }
+  // }
 
   const handleSubmit = async () => {
     if (!selectedProduct || quantity <= 0) return
@@ -116,9 +137,9 @@ export default function CounterTimbangPage() {
 
       // Use context method to update product
       await updateProduct({
-        productId: selectedProduct,
-        operation: "menambahkan",
-        place: Counter.PENYEMBELIHAN,
+        produkId: selectedProduct,
+        event: "menambahkan",
+        place: Counter.TIMBANG,
         value: quantity,
         note: "Penambahan dari timbangan"
       })
@@ -139,41 +160,19 @@ export default function CounterTimbangPage() {
     }
   }
 
-  // const handleDecreaseProduct = async (id: number) => {
-  //   try {
-  //     // Update local counter
-  //     setCounters((prev) => ({
-  //       ...prev,
-  //       [id]: Math.max(0, prev[id] - 1),
-  //     }))
+  // Get total quantity already added to shipment for a specific product
+  const getShipmentQuantity = (produkId: number) => {
+    const shipmentItem = shipmentProducts.find(p => p.produkId === produkId)
+    return shipmentItem ? shipmentItem.jumlah : 0
+  }
 
-  //     // Add to history
-  //     const currentTime = new Date().toLocaleTimeString()
-  //     setHistory((prev) => [
-  //       {
-  //         text: `🔴➖ 1 from ${getProductName(id)}`,
-  //         time: currentTime,
-  //       },
-  //       ...prev.slice(0, 19), // Keep only last 20 items
-  //     ])
-
-  //     // Use context method to memindahkan product
-  //     updateProduct({
-  //       productId: id,
-  //       operation: "memindahkan",
-  //       place: Counter.PENYEMBELIHAN,
-  //       value: 1,
-  //       note: "Decreased from counter timbang"
-  //     })
-  //   } catch (error) {
-  //     console.error("Error decreasing product:", error)
-  //     toast({
-  //       title: "Error",
-  //       description: "Failed to memindahkan product. Please try again.",
-  //       variant: "destructive",
-  //     })
-  //   }
-  // }
+  // Get actual available stock (original - already in shipment)
+  const getActualAvailable = (produkId: number) => {
+    const product = allProdukHewan.find(p => p.id === produkId)
+    const originalStock = product ? product.diTimbang : 0
+    const alreadyInShipment = getShipmentQuantity(produkId)
+    return Math.max(0, originalStock - alreadyInShipment)
+  }
 
   // Shipping functions
   const handleCreateShipment = async () => {
@@ -189,16 +188,8 @@ export default function CounterTimbangPage() {
     setIsCreatingShipment(true)
 
     try {
-       // First update products with "memindahkan" operation
+       // First update products with "memindahkan" event
       for (const item of shipmentProducts) {
-        await updateProduct({
-          productId: item.produkId,
-          operation: "memindahkan",
-          place: Counter.PENYEMBELIHAN,
-          value: item.jumlah,
-          note: `Dipindahkan ke inventori: ${shipmentNote}`
-        })
-
         // Add to history with "-" symbol
         const currentTime = new Date().toLocaleTimeString()
         setHistory((prev) => [
@@ -212,37 +203,58 @@ export default function CounterTimbangPage() {
       // Use context method to create shipment
       await createShipment(shipmentProducts, shipmentNote)
 
-      toast({
-        title: "Pengiriman dicatat",
-        description: "Pengiriman Produk dapat segera dikirim ke inventori",
-      })
-
       // Reset shipment form
       setShipmentProducts([])
       setShipmentNote("")
     } catch (error) {
       console.error("Error creating shipment:", error)
-      toast({
-        title: "Error",
-        description: "Gagal mencatat pengiriman. Coba lagi.",
-        variant: "destructive",
-      })
     } finally {
       setIsCreatingShipment(false)
     }
   }
-  const handleAddToShipment = (produkId: number, jumlah: number) => {
-    const product = getProductById(produkId)
-    if (!product) return
 
-    if (jumlah <= 0 || jumlah > product.diTimbang) {
+  const handleProductClick = (produkId: number) => {
+    const actualAvailable = getActualAvailable(produkId)
+    
+    if (actualAvailable <= 0) {
       toast({
-        title: "Invalid quantity",
-        description: `Quantity must be between 1 and ${product.diTimbang}`,
+        title: "No stock available",
+        description: "This product has no remaining stock for shipment",
         variant: "destructive",
       })
       return
     }
+
+    setSelectedProductForShipment(produkId)
+    setTempQuantity(0)
+    setShowQuantityDialog(true)
+  }
+
+  const handleQuantityChange = (change: number) => {
+    if (!selectedProductForShipment) return
+    
+    const originalAvailableAmount = originalAvailable[selectedProductForShipment] || 0
+    const newQuantity = tempQuantity + change
+    
+    // Ensure quantity stays within bounds (1 to originalAvailableAmount)
+    if (newQuantity >= 1 && newQuantity <= originalAvailableAmount) {
+      setTempQuantity(newQuantity)
+    }
+  }
+
+  // Calculate remaining available based on original available and current temp quantity
+  const getRemainingAvailable = (produkId: number) => {
+    const original = originalAvailable[produkId] || 0
+    return original - tempQuantity
+  }
+
+  const handleAddToShipment = () => {
+    if (!selectedProductForShipment) return
+    
+    const produkId = selectedProductForShipment
+    const jumlah = tempQuantity
+    const product = getProductById(produkId)
+    if (!product) return
 
     // Check if product already exists in shipment
     const existingIndex = shipmentProducts.findIndex((p) => p.produkId === produkId)
@@ -271,15 +283,27 @@ export default function CounterTimbangPage() {
       title: "Added to shipment",
       description: `Added ${jumlah} of ${getProductName(produkId)} to shipment`,
     })
+
+    // Close dialog and reset states
+    handleCloseQuantityDialog()
   }
 
+  const handleCloseQuantityDialog = () => {
+    setShowQuantityDialog(false)
+    setSelectedProductForShipment(null)
+    setTempQuantity(0)
+  }
+
+    
   const handleRemoveFromShipment = (produkId: number) => {
     setShipmentProducts(shipmentProducts.filter((p) => p.produkId !== produkId))
   }
+
   const handleShowProductHistory = (produkId: number) => {
     setSelectedProductForHistory(produkId)
     setShowProductHistory(true)
   }
+
   // Show loading state while products are loading
   if (productsQuery.isLoading) {
     return (
@@ -317,7 +341,7 @@ export default function CounterTimbangPage() {
     const rows = allProdukHewan.map(p => ({
       ID: p.id,
       Nama: p.nama,
-      Tipe: p.tipe_hewan?.nama || "-",
+      Hewan: p.JenisHewan || "-",
       Jenis: p.JenisProduk,
       Berat: p.berat ?? 0,
       "Target Paket": p.targetPaket,
@@ -334,9 +358,10 @@ export default function CounterTimbangPage() {
       <ConnectionStatus isConnected={isConnected} />
 
       <Tabs defaultValue="timbang">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="timbang">Timbang</TabsTrigger>
           <TabsTrigger value="pengiriman">Pengiriman ke Inventori</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
         <TabsContent value="timbang">
@@ -363,7 +388,7 @@ export default function CounterTimbangPage() {
                         <div key={product.id} className="flex items-center space-x-2">
                           <RadioGroupItem value={product.id.toString()} id={`product-${product.id}`} />
                           <Label htmlFor={`product-${product.id}`} className="cursor-pointer">
-                            {product.nama} ({product.tipe_hewan?.nama})
+                            {product.nama}
                           </Label>
                         </div>
                       ))}
@@ -409,14 +434,8 @@ export default function CounterTimbangPage() {
                       <Minus className="h-4 w-4" />
                     </Button>
                     
-                    <div className="flex items-center space-y-1">
-                      <Input
-                        type="number"
-                        value={quantity}
-                        onChange={(e) => handleSetQuantity(e.target.value)}
-                        min={0}
-                        className="w-20 text-center text-lg font-semibold border-2 focus:border-blue-400"
-                      />
+                    <div className="flex items-center space-y-1 space-x-1">
+                      <span className="w-20 text-center text-lg font-semibold border-2 focus:border-blue-400">{quantity}</span>
                       <span className="pl-1 text-xs text-gray-500">Qty</span>
                     </div>
                     
@@ -542,186 +561,213 @@ export default function CounterTimbangPage() {
               <div className="space-y-6">
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium">Available Products</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {allProdukHewan
-                      .filter((product) => product.diTimbang > 0)
-                      .map((product) => (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3.5 lg:grid-cols-5 gap-4">
+                  {allProdukHewan
+                    .filter((product) => product.diTimbang > 0)
+                    .map((product) => {
+                      const actualAvailable = getActualAvailable(product.id)
+                      const inShipment = getShipmentQuantity(product.id)
+                      
+                      return (
                         <div key={product.id} className="border rounded-md p-4">
-                          <div className="font-medium">{product.nama}</div>
-                          <div className="text-sm text-muted-foreground">Available: {product.diTimbang}</div>
-                          <div className="flex items-center gap-2 mt-2">
-                            <Input
-                              type="number"
-                              min={1}
-                              max={product.diTimbang}
-                              defaultValue="1"
-                              className="w-20"
-                              id={`qty-${product.id}`}
-                            />
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                const input = document.getElementById(`qty-${product.id}`) as HTMLInputElement
-                                const value = Number.parseInt(input.value)
-                                if (!isNaN(value) && value > 0 && value <= product.diTimbang) {
-                                  handleAddToShipment(product.id, value)
-                                }
-                              }}
-                            >
-                              Add
-                            </Button>
+                          <div 
+                            className={`cursor-pointer p-2 rounded transition-colors ${
+                              actualAvailable > 0 ? 'hover:bg-gray-50' : 'bg-gray-100 cursor-not-allowed'
+                            }`}
+                            onClick={() => actualAvailable > 0 && handleProductClick(product.id)}
+                          >
+                            <div className="font-medium">{product.nama}</div>
+                            <div className="text-sm text-muted-foreground">
+                              Total Stock: {product.diTimbang}
+                            </div>
+                            {inShipment > 0 && (
+                              <div className="text-sm text-orange-600">
+                                In Shipment: {inShipment}
+                              </div>
+                            )}
+                            <div className={`text-sm ${actualAvailable > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                              Available: {actualAvailable}
+                            </div>
+                            <div className={`text-xs mt-1 ${
+                              actualAvailable > 0 ? 'text-blue-600' : 'text-gray-400'
+                            }`}>
+                              {actualAvailable > 0 ? 'Click to add to shipment' : 'No stock available'}
+                            </div>
                           </div>
                         </div>
-                      ))}
+                      )
+                    })}
                   </div>
+                  {/* Quantity Selection Dialog */}
+                  <Dialog
+                    open={showQuantityDialog}
+                    onOpenChange={setShowQuantityDialog}
+                  >
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>
+                          Add {selectedProductForShipment ? getProductName(selectedProductForShipment) : ""} to Shipment
+                        </DialogTitle>
+                      </DialogHeader>
+                      
+                      <div className="space-y-4">
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">
+                            Available:  {selectedProductForShipment && getActualAvailable(selectedProductForShipment)}
+                          </p>
+                          {getShipmentQuantity(selectedProductForShipment || 0) > 0 && (
+                              <p className="text-sm text-orange-600">
+                                Already in shipment: {selectedProductForShipment && getShipmentQuantity(selectedProductForShipment)}
+                              </p>
+                            )}
+                        </div>
+                        
+                        <div className="flex flex-col items-center space-y-4">
+                          <div className="text-center mb-4">
+                            <span className="text-2xl font-bold">{tempQuantity}</span>
+                            <span className="text-sm text-muted-foreground ml-2">units</span>
+                          </div>
+        
+                          <div className="grid grid-cols-3 gap-2 w-full">
+                            {[-10, -5, -1, 1, 5, 10].map((value) => (
+                              <Button
+                                key={value}
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleQuantityChange(value)}
+                                disabled={
+                                  value < 0 
+                                    ? tempQuantity <= Math.abs(value)
+                                    : tempQuantity + value > getActualAvailable(selectedProductForShipment!)
+                                }
+                              >
+                                {value > 0 ? `+${value}` : value}
+                              </Button>
+                            ))}
+                          </div>
+                          
+                          <p className="text-sm text-muted-foreground">
+                            Remaining after selection: {getRemainingAvailable(selectedProductForShipment ?? 0)}
+                          </p>
+                        </div>
+                        
+                        <div className="flex gap-3">
+                          <Button
+                            onClick={handleAddToShipment}
+                            className="flex-1"
+                          >
+                            Add to Shipment
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={handleCloseQuantityDialog}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                   {allProdukHewan.filter((product) => product.diTimbang > 0).length === 0 && (
                     <div className="text-center p-4 border rounded-md">No products available for shipment</div>
                   )}
                 </div>
 
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Products to Ship</h3>
-                  {shipmentProducts.length > 0 ? (
-                    <div className="space-y-2">
-                      {shipmentProducts.map((item, index) => {
-                        const product = getProductById(item.produkId)
-                        return (
-                          <div key={index} className="flex justify-between items-center border p-3 rounded-md">
-                            <div>
-                              <span className="font-medium">{product?.nama}</span>
-                              <span className="ml-2 text-sm text-muted-foreground">Quantity: {item.jumlah}</span>
-                            </div>
-                            <Button variant="outline" size="sm" onClick={() => handleRemoveFromShipment(index)}>
-                              Remove
-                            </Button>
-                          </div>
-                        )
-                      })}
+
+                {shipmentProducts.length > 0 ? (
+                  <div className="space-y-4">
+                    <div className="border rounded-md p-4">
+                      <h3 className="font-medium mb-2">Products to Ship</h3>
+                      <ul className="space-y-2">
+                        {shipmentProducts.map((item) => {
+                          const product = productsQuery.data.find((p) => p.id === item.produkId)
+                          return (
+                            <li key={item.produkId} className="flex justify-between items-center">
+                              <span>
+                                {product?.nama}: {item.jumlah} units
+                              </span>
+                              <Button size="sm" variant="outline" onClick={() => handleRemoveFromShipment(item.produkId)}>
+                                Remove
+                              </Button>
+                            </li>
+                          )
+                        })}
+                      </ul>
                     </div>
-                  ) : (
-                    <div className="text-center p-4 border rounded-md">No products added to shipment yet</div>
-                  )}
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="shipment-note">Notes (Optional)</Label>
-                  <Textarea
-                    id="shipment-note"
-                    placeholder="Add any notes about this shipment"
-                    value={shipmentNote}
-                    onChange={(e) => setShipmentNote(e.target.value)}
-                  />
-                </div>
-
-                <Button
-                  className="w-full"
-                  onClick={handleCreateShipment}
-                  disabled={shipmentProducts.length === 0 || isCreatingShipment}
-                >
-                  {isCreatingShipment ? "Creating Shipment..." : "Create Shipment"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-      
-      <Tabs defaultValue="shipment">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="shipment">Shipment</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="shipment">
-          <Card>
-            <CardHeader>
-              <CardTitle>Create Shipment</CardTitle>
-              <CardDescription>Send products to inventory</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {shipmentProducts.length > 0 ? (
-                <div className="space-y-4">
-                  <div className="border rounded-md p-4">
-                    <h3 className="font-medium mb-2">Products to Ship</h3>
-                    <ul className="space-y-2">
-                      {shipmentProducts.map((item) => {
-                        const product = productsQuery.data.find((p) => p.id === item.produkId)
-                        return (
-                          <li key={item.produkId} className="flex justify-between items-center">
-                            <span>
-                              {product?.nama}: {item.jumlah} units
-                            </span>
-                            <Button size="sm" variant="outline" onClick={() => handleRemoveFromShipment(item.produkId)}>
-                              Remove
-                            </Button>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="shipmentNote">Shipment Note</Label>
-                    <Textarea
-                      id="shipmentNote"
-                      placeholder="Add a note about this shipment"
-                      value={shipmentNote}
-                      onChange={(e) => setShipmentNote(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="flex justify-end">
-                    <Button onClick={handleCreateShipment} disabled={isCreatingShipment}>
-                      {isCreatingShipment ? "Creating..." : "Create Shipment"}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center p-8 border rounded-md">
-                  <p>No products added to shipment yet</p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Add products from the Inventory tab to create a shipment
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="history">
-          <Card>
-            <CardHeader>
-              <CardTitle>Operation History</CardTitle>
-              <CardDescription>Recent inventory operations</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {productLogs.length > 0 ? (
-                  productLogs.map((log) => (
-                    <div key={log.id} className="border rounded-md p-4">
-                      <div className="flex justify-between">
-                        <div className="font-medium">{log.produk.nama}</div>
-                        <div className="text-sm text-muted-foreground">{new Date(log.timestamp).toLocaleString()}</div>
-                      </div>
-                      <div className="mt-1 flex items-center gap-2">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs ${
-                            log.event === "menambahkan" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {log.event === "menambahkan" ? "➕" : "➖"}
-                        </span>
-                        <span>{log.value} units</span>
-                      </div>
-                      {log.note && <div className="mt-2 text-sm">{log.note}</div>}
+                    <div>
+                      <Label htmlFor="shipmentNote">Shipment Note</Label>
+                      <Textarea
+                        id="shipmentNote"
+                        placeholder="Add a note about this shipment"
+                        value={shipmentNote}
+                        onChange={(e) => setShipmentNote(e.target.value)}
+                      />
                     </div>
-                  ))
+
+                    <div className="flex justify-end">
+                      <Button onClick={handleCreateShipment} disabled={shipmentProducts.length === 0 || isCreatingShipment}>
+                        {isCreatingShipment ? "Creating Shipment..." : "Create Shipment"}
+                      </Button>
+                    </div>
+                  </div>
                 ) : (
-                  <div className="text-center p-4">Belum ada catatan</div>
+                  <div className="text-center p-8 border rounded-md">
+                    <p>No products added to shipment yet</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Add products from the Inventory tab to create a shipment
+                    </p>
+                  </div>
                 )}
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+        <TabsContent value="history">
+          <Tabs defaultValue="account" className="p-4">
+            <TabsList>
+              <TabsTrigger value="riwayat-pengiriman">Riwayat Pengiriman</TabsTrigger>
+              <TabsTrigger value="riwayat-product">Riwayat PerProduk</TabsTrigger>
+            </TabsList>
+            <TabsContent value="riwayat-pengiriman">
+              <ShipmentHistory />
+            </TabsContent>
+            <TabsContent value="riwayat-product">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Operation History</CardTitle>
+                  <CardDescription>Recent inventory events</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {productLogs.length > 0 ? (
+                      productLogs.map((log) => (
+                        <div key={log.id} className="border rounded-md p-4">
+                          <div className="flex justify-between">
+                            <div className="font-medium">{log.produk.nama}</div>
+                            <div className="text-sm text-muted-foreground">{new Date(log.timestamp).toLocaleString()}</div>
+                          </div>
+                          <div className="mt-1 flex items-center gap-2">
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs ${
+                                log.event === "menambahkan" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              {log.event === "menambahkan" ? "➕" : "➖"}
+                            </span>
+                            <span>{log.value} units</span>
+                          </div>
+                          {log.note && <div className="mt-2 text-sm">{log.note}</div>}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center p-4">Belum ada catatan</div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
 

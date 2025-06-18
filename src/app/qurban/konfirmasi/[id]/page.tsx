@@ -3,7 +3,19 @@ import Link from "next/link"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { getMudhohiById } from "./actions"
+import { MudhohiQRCode } from "@/components/qurban/mudhohi-qr"
+import type { Mudhohi } from "@prisma/client"
 
+/*
+In a React component:
+
+
+Or use the hook for data URL:
+const { qrDataURL, loading } = useQRCodeDataURL(mudhohiData);
+
+In your createMudhohi API response, you can return the mudhohi data
+and generate QR on the frontend instead of server-side
+*/
 export default async function KonfirmasiPage({ params }: { params: { id: string } }) {
   const { id } = await params;
   const mudhohi = await getMudhohiById(id)
@@ -54,6 +66,13 @@ export default async function KonfirmasiPage({ params }: { params: { id: string 
                   )}
                 </p>
               </div>
+              <MudhohiQRCode 
+                mudhohi={mudhohi as Mudhohi} 
+                size={256}
+                format="svg"
+                includeDownload={true}
+                className="border p-4 rounded-lg"
+              />
             </div>
           </div>
 
@@ -80,7 +99,7 @@ export default async function KonfirmasiPage({ params }: { params: { id: string 
           <div className="space-y-4">
             <h3 className="font-medium text-lg">Informasi Pengambilan</h3>
             <div className="p-4 border rounded-md">
-              {mudhohi.mengambilDaging ? (
+              {mudhohi.ambil_daging ? (
                 <div>
                   <p>Anda telah memilih untuk mengambil daging qurban.</p>
                   <p className="mt-2">

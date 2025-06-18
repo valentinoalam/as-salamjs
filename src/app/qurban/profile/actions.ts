@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { getCurrentUser } from "@/lib/auth"
+import type { User } from "@prisma/client"
 
 export async function updateUserProfile(data: {
   userId: string
@@ -18,7 +19,7 @@ export async function updateUserProfile(data: {
     }
 
     // Prepare update data
-    const updateData: any = {}
+    const updateData: User = {} as User
 
     if (data.urlAvatar !== undefined) {
       updateData.urlAvatar = data.urlAvatar

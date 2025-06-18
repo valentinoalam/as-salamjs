@@ -180,9 +180,9 @@ function mapToMudhohiSchema(rowData: Record<string, any>, userId: string) {
     keterangan: rowData.keterangan || null,
     potong_sendiri: convertToBoolean(rowData.potong_sendiri),
     ambil_daging: convertToBoolean(rowData.ambil_daging),
-    mengambilDaging: convertToBoolean(rowData.mengambil_daging || rowData.sudah_ambil),
+    ambil_daging: convertToBoolean(rowData.mengambil_daging || rowData.sudah_ambil),
     dash_code: rowData.dash_code || rowData.kode || generateDashCode(),
-    barcode_image: rowData.barcode_image || rowData.barcode || null,
+    qrcode_url: rowData.qrcode_url || rowData.barcode || null,
   }
 }
 

@@ -1,0 +1,80 @@
+{
+  "extends": "./tsconfig.json", // Extends your main tsconfig.json located at the project root
+  "compilerOptions": {
+    // --- Module and Target for Test Environment ---
+    // Output CommonJS modules suitable for Node.js (Jest's runtime environment).
+    // This is often more stable for test runners than 'esnext' or 'bundler' for compilation.
+    "module": "CommonJS",
+    // Use Node.js-style module resolution.
+    // This aligns with how Node.js resolves modules and is typically robust for Jest.
+    "moduleResolution": "Node",
+    // Target a specific ECMAScript version for compilation.
+    // Match your Node.js version's capabilities or your main app's target.
+    "target": "ES2022",
+    // Leave JSX as-is for Jest. `react-jsx` (for React 17+) is often fine here too.
+    // `preserve` delegates JSX transformation to Jest/Babel/SWC (often via next/jest).
+    "jsx": "preserve",
+
+    // --- Type Definitions for Testing ---
+    // Explicitly include types for Jest, Node.js, and React Testing Library matchers.
+    // Excluding "next" as these types are not directly relevant for test compilation.
+    "types": [
+      "jest",
+      "node",
+      "@testing-library/jest-dom"
+    ],
+
+    // --- Other Compiler Options for Tests ---
+    // Important for modern setups like Next.js and Babel/SWC.
+    // Set to `false` here if you encounter issues with mocks or non-isolated test files.
+    "isolatedModules": false,
+    // Enable seamless interoperability between CommonJS and ES Modules.
+    "esModuleInterop": true,
+    // Allow synthetic default imports (e.g., `import React from 'react'`).
+    "allowSyntheticDefaultImports": true,
+    // Do not emit JavaScript files to disk; Jest/ts-jest handle compilation in memory.
+    "noEmit": true,
+    // Do not generate declaration (.d.ts) files for test code.
+    "emitDeclarationOnly": false,
+    // If 'module' is CommonJS, 'verbatimModuleSyntax' is typically 'false' to allow mixed import/require.
+    // If your main tsconfig has `verbatimModuleSyntax: true` and `type: "module"` in package.json,
+    // then you might need to try `true` here as well if Jest supports it for .cts.
+    "verbatimModuleSyntax": false
+  },
+  "include": [
+    // Include your Jest configuration file itself (if it's .cts)
+    "jest.config.cjs",
+    // Include your Jest setup file for `@testing-library/jest-dom`
+    "jest.setup.ts",
+    // Include all TypeScript and JavaScript test files
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    // Include any mock files you might have
+    "__mocks__/**/*.ts",
+    "__mocks__/**/*.tsx",
+    "__mocks__/**/*.js",
+    // Include files within `__tests__` directories (a common pattern)
+    "__tests__/**/*.ts",
+    "__tests__/**/*.tsx",
+    "__tests__/**/*.js"
+  ],
+  "exclude": [
+    // Exclude standard project directories not relevant for testing
+    "node_modules",
+    ".next",
+    "dist",
+    "build",
+    "out",
+    // Exclude Cypress files if they have their own tsconfig or should not be compiled by Jest
+    "cypress",
+    // Exclude the main application source code to speed up test compilation
+    // and prevent conflicts with app-specific tsconfig rules.
+    "src",
+    // Exclude Next.js environment declaration file as it's for app context
+    "next-env.d.ts",
+    // Exclude Next.js config files
+    "next.config.js"
+  ]
+}

@@ -7,18 +7,19 @@ export async function GET(request: NextRequest) {
   const page = Number.parseInt(searchParams.get("page") || "1")
   const pageSize = Number.parseInt(searchParams.get("pageSize") || "10")
 
-
-
   try {
-    const data = await getPenerima(distribusiId || undefined, {page, pageSize})
+    const penerima = await getPenerima(distribusiId || undefined, {page, pageSize})
+    const total = penerima.length
 
     return NextResponse.json({
-      data,
-      meta: {
-        total:data.length,
-        page,
+      data: penerima,
+      pagination: {
+        currentPage: page,
+        total,
         pageSize,
-        totalPages: Math.ceil(data.length / pageSize),
+        totalPages: Math.ceil(total / pageSize),
+        hasNext: page < Math.ceil(total / pageSize),
+        hasPrev: page > 1,
       },
     })
   } catch (error) {
@@ -26,7 +27,6 @@ export async function GET(request: NextRequest) {
     return new NextResponse("Internal Server Error", { status: 500 })
   }
 }
-
 
 export async function POST(req: NextRequest) {
   try {

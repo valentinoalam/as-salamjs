@@ -1,6 +1,6 @@
 import type { Server as HTTPServer } from "http"
 import { Server as SocketIOServer } from "socket.io"
-// import { getProdukHewan, getErrorLogs } from "@/services/qurban"
+import { getProdukHewan, getErrorLogs } from "@/services/qurban"
 
 export function setupSocketServer(httpServer: HTTPServer) {
   const io = new SocketIOServer(httpServer, {
@@ -64,22 +64,21 @@ export function setupSocketServer(httpServer: HTTPServer) {
     })
 
     // // Handle update-product event
-    // socket.on("update-product", async (data) => {
-    //   console.log("update-product:", data)
-    //   try {
-    //     // Broadcast updated data to all clients
-    //     const products = await getProdukHewan()
-    //     console.log("update-product:", products)
-    //     io.emit("update-product", { products })
+    socket.on("update-product", async (data) => {
+      console.log("update-product:", data)
+      try {
+        // Broadcast updated data to all clients
+        const products = await getProdukHewan()
+        io.emit("update-product", { products })
 
-    //     // Check for errors and broadcast them
-    //     const errorLogs = await getErrorLogs()
-    //     io.emit("error-logs", { errorLogs })
-    //   } catch (error) {
-    //     console.error("Error updating products:", error)
-    //     socket.emit("server-error", { message: "Failed to update products" })
-    //   }
-    // })
+        // Check for errors and broadcast them
+        const errorLogs = await getErrorLogs()
+        io.emit("error-logs", { errorLogs })
+      } catch (error) {
+        console.error("Error updating products:", error)
+        socket.emit("server-error", { message: "Failed to update products" })
+      }
+    })
 
     // Handle ping event for connection testing
     socket.on("ping", (callback: (arg0: { status: string; time: number; }) => void) => {

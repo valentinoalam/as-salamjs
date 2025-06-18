@@ -19,8 +19,11 @@ export const baseQurbanSchema = z.object({
   pesan_khusus: z.string().optional(),
   keterangan: z.string().optional(),
   potong_sendiri: z.boolean(),
-  mengambilDaging: z.boolean(),
-})
+  ambil_daging: z.boolean(),
+  jatahPengqurban: z.array(z.string())
+    .max(2, "Maksimal 2 produk yang dapat dipilih")
+    .optional(),
+});
 
 // User-facing form schema
 export const userQurbanSchema = baseQurbanSchema.extend({

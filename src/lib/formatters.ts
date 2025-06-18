@@ -10,6 +10,34 @@ export const formatCurrency = (amount: number, currency = 'IDR'): string => {
   }).format(amount);
 };
 
+export function formatAngkaManual(angka: number) {
+  if (angka < 1000) {
+    return angka.toString();
+  }
+
+  const suffixes = [
+    { value: 1, symbol: "" },
+    { value: 1000, symbol: "Rb" },
+    { value: 1_000_000, symbol: "Jt" },
+    { value: 1_000_000_000, symbol: "M" }, // Anda bisa menambahkan 'M' untuk Miliar jika perlu
+    { value: 1_000_000_000_000, symbol: "T" } // Dan 'T' untuk Triliun
+  ];
+
+  let i;
+  for (i = suffixes.length - 1; i > 0; i--) {
+    if (angka >= suffixes[i].value) {
+      break;
+    }
+  }
+
+  const num = angka / suffixes[i].value;
+  // Memformat angka dengan 1 desimal jika diperlukan, tanpa desimal jika bulat
+  const formattedNum = num % 1 === 0 ? num.toString() : num.toFixed(1).replace(/\.0$/, '');
+
+  return formattedNum + suffixes[i].symbol;
+}
+
+
 /**
  * Formats a date as localized string
  */

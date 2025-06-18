@@ -20,6 +20,7 @@ import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { adminQurbanSchema, getPaymentStatusFromAmount, type AdminQurbanFormValues } from "@/lib/zod/qurban-form"
 import type { TipeHewan } from "@/types/keuangan"
+import { ProductSelectionCard } from "../trx-user/product-selection-card"
 
 interface AdminQurbanFormProps {
   tipeHewan: TipeHewan[]
@@ -32,7 +33,7 @@ export function AdminQurbanForm({ tipeHewan, onSubmit, onCancel, initialData }: 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedAnimal, setSelectedAnimal] = useState<TipeHewan | null>(null)
   const [totalAmount, setTotalAmount] = useState(0)
-
+  const [selectedProducts, setSelectedProducts] = useState<string[]>(initialData?.jatahPengqurban || []);
   const form = useForm<AdminQurbanFormValues>({
     resolver: zodResolver(adminQurbanSchema),
     defaultValues: {
@@ -47,12 +48,13 @@ export function AdminQurbanForm({ tipeHewan, onSubmit, onCancel, initialData }: 
       pesan_khusus: initialData?.pesan_khusus || "",
       keterangan: initialData?.keterangan || "",
       potong_sendiri: initialData?.potong_sendiri || false,
-      mengambilDaging: initialData?.mengambilDaging || false,
+      ambil_daging: initialData?.ambil_daging || false,
       createdAt: initialData?.createdAt || new Date(),
       cara_bayar: initialData?.cara_bayar || CaraBayar.TRANSFER,
       paymentStatus: initialData?.paymentStatus || PaymentStatus.BELUM_BAYAR,
       dibayarkan: initialData?.dibayarkan || 0,
       kodeResi: initialData?.kodeResi || "",
+      jatahPengqurban: initialData?.jatahPengqurban || [],
     },
   })
 
@@ -295,7 +297,7 @@ export function AdminQurbanForm({ tipeHewan, onSubmit, onCancel, initialData }: 
                 <h2 className="text-xl font-semibold">Preferensi Penyembelihan</h2>
                 <FormField
                   control={form.control}
-                  name="mengambilDaging"
+                  name="ambil_daging"
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                       <FormControl>
@@ -330,7 +332,27 @@ export function AdminQurbanForm({ tipeHewan, onSubmit, onCancel, initialData }: 
 
               <Separator />
               <h2 className="text-xl font-semibold">Informasi Tambahan</h2>
-              
+              <FormField
+                control={form.control}
+                name="jatahPengqurban"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Pilih Jatah Daging (Maksimal 2)</FormLabel>
+                    <FormControl>
+                      <ProductSelectionCard
+                        jenisHewan={selectedAnimal!.jenis}
+                        // tipeHewanId={parseInt(form.watch("tipeHewanId"))}
+                        selectedProducts={selectedProducts}
+                        onChange={(selected) => {
+                          field.onChange(selected);
+                          setSelectedProducts(selected);
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="pesan_khusus"

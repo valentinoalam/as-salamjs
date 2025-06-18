@@ -6,7 +6,8 @@ import { useQurban } from "@/contexts/qurban-context"
 
 export default function ProgressSembelihPage() {
   const { meta, isConnected, sapiQuery, dombaQuery } = useQurban();
-  const { tabs, setActiveTab, pagination, setPagination } = useUIState();
+  const { tabs, setActiveTab, pagination, setPagination, isHydrated } = useUIState();
+  if(!isHydrated) return <div>Loading...</div> 
   return (
     <div className="space-y-8">
       <div className="flex items-center gap-2">

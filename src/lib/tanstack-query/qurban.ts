@@ -2,7 +2,7 @@
 export const queryKeys = {
   sapi: ['hewan', 'sapi'] as const,
   domba: ['hewan', 'domba'] as const,
-  products: ['products'] as const,
+  products: ['products', 'product'] as const,
   shipments: ['shipments'] as const,
   productLogs: ['productLogs'] as const,
   errorLogs: ['errorLogs'] as const,

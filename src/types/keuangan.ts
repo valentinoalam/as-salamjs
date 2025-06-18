@@ -116,6 +116,7 @@ export interface Transaction {
   type: TransactionType
   categoryId: number
   category: Category
+  receiptUrl: Image[]
   date: Date
   createdBy: string
   createdAt: Date

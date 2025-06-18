@@ -42,7 +42,7 @@ export const METADATA: MetadataConfig = {
       card: 'summary_large_image',
       title: 'Masjid As-Salam Jakasampurna | Community & Worship',
       description: 'Join our vibrant Islamic community in Bekasi for prayers, education, and social initiatives.',
-      images: ['https://as-salamjs.online/images/masjid-as-salam.jpg'],
+      images: ['https://as-salamjs.online/images/alquran.jpg'],
       site: '@assalam_jakasampurna',
     },
     robots: {

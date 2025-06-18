@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(req: Request) {
   try {
-    const { productId:produkId, operation:event, place, value, note } = await req.json()
+    const { produkId, event, place, value, note } = await req.json()
 
     if (!produkId || !event) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })

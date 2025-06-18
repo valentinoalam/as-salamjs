@@ -6,7 +6,7 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { CaraBayar, PaymentStatus } from "@prisma/client"
-import { ChevronLeft, ChevronRight, Check, Calendar, User, CreditCard } from "lucide-react"
+import { ChevronLeft, ChevronRight, Check, Calendar, User, CreditCard, ShoppingBasket } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -21,6 +21,7 @@ import { toast } from "@/hooks/use-toast"
 import { AnimalSelectionCard } from "./animal-selection-card"
 import { userQurbanSchema, type UserQurbanFormValues } from "@/lib/zod/qurban-form"
 import type { TipeHewan, TipeHewanWithImages } from "@/types/keuangan"
+import { ProductSelectionCard } from "./product-selection-card"; // New component
 
 type Step = {
   id: string
@@ -48,6 +49,12 @@ const STEPS: Step[] = [
     description: "Metode dan informasi pembayaran",
     icon: CreditCard,
   },
+  {
+    id: "products",
+    title: "Pilih Jatah Daging",
+    description: "Pilih produk daging yang diinginkan",
+    icon: ShoppingBasket,
+  },
 ]
 
 interface UserQurbanFormProps {
@@ -62,7 +69,7 @@ export function UserQurbanForm({ tipeHewan, onSubmit, onCancel, initialData }: U
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedAnimal, setSelectedAnimal] = useState<TipeHewan | null>(null)
   const [totalAmount, setTotalAmount] = useState(0)
-
+  const [selectedProducts, setSelectedProducts] = useState<string[]>(initialData?.jatahPengqurban || []);
   const form = useForm<UserQurbanFormValues>({
     resolver: zodResolver(userQurbanSchema),
     defaultValues: {
@@ -77,8 +84,9 @@ export function UserQurbanForm({ tipeHewan, onSubmit, onCancel, initialData }: U
       pesan_khusus: initialData?.pesan_khusus || "",
       keterangan: initialData?.keterangan || "",
       potong_sendiri: initialData?.potong_sendiri || false,
-      mengambilDaging: initialData?.mengambilDaging || false,
+      ambil_daging: initialData?.ambil_daging || false,
       cara_bayar: initialData?.cara_bayar || CaraBayar.TRANSFER,
+      jatahPengqurban: initialData?.jatahPengqurban || [],
     },
   })
 
@@ -163,6 +171,7 @@ export function UserQurbanForm({ tipeHewan, onSubmit, onCancel, initialData }: U
         return ["nama_pengqurban", "email", "phone", "alamat"]
       case 2: // Payment
         return ["cara_bayar"]
+      case 3: return ["jatahPengqurban"]; // New validation
       default:
         return []
     }
@@ -342,7 +351,7 @@ export function UserQurbanForm({ tipeHewan, onSubmit, onCancel, initialData }: U
                   <div className="space-y-4">
                     <FormField
                       control={form.control}
-                      name="mengambilDaging"
+                      name="ambil_daging"
                       render={({ field }) => (
                         <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                           <FormControl>
@@ -445,6 +454,31 @@ export function UserQurbanForm({ tipeHewan, onSubmit, onCancel, initialData }: U
                               </div>
                             </div>
                           </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+              {currentStep === 3 && (
+                <div className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="jatahPengqurban"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Pilih Jatah Daging (Maksimal 2)</FormLabel>
+                        <FormControl>
+                          <ProductSelectionCard
+                            jenisHewan={selectedAnimal!.jenis}
+                            // tipeHewanId={parseInt(form.watch("tipeHewanId"))}
+                            selectedProducts={selectedProducts}
+                            onChange={(selected) => {
+                              field.onChange(selected);
+                              setSelectedProducts(selected);
+                            }}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

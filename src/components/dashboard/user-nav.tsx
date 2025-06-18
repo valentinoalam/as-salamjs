@@ -32,7 +32,7 @@ export function UserNav() {
     'ADMIN': 'Administrator',
     'PETUGAS_PENDAFTARAN': 'Panitia Pendaftaran',
     'PETUGAS_KEUANGAN': 'Panitia Keuangan',
-    'PETUGAS_PENYEMBELIHAN': 'Panitia Lapangan',
+    'PETUGAS_TIMBANG': 'Panitia Lapangan',
     'PETUGAS_INVENTORY': 'Panitia Distribusi',
   };
 

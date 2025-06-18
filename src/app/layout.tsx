@@ -9,6 +9,7 @@ import { generateMetaData } from "@/lib/metadata"
 import { NextAuthProvider } from "@/components/layout/providers/next-auth-provider"
 import { getServerSession } from "next-auth"
 import { authOptions } from "./api/auth/[...nextauth]/route"
+import { AuthProvider } from "@/components/layout/providers/auth-provider"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -123,10 +124,12 @@ export default async function RootLayout({
       </head>
       <body className={inter.className}>
         <NextAuthProvider session={session}>
-          <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-            {children}
-            <Toaster />
-          </ThemeProvider>
+          <AuthProvider>
+            <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+              {children}
+              <Toaster />
+            </ThemeProvider>
+          </AuthProvider>
         </NextAuthProvider>
       </body>
     </html>

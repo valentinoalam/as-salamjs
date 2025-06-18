@@ -1,60 +1,105 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Trash2, Upload, Camera, X } from "lucide-react";
+import { Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 
 interface ImageUploaderProps {
-  onImagesChange: (urls: string[]) => void;
-  existingImages: string[];
+  onFilesChange: (files: File[]) => void;
+  existingUrls?: string[];
+  maxFiles?: number;
+  maxSize?: number;
 }
 
-export function ImageUploader({ onImagesChange, existingImages = [] }: ImageUploaderProps) {
-  const [images, setImages] = useState<string[]>(existingImages);
-  
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    // In a real application, you would upload these files to your server or cloud storage
-    // and then use the returned URLs
-    const newImageUrls = acceptedFiles.map(file => {
-      // Create a URL for the dropped file
-      // In production, you would replace this with the actual upload
-      return URL.createObjectURL(file);
-    });
-    
-    const updatedImages = [...images, ...newImageUrls];
-    setImages(updatedImages);
-    onImagesChange(updatedImages);
-  }, [images, onImagesChange]);
-  
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+export default function ImageUploader({
+  onFilesChange,
+  existingUrls = [],
+  maxFiles = 5,
+  maxSize = 5, // in MB
+}: ImageUploaderProps) {
+  const [files, setFiles] = useState<File[]>([]);
+  const objectUrlsRef = useRef<string[]>([]);
+  const isMounted = useRef(false);
+
+  // Cleanup object URLs
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+      objectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      objectUrlsRef.current = [];
+    };
+  }, []);
+
+  const getImageUrls = useCallback(() => {
+    return [
+      ...existingUrls,
+      ...files.map(file => URL.createObjectURL(file))
+    ];
+  }, [existingUrls, files]);
+
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      const remainingSlots = maxFiles - (files.length + existingUrls.length);
+      if (remainingSlots <= 0) return;
+
+      const validFiles = acceptedFiles
+        .filter(file => file.size <= maxSize * 1024 * 1024)
+        .slice(0, remainingSlots);
+
+      setFiles(prev => [...prev, ...validFiles]);
+    },
+    [files.length, existingUrls.length, maxFiles, maxSize]
+  );
+
+  const removeImage = useCallback(
+    (index: number, type: "existing" | "new") => {
+      if (type === "existing") {
+        const updatedExisting = [...existingUrls];
+        updatedExisting.splice(index, 1);
+        onFilesChange([...files, ...updatedExisting.map(() => new File([], "placeholder"))]);
+      } else {
+        const updatedFiles = [...files];
+        const removedFile = updatedFiles.splice(index, 1)[0];
+        setFiles(updatedFiles);
+        
+        // Cleanup object URL
+        const urlIndex = objectUrlsRef.current.findIndex(
+          url => url === URL.createObjectURL(removedFile)
+        );
+        if (urlIndex !== -1) {
+          URL.revokeObjectURL(objectUrlsRef.current[urlIndex]);
+          objectUrlsRef.current.splice(urlIndex, 1);
+        }
+      }
+    },
+    [files, existingUrls, onFilesChange]
+  );
+
+  const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.jpeg', '.jpg', '.png', '.webp']
+      "image/*": [".jpeg", ".jpg", ".png", ".webp"],
     },
-    maxFiles: 5,
+    maxFiles,
+    maxSize: maxSize * 1024 * 1024,
   });
-  
-  const removeImage = (index: number) => {
-    const updatedImages = [...images];
-    updatedImages.splice(index, 1);
-    setImages(updatedImages);
-    onImagesChange(updatedImages);
-  };
-  
-  // Mock function to simulate taking a photo
-  const takePhoto = () => {
-    // In a real application, you would access the device camera
-    // For now, we'll just add a placeholder image
-    const newImage = "https://images.pexels.com/photos/4473398/pexels-photo-4473398.jpeg";
-    const updatedImages = [...images, newImage];
-    setImages(updatedImages);
-    onImagesChange(updatedImages);
-  };
-  
+
+  // Handle file changes
+  useEffect(() => {
+    if (files.length > 0) {
+      onFilesChange(files);
+    }
+  }, [files, onFilesChange]);
+
+  const allImages = getImageUrls();
+  const isMaxFilesReached = allImages.length >= maxFiles;
+
   return (
     <div className="space-y-4">
       <div
@@ -63,10 +108,12 @@ export function ImageUploader({ onImagesChange, existingImages = [] }: ImageUplo
           "border-2 border-dashed rounded-md p-6 text-center cursor-pointer transition-colors",
           isDragActive
             ? "border-primary bg-primary/5"
-            : "border-muted hover:border-primary/50 hover:bg-muted/50"
+            : "border-muted hover:border-primary/50 hover:bg-muted/50",
+          isMaxFilesReached && "opacity-50 cursor-not-allowed"
         )}
+        aria-disabled={isMaxFilesReached}
       >
-        <input {...getInputProps()} />
+        <Input {...getInputProps()} />
         <div className="flex flex-col items-center justify-center gap-2">
           <Upload className="h-10 w-10 text-muted-foreground" />
           <p className="text-sm font-medium">
@@ -75,28 +122,34 @@ export function ImageUploader({ onImagesChange, existingImages = [] }: ImageUplo
               : "Tarik dan lepaskan foto, atau klik untuk memilih"}
           </p>
           <p className="text-xs text-muted-foreground">
-            Maksimal 5 foto, format JPG, PNG, WEBP (maks. 5MB per foto)
+            Maksimal {maxFiles} foto, format JPG, PNG, WEBP (maks. {maxSize}MB per foto)
           </p>
         </div>
       </div>
-      
-      <div className="flex justify-center">
-        <Button type="button" variant="outline" onClick={takePhoto}>
-          <Camera className="mr-2 h-4 w-4" />
-          Ambil Foto dengan Kamera
-        </Button>
-      </div>
-      
-      {images.length > 0 && (
+
+      {fileRejections.length > 0 && (
+        <div className="text-red-500 text-sm">
+          {fileRejections.map(({ errors }) =>
+            errors.map(e => (
+              <p key={e.code} className="flex items-center gap-1">
+                <X className="h-4 w-4" /> {e.message}
+              </p>
+            ))
+          )}
+        </div>
+      )}
+
+      {allImages.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-          {images.map((image, index) => (
-            <Card key={index} className="relative overflow-hidden h-48 group">
+          {existingUrls.map((url, index) => (
+            <Card key={`existing-${index}`} className="relative overflow-hidden h-48 group">
               <div className="absolute inset-0">
                 <Image
-                  src={image}
-                  alt={`Uploaded image ${index + 1}`}
+                  src={url}
+                  alt={`Existing image ${index + 1}`}
                   fill
                   className="object-cover"
+                  sizes="(max-width: 768px) 50vw, 33vw"
                 />
               </div>
               <Button
@@ -104,12 +157,47 @@ export function ImageUploader({ onImagesChange, existingImages = [] }: ImageUplo
                 variant="destructive"
                 size="icon"
                 className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={() => removeImage(index)}
+                onClick={() => removeImage(index, "existing")}
+                aria-label={`Hapus gambar ${index + 1}`}
               >
                 <X className="h-4 w-4" />
               </Button>
             </Card>
           ))}
+
+          {files.map((file, index) => {
+            const url = URL.createObjectURL(file);
+            if (!objectUrlsRef.current.includes(url)) {
+              objectUrlsRef.current.push(url);
+            }
+            
+            return (
+              <Card key={`new-${index}`} className="relative overflow-hidden h-48 group">
+                <div className="absolute inset-0">
+                  <Image
+                    src={url}
+                    alt={`Uploaded image ${existingUrls.length + index + 1}`}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 50vw, 33vw"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => removeImage(index, "new")}
+                  aria-label={`Hapus gambar ${existingUrls.length + index + 1}`}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+                <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1 truncate">
+                  {file.name}
+                </div>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

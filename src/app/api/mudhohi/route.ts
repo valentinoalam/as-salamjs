@@ -6,27 +6,41 @@ import type { PaymentStatus } from "@prisma/client"
 import { getCurrentUser } from "@/lib/auth"
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams
-  const page = Number.parseInt(searchParams.get("page") || "1")
-  const pageSize = Number.parseInt(searchParams.get("pageSize") || "10")
-  const status = searchParams.get('status') as PaymentStatus | null
-  const searchTerm = searchParams.get('search') || undefined
-
   try {
-    const data = await getMudhohi(page, pageSize, status || undefined, searchTerm || undefined)
-    const total = await countMudhohi()
+    const searchParams = request.nextUrl.searchParams
+    // const { searchParams } = new URL(request.url) 
+    const page = Number.parseInt(searchParams.get("page") || "1")
+    const pageSize = Number.parseInt(searchParams.get("pageSize") || "10")
+    const status = searchParams.get('status') as PaymentStatus | null
+    const searchTerm = searchParams.get('search') || undefined
 
-    return NextResponse.json(data, {
-      headers: {
-        "X-Total-Count": total.toString(),
-        "X-Total-Pages": Math.ceil(total / pageSize).toString(),
+    const [mudhohi, total] = await Promise.all([
+      getMudhohi(page, pageSize, status || undefined, searchTerm || undefined),
+      countMudhohi(),
+    ])
+    // return NextResponse.json(data, {
+    //   headers: {
+    //     "X-Total-Count": total.toString(),
+    //     "X-Total-Pages": Math.ceil(total / pageSize).toString(),
+    //   },
+    // })
+    return NextResponse.json({
+      data: mudhohi,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(total / pageSize),
+        pageSize,
+        total,
+        hasNext: page < Math.ceil(total / pageSize),
+        hasPrev: page > 1,
       },
     })
   } catch (error) {
-    console.error("Error fetching mudhohi data:", error)
-    return NextResponse.json({ error: "Failed to fetch data" }, { status: 500 })
+    console.error("Error fetching mudhohi:", error)
+    return NextResponse.json({ error: "Failed to fetch mudhohi data" }, { status: 500 })
   }
 }
+
 
 export async function POST(request: Request) {
   try {

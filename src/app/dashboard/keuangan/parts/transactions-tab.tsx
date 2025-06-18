@@ -59,6 +59,7 @@ export default function TransactionsTab() {
 
   // Get data from context
   const { isLoading: transactionsLoading, refetch: refetchTransactions } = transactionsQuery
+  const [hasMounted, setHasMounted] = useState(false)
   const { data: categories = [] } = categoriesQuery
 
   // Reset current page when filters change
@@ -175,7 +176,8 @@ export default function TransactionsTab() {
   const handleRefresh = async () => {
     await refetchTransactions()
   }
-
+  useEffect(() => setHasMounted(true), [])
+  if (!hasMounted) return null
   return (
     <div className="space-y-6">
       <Overview />

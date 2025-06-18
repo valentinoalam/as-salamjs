@@ -6,7 +6,7 @@ import { signIn } from 'next-auth/react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Sheet as Sheep } from 'lucide-react';
+import { Sheet as Sheep, Loader2 } from 'lucide-react'; // Added Loader2 for spinner
 
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +20,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import Icons from "@/components/layout/icons/socialIcon"
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Email tidak valid' }),
@@ -34,6 +35,7 @@ export default function LoginPage() {
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState<boolean>(false); // New state for Google loading
 
   const {
     register,
@@ -66,9 +68,36 @@ export default function LoginPage() {
       router.push(callbackUrl);
       router.refresh();
     } catch (error) {
+      console.error(error)
       setError('Terjadi kesalahan. Silakan coba lagi.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // New function for Google login
+  const handleGoogleLogin = async () => {
+    try {
+      setIsGoogleLoading(true);
+      setError(null);
+      
+      const result = await signIn('google', {
+        redirect: false,
+        callbackUrl,
+      });
+
+      if (result?.error) {
+        throw new Error(result.error);
+      }
+
+      if (result?.url) {
+        router.push(result.url);
+      }
+    } catch (error) {
+      console.error('Google login error:', error);
+      setError('Gagal login dengan Google. Silakan coba lagi.');
+    } finally {
+      setIsGoogleLoading(false);
     }
   };
 
@@ -124,9 +153,42 @@ export default function LoginPage() {
               )}
             </div>
           </CardContent>
-          <CardFooter>
-            <Button className="w-full" type="submit" disabled={isLoading}>
-              {isLoading ? 'Memproses...' : 'Masuk'}
+          <CardFooter className="flex flex-col gap-4">
+            <Button className="w-full" type="submit" disabled={isLoading || isGoogleLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Memproses...
+                </>
+              ) : 'Masuk'}
+            </Button>
+            
+            {/* Divider */}
+            <div className="relative w-full">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Atau lanjutkan dengan
+                </span>
+              </div>
+            </div>
+            
+            {/* Google Login Button */}
+            <Button 
+              variant="outline" 
+              className="w-full flex items-center gap-2"
+              onClick={handleGoogleLogin}
+              type="button"
+              disabled={isGoogleLoading || isLoading}
+            >
+              {isGoogleLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Icons.google className="h-4 w-4" />
+              )}
+              <span>Google</span>
             </Button>
           </CardFooter>
         </form>

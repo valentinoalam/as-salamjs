@@ -286,7 +286,7 @@ if (!files.length || !transactionId) {
     })
 
     revalidatePath("/keuangan")
-    return { success: true }
+    return { success: true,  imageUrls}
   } catch (error) {
     console.error("Error uploading receipt:", error)
     return { success: false, error: "Failed to upload receipt" }

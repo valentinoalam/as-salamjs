@@ -4,7 +4,7 @@ import { receiveShipment } from "@/services/qurban"
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const { id } = await params 
   try {
-    console.log(id)
+
     const shipmentId = Number.parseInt(id)
     if (isNaN(shipmentId)) {
       return NextResponse.json({ error: "Invalid shipment ID" }, { status: 400 })

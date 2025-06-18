@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
@@ -31,6 +32,8 @@ interface FormState {
 }
 
 interface UIStateContextType {
+  isSidebarOpen: boolean
+  toggleSidebar: () => void
   // Tab states
   tabs: TabState
   setActiveTab: (component: keyof TabState, tabValue: string) => void
@@ -43,6 +46,7 @@ interface UIStateContextType {
   forms: FormState
   updateFormField: <K extends keyof FormState>(formName: K, fieldName: keyof FormState[K], value: any) => void
   resetForm: (formName: keyof FormState) => void
+  isHydrated: boolean
 }
 
 // Default values
@@ -69,6 +73,45 @@ const defaultForms: FormState = {
   },
 }
 
+const defaultSidebar: boolean = true
+
+// Storage keys - centralized for consistency
+const STORAGE_KEYS = {
+  tabs: "qurban_tabs",
+  pagination: "qurban_pagination", 
+  forms: "qurban_forms",
+  sidebar: "qurban_sidebar"
+} as const
+
+// Helper function to safely get from localStorage
+const getFromLocalStorage = <T,>(key: string, defaultValue: T): T => {
+  // Always return default value during SSR
+  if (typeof window === "undefined") {
+    return defaultValue
+  }
+
+  try {
+    const item = window.localStorage.getItem(key)
+    return item !== null ? (JSON.parse(item) as T) : defaultValue
+  } catch (error) {
+    console.error(`Error loading "${key}" from localStorage:`, error)
+    return defaultValue
+  }
+}
+
+// Helper function to safely set to localStorage
+const setToLocalStorage = (key: string, value: any) => {
+  if (typeof window === "undefined") {
+    return
+  }
+  
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch (error) {
+    console.error(`Error saving ${key} to localStorage:`, error)
+  }
+}
+
 // Create context
 const UIStateContext = createContext<UIStateContextType>({
   tabs: defaultTabs,
@@ -78,54 +121,62 @@ const UIStateContext = createContext<UIStateContextType>({
   forms: defaultForms,
   updateFormField: () => {},
   resetForm: () => {},
+  isSidebarOpen: defaultSidebar,
+  toggleSidebar: () => {},
+  isHydrated: false
 })
 
 // Provider component
 export const UIStateProvider = ({ children }: { children: ReactNode }) => {
-  // Initialize state with default values
+  // Initialize ALL state with default values to ensure SSR/CSR consistency
   const [tabs, setTabs] = useState<TabState>(defaultTabs)
   const [pagination, setPaginationState] = useState<PaginationState>(defaultPagination)
   const [forms, setForms] = useState<FormState>(defaultForms)
-  const [isLoaded, setIsLoaded] = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(defaultSidebar)
+  const [isHydrated, setIsHydrated] = useState(false)
 
-  // Load state from localStorage on mount
+  // Load state from localStorage on mount (client-side only)
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        // Load tabs state
-        const savedTabs = localStorage.getItem("qurban_tabs")
-        if (savedTabs) {
-          setTabs(JSON.parse(savedTabs))
-        }
+    // Load persisted state from localStorage
+    const storedTabs = getFromLocalStorage(STORAGE_KEYS.tabs, defaultTabs)
+    const storedPagination = getFromLocalStorage(STORAGE_KEYS.pagination, defaultPagination)
+    const storedForms = getFromLocalStorage(STORAGE_KEYS.forms, defaultForms)
+    const storedSidebar = getFromLocalStorage(STORAGE_KEYS.sidebar, defaultSidebar)
 
-        // Load pagination state
-        const savedPagination = localStorage.getItem("qurban_pagination")
-        if (savedPagination) {
-          setPaginationState(JSON.parse(savedPagination))
-        }
-
-        // Load forms state
-        const savedForms = localStorage.getItem("qurban_forms")
-        if (savedForms) {
-          setForms(JSON.parse(savedForms))
-        }
-      } catch (error) {
-        console.error("Error loading UI state from localStorage:", error)
-        // If there's an error, use default values
-      }
-
-      setIsLoaded(true)
-    }
+    // Update state with persisted values
+    setTabs(storedTabs)
+    setPaginationState(storedPagination)
+    setForms(storedForms)
+    setIsSidebarOpen(storedSidebar)
+    
+    // Mark as hydrated
+    setIsHydrated(true)
   }, [])
 
-  // Save state to localStorage whenever it changes
+  // Save state to localStorage whenever it changes (only after hydration)
   useEffect(() => {
-    if (typeof window !== "undefined" && isLoaded) {
-      localStorage.setItem("qurban_tabs", JSON.stringify(tabs))
-      localStorage.setItem("qurban_pagination", JSON.stringify(pagination))
-      localStorage.setItem("qurban_forms", JSON.stringify(forms))
+    if (isHydrated) {
+      setToLocalStorage(STORAGE_KEYS.sidebar, isSidebarOpen)
     }
-  }, [tabs, pagination, forms, isLoaded])
+  }, [isSidebarOpen, isHydrated])
+
+  useEffect(() => {
+    if (isHydrated) {
+      setToLocalStorage(STORAGE_KEYS.tabs, tabs)
+    }
+  }, [tabs, isHydrated])
+  
+  useEffect(() => {
+    if (isHydrated) {
+      setToLocalStorage(STORAGE_KEYS.pagination, pagination)
+    }
+  }, [pagination, isHydrated])
+
+  useEffect(() => {
+    if (isHydrated) {
+      setToLocalStorage(STORAGE_KEYS.forms, forms)
+    }
+  }, [forms, isHydrated])
 
   // Tab state handlers
   const setActiveTab = (component: keyof TabState, tabValue: string) => {
@@ -161,9 +212,15 @@ export const UIStateProvider = ({ children }: { children: ReactNode }) => {
     }))
   }
 
+  const toggleSidebar = () => {
+    setIsSidebarOpen((prev) => !prev)
+  }
+
   return (
     <UIStateContext.Provider
       value={{
+        isSidebarOpen,
+        toggleSidebar,
         tabs,
         setActiveTab,
         pagination,
@@ -171,6 +228,7 @@ export const UIStateProvider = ({ children }: { children: ReactNode }) => {
         forms,
         updateFormField,
         resetForm,
+        isHydrated
       }}
     >
       {children}
@@ -179,4 +237,10 @@ export const UIStateProvider = ({ children }: { children: ReactNode }) => {
 }
 
 // Custom hook to use the context
-export const useUIState = () => useContext(UIStateContext)
+export const useUIState = () => {
+  const context = useContext(UIStateContext)
+  if (!context) {
+    throw new Error('useUIState must be used within a UIStateProvider')
+  }
+  return context
+}

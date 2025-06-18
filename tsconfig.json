@@ -1,62 +1,82 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ES2022", // Modern target, good for current Node.js and browsers
     "lib": [
       "dom",
       "dom.iterable",
-      "ES2022" // ES2022 is usually implied by target: ES2022, but harmless.
+      "ES2022" // ES2022 is good. Adding 'ES2022' here in `lib` when `target` is `ES2022` is technically redundant but harmless and explicit.
     ],
-    "module": "esnext", // 'esnext' is suitable for modern module systems
-    "moduleResolution": "bundler", // Prefer 'bundler' for Next.js/modern setups for better tree-shaking
+    "module": "esnext", // 'esnext' is suitable for modern module systems like ESM
+    "moduleResolution": "bundler", // Prefer 'bundler' for Next.js/Vite/modern setups for better tree-shaking and module resolution behavior
+    "sourceMap": true, // Generally good for debugging
     "types": [
+      // These types are correct for your setup. Jest-dom should be included via setupFilesAfterEnv typically.
+      // Explicitly listing "next" for Next.js specific types.
+      // "jest" and "node" are good for general Jest/Node types.
+      // "cypress" for Cypress test runner global types.
       "next",
-      "node"
+      "cypress",
+      "node",
     ],
-    "skipLibCheck": true, // Often enabled for speed in large projects, but consider disabling for stricter checks.
-    "strict": true, // Essential for strong type safety
-    "strictNullChecks": true,
-    "forceConsistentCasingInFileNames": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true, // Often enabled with esModuleInterop
-    "allowImportingTsExtensions": true, // Useful for explicit .ts imports, if needed (Node.js ESM)
-    "resolveJsonModule": true,
-    "isolatedModules": true, // Crucial for Babel/SWC and Next.js
-    "jsx": "preserve", // Essential for Next.js to handle JSX
-    "incremental": true, // For faster incremental builds
-    "noEmit": true, // Next.js handles compilation, so TypeScript doesn't emit JS directly
+    "skipLibCheck": true, // Often enabled for speed in large projects. Can disable for stricter checks if desired (might reveal issues in node_modules).
+    "strict": true, // Essential for strong type safety. Highly recommended.
+    "strictNullChecks": true, // Included in "strict", but explicit doesn't hurt.
+    "forceConsistentCasingInFileNames": true, // Important for cross-platform consistency
+    "esModuleInterop": true, // Enables better interoperability between CommonJS and ES Modules.
+    "allowSyntheticDefaultImports": true, // Often enabled with esModuleInterop, allows `import React from 'react'` instead of `import * as React from 'react'` for CJS modules.
+    "allowImportingTsExtensions": true, // Useful for explicit .ts/.mts imports in ESM Node.js environments. If you're not using this explicitly, it might not be strictly necessary, but can be helpful.
+    "resolveJsonModule": true, // Allows importing JSON files as modules
+    "isolatedModules": true, // Crucial for Babel/SWC and Next.js's fast transpilation process. Ensures each file is compiled in isolation.
+    "jsx": "preserve", // Essential for Next.js to handle JSX (it transforms it itself).
+    "incremental": true, // For faster incremental builds (caching type info).
+    "noEmit": true, // Next.js handles compilation, so TypeScript doesn't emit JS directly to disc.
     // "outDir": "./dist", // Redundant with noEmit: true for Next.js
-    // "rootDir": ".", // Redundant if baseUrl is '.' and paths are used
-    "baseUrl": ".",
+    // "rootDir": ".", // Usually defaults correctly, or set baseUrl to '.'
+    "baseUrl": ".", // Important for resolving non-relative modules like those configured in `paths`.
     "paths": {
       "@/*": [
-        "./src/*"
+        "./src/*" // Correct alias for your source files
       ]
     },
-    "allowJs": true, // Allow JavaScript files in your project
-    "noEmitOnError": true, // Prevents emission of JS if there are TS errors. Good for CI/CD.
-    "verbatimModuleSyntax": true, // Recommended for modern ESM and Next.js
+    "allowJs": true, // Allow JavaScript files in your project (e.g., legacy code, utility scripts).
+    "noEmitOnError": true, // Prevents emission of JS if there are TS errors. Good for CI/CD and ensuring type safety.
+    "verbatimModuleSyntax": true, 
     "plugins": [
       {
-        "name": "next"
+        "name": "next" // Essential for Next.js-specific type checking and linting
       }
     ]
   },
   "include": [
-    "next-env.d.ts", // Essential for Next.js environment types
+    "next-env.d.ts", // Essential for Next.js environment types (e.g., JSX types, global Next types)
     "**/*.ts",
     "**/*.tsx",
     "**/*.js", // Include JS files if allowJs is true
     "**/*.jsx", // Include JSX files if allowJs is true
-    "migrate/*.ts",
-    ".next/types/**/*.ts", // For Next.js generated types
-    "server/socket-server.ts", // Explicitly include server-side TS files
-    "server.ts" // Explicitly include server.ts
+    "migrate/*.ts", // Specific directory
+    ".next/types/**/*.ts", // For Next.js generated types (e.g., from server actions, API routes)
+    "server/socket-server.ts", // Explicitly include server-side TS files if they are outside typical src/pages etc.
+    "server.ts", // Explicitly include server.ts if it's a top-level server entry.
+    // "jest.config.ts", 
+    // "jest.setup.ts", // Include your Jest setup file for type checking
+    "src", // Ensures all files under `src` are included. Redundant if "**/*.ts", "**/*.tsx" covers it but explicit can be clearer.
+    "cypress/**/*.ts", // This line is crucial for Cypress test files
+    "cypress/**/*.js", // If you have JS files in Cypress
+    "cypress/support/*.d.ts",// Ensure your custom Cypress support types are included
+    // "types/**/*.d.ts" // If you have a dedicated 'types' folder for global declarations
   ],
   "exclude": [
-    "node_modules",
+    "node_modules", // Standard exclusion
+    "jest.config.cjs",
+    "./cypress.config.ts", // Exclude the Cypress config itself from being type-checked as part of the app.
+                            // Cypress handles its own config.
+    // Recommended exclusions for Next.js and build artifacts:
     ".next",
     "dist",
-    "next.config.js"
-    // "next-env.d.ts" // Don't exclude, it's needed for 'include'
+    "build", // Common build output folder
+    "out", // Next.js export output folder
+    "next.config.js" // Exclude Next.js config as it's a JS file and not part of your TS compilation unit.
+    // "**/*.cy.tsx", // If you specifically want to exclude Cypress component test files from your main app compilation
+    //                 // (though `cypress/` inclusion should handle them correctly within Cypress context).
   ]
 }
