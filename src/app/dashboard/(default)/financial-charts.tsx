@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import dynamic from 'next/dynamic';
-import { formatCurrency } from '@/lib/formatters';
+import { formatCurrency } from '#@/lib/utils/formatters.ts';
 import { TrendingUp } from "lucide-react"
 import { 
   Area,
@@ -26,7 +26,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart"
 import type { QurbanSalesStats } from'@/types/keuangan';
-import { getMudhohiProgress } from '@/services/mudhohi';
+import { getMudhohiProgress } from '#@/lib/server/repositories/mudhohi.ts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RecentTransactions } from '@/components/dashboard/summaries/recent-transactions';
 
@@ -200,8 +200,7 @@ export default function FinancialCharts({
       <TabsContent value="transactions" className="space-y-4">
         {/* Recent Transactions with Qurban Sales */}
         <Suspense fallback={<Skeleton className="h-[400px] w-full" />}>
-          <RecentTransactions 
-          />
+          <RecentTransactions />
         </Suspense>
       </TabsContent>
       <TabsContent value="distributions" className="space-y-4">

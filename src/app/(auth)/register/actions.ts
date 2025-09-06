@@ -1,8 +1,9 @@
 "use server"
 
-import prisma from "@/lib/prisma"
+import prisma from "#@/lib/server/prisma.ts"
 import { hash } from "bcryptjs"
 import { Role } from "@prisma/client"
+import { createVerificationToken, sendVerificationEmail } from "#@/lib/server/repositories/mudhohi.ts"
 
 export async function registerUser(data: {
   name: string
@@ -36,5 +37,8 @@ export async function registerUser(data: {
   } catch (error) {
     console.error("Error registering user:", error)
     return { success: false, error: "Failed to register user" }
+  } finally {
+    const { token } = await createVerificationToken(data.email)
+    await sendVerificationEmail(data.email, token)
   }
 }

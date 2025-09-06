@@ -5,23 +5,12 @@ import {
 } from '@/components/ui/hover-card'
 import { format } from 'date-fns'
 import { Info, Clock, Wallet, CheckCircle, XCircle, User } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '#@/lib/utils/utils.ts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { formatCurrency, formatDate } from '@/lib/formatters'
+import { formatCurrency, formatDate } from '#@/lib/utils/formatters.ts'
+import type { TransactionDetail } from '#@/types/keuangan.ts'
 
-export interface TransactionDetail {
-  id: string
-  nama_pengqurban: string | null
-  createdAt: Date
-  totalAmount: number
-  hewanTypes: Array<{
-    nama: string
-    harga: number
-    count: number
-  }>
-  paymentStatus: string
-}
 export function TransactionList({ transactions }: { transactions: TransactionDetail[] }) {
   const groupedTransactions = transactions.reduce((acc, transaction) => {
     const dateKey = format(transaction.createdAt, 'yyyy-MM-dd')

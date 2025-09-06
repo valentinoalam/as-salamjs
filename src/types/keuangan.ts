@@ -1,12 +1,4 @@
-import type { JenisHewan, TransactionType } from "@prisma/client";
-
-export enum PaymentStatus {
-  BELUM_BAYAR = "BELUM_BAYAR",
-  DOWN_PAYMENT = "DOWN_PAYMENT",
-  MENUNGGU_KONFIRMASI = "MENUNGGU_KONFIRMASI",
-  LUNAS = "LUNAS",
-  BATAL = "BATAL",
-}
+import type { TransactionType } from "@prisma/client";
 
 export type perHewanSalesStat = {
   tipeHewanId: number;
@@ -39,6 +31,7 @@ export interface TransactionDetail {
   nama_pengqurban: string
   createdAt: Date
   totalAmount: number
+  paidAmount: number
   hewanTypes: Array<{
     nama: string
     harga: number
@@ -47,25 +40,6 @@ export interface TransactionDetail {
   paymentStatus: string //"PAID" | "PENDING"
 }
 
-type TipeHewanImage = {
-  id: string
-  url: string
-  alt: string
-}
-
-export type TipeHewan = {
-  id: number
-  nama: string
-  icon: string | null
-  target?: number
-  harga: number
-  hargaKolektif?: number | null
-  note?: string | null
-  jenis: JenisHewan
-}
-export interface TipeHewanWithImages extends TipeHewan {
-  images: TipeHewanImage[]
-}
 export interface DataPoint {
   name: string;
   value: number
@@ -77,6 +51,10 @@ export interface CategoryDistribution {
   name: string
   value: number
   color: string
+    metadata?: {
+    isQurban?: boolean
+    categoryId?: number
+  }
 }
 
 export interface CategoryFormValues {
@@ -98,8 +76,12 @@ export interface ProcessedData {
   pengeluaranData: CategoryDistribution[];
   totalPemasukan: number;
   totalPengeluaran: number;
+    debug?: {
+    totalTransactions: number
+    qurbanTransactions: number
+    processedCategories: number
+  }
 }
-
 
 export interface Image {
   id: string
@@ -121,6 +103,10 @@ export interface Transaction {
   createdBy: string
   createdAt: Date
   updatedAt: Date
+}
+
+export interface CombinedTransaction extends Transaction {
+  isQurbanTransaction?: boolean
 }
 
 export interface TransactionFormValues {
@@ -150,11 +136,16 @@ export interface ChartDataResponse {
   totalSales: number
   transactions: TransactionDetail[]
   totalRevenue: number
+  dateRange: {
+    start: Date
+    end: Date
+  }
 }
 
 export interface Budget {
   id: string
   amount: number
+  spent?: number;
   categoryId: number
   category: Category
   startDate: Date

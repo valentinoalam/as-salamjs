@@ -1,4 +1,4 @@
-import { formatCurrency } from '@/lib/formatters';
+import { formatCurrency } from '#@/lib/utils/formatters.ts';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import type { perHewanSalesStat, QurbanSalesStats } from'@/types/keuangan';

@@ -70,7 +70,6 @@ export default function Home() {
           <p className="text-green-100 mt-1">Mari Eratkan Persaudaraan Dengan Keimanan di atas Keilmuan</p>
         </CardHeader>
         
-
         <CardContent className="p-6 space-y-5">
           {/* Featured Links (Itikaf and Qurban) */}
           <div className="mt-6 grid grid-cols-2 gap-4">

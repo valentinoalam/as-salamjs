@@ -2,12 +2,11 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { cn } from "@/lib/utils"
+import { cn } from "#@/lib/utils/utils.ts"
 import { ModeToggle } from "@/components/ui/mode-toggle"
-import { useEffect, useMemo, useState } from "react"
+import { useMemo } from "react"
 import { Role } from "@prisma/client"
-import { checkAccess } from "@/app/actions"
-import { useSession, signOut } from "next-auth/react"
+import { signOut } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -18,60 +17,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { LogOut, User } from "lucide-react"
+import { LogOut, UserIcon } from "lucide-react"
 import moment from 'moment-hijri'
-import { useStores } from "@/hooks/use-stores"
-
+import { useAuthStore } from "@/hooks/qurban/use-stores"
 
 export default function Header() {
   const pathname = usePathname()
-  const { data: session, status } = useSession()
-  const [accessiblePages, setAccessiblePages] = useState<string[]>([])
-  
-  // Get Zustand store state and actions
-  const { 
-    showRegisterButton, 
-    user, 
-    setUser, 
-    setShowRegisterButton 
-  } = useStores().ui
-
-  useEffect(() => {
-    // Update Zustand store when session changes
-    if (status === "authenticated" && session?.user) {
-      setUser({
-        id: session.user.id,
-        name: session.user.name,
-        email: session.user.email,
-        role: session.user.role as Role,
-        urlAvatar: session.user.urlAvatar || null
-      })
-      
-      // Hide register button after login
-      setShowRegisterButton(false)
-    } else if (status === "unauthenticated") {
-      setUser(null)
-      setShowRegisterButton(true)
-    }
-  }, [status, session, setUser, setShowRegisterButton])
-
-  useEffect(() => {
-    const fetchAccessiblePages = async () => {
-      const result = await checkAccess()
-      setAccessiblePages(result.accessiblePages)
-    }
-
-    if (status === "authenticated") {
-      fetchAccessiblePages()
-    }
-  }, [status])
+  const { user,isAuthenticated, accessiblePages } = useAuthStore()
 
   const navItems = useMemo(() => {
     const items = [
       // { name: "Pemesanan", href: "/qurban/pemesanan" }
     ]
-    if (user?.role !== Role.MEMBER) {
-      items.push({ name: "Dashboard", href: "/dashboard" })
+    const isMember = user?.roles?.some(role => role === Role.MEMBER);
+
+    if (!isMember) { // If the user is NOT a member
+      items.push({ name: "Dashboard", href: "/dashboard" });
     }
     return items
   }, [user])
@@ -111,7 +72,7 @@ export default function Header() {
                 Dalil
               </Link>
             </div>)}
-            { status === "authenticated" && 
+            { isAuthenticated && 
               <Link
                 href={`qurban/konfirmasi/${user?.id}`}
                 className="text-primary font-semibold uppercase hover:text-green-700 transition-colors"
@@ -121,7 +82,7 @@ export default function Header() {
             {navItems.map((item) => {
               const slug = item.href.startsWith("/") ? item.href.slice(1) : item.href
               const isAccessible =
-                status === "authenticated" &&
+                isAuthenticated &&
                 (accessiblePages.includes(slug) || item.href === "/")
 
               return isAccessible ? (
@@ -144,12 +105,12 @@ export default function Header() {
         <div className="ml-auto flex items-center space-x-4">
           <ModeToggle />
 
-          {status === "authenticated" && user ? (
+          {isAuthenticated && user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={user.urlAvatar || undefined} alt={user.name || "User"} />
+                    <AvatarImage src={user.image || undefined} alt={user.name || "User"} />
                     <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
                   </Avatar>
                 </Button>
@@ -162,13 +123,17 @@ export default function Header() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Role: {user.role?.replace("_", " ")}</span>
-                </DropdownMenuItem>
+                {!user.roles.includes("USER") && <DropdownMenuItem>
+                  <span>
+                    Role:{" "}
+                    {user.roles
+                      ?.map((role) => role.replace("_", " "))
+                      .join(", ")}
+                  </span>
+                </DropdownMenuItem>}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
-                  <Link href="/qurban/profile">Profile Settings</Link>
+                  <UserIcon className="mr-2 h-4 w-4" /><Link href="/qurban/profile">Profile Page</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })}>
@@ -179,11 +144,9 @@ export default function Header() {
             </DropdownMenu>
           ) : (
             <div className="flex gap-2">
-              {showRegisterButton && (
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/register">Register</Link>
-                </Button>
-              )}
+              <Button asChild variant="outline" size="sm">
+                <Link href="/register">Register</Link>
+              </Button>
               <Button asChild variant="default" size="sm">
                 <Link href="/login">Login</Link>
               </Button>

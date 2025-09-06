@@ -39,7 +39,7 @@ export function HewanProcessingTable({ data }: HewanProcessingTableProps) {
     setIsLoading(true)
     try {
       await markAsSembelih(selectedHewan.id)
-      toast.success(`Hewan ID ${selectedHewan.animalId} berhasil ditandai sebagai sudah disembelih`)
+      toast.success(`Hewan ID ${selectedHewan.hewanId} berhasil ditandai sebagai sudah disembelih`)
       router.refresh()
     } catch (error) {
       toast.error("Gagal mengubah status hewan")
@@ -57,7 +57,7 @@ export function HewanProcessingTable({ data }: HewanProcessingTableProps) {
     setIsLoading(true)
     try {
       await markAsCacah(selectedHewan.id, meatPackageCount)
-      toast.success(`Hewan ID ${selectedHewan.animalId} berhasil ditandai sebagai sudah dicacah`)
+      toast.success(`Hewan ID ${selectedHewan.hewanId} berhasil ditandai sebagai sudah dicacah`)
       router.refresh()
     } catch (error) {
       toast.error("Gagal mengubah status hewan")
@@ -106,7 +106,7 @@ export function HewanProcessingTable({ data }: HewanProcessingTableProps) {
           ) : (
             data.map((hewan) => (
               <TableRow key={hewan.id}>
-                <TableCell className="font-medium">{hewan.animalId}</TableCell>
+                <TableCell className="font-medium">{hewan.hewanId}</TableCell>
                 <TableCell>{hewan.type}</TableCell>
                 <TableCell>{getStatusBadge(hewan.status)}</TableCell>
                 <TableCell className="text-right">
@@ -151,7 +151,7 @@ export function HewanProcessingTable({ data }: HewanProcessingTableProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Konfirmasi Penyembelihan</AlertDialogTitle>
             <AlertDialogDescription>
-              Apakah Anda yakin ingin menandai hewan {selectedHewan?.animalId} sebagai sudah disembelih?
+              Apakah Anda yakin ingin menandai hewan {selectedHewan?.hewanId} sebagai sudah disembelih?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -178,7 +178,7 @@ export function HewanProcessingTable({ data }: HewanProcessingTableProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Konfirmasi Pencacahan</AlertDialogTitle>
             <AlertDialogDescription>
-              Apakah Anda yakin ingin menandai hewan {selectedHewan?.animalId} sebagai sudah dicacah?
+              Apakah Anda yakin ingin menandai hewan {selectedHewan?.hewanId} sebagai sudah dicacah?
             </AlertDialogDescription>
           </AlertDialogHeader>
 

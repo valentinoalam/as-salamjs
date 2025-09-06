@@ -1,0 +1,119 @@
+.thumbnailContainer {
+  display: inline-block; /* Or use flexbox/grid for layout */
+  border: 1px solid #eee; /* Optional: for visual separation */
+  margin: 10px;
+  vertical-align: top;
+  text-align: center;
+  padding-bottom: 5px; /* Space for text below */
+}
+
+.thumbnailImage {
+  background-image: url('/wegoatw.webp'); /* <-- UPDATED: Path to your new spritesheet */
+  background-repeat: no-repeat;
+  display: block; /* Ensures width/height apply */
+  /* Add common styles if needed, e.g., border-radius */
+}
+
+/* Individual thumbnail styles - UPDATED COORDINATES AND NAMES */
+.thumbnailWholeWhiteGoat {
+  width: 60px;
+  height: 70px;
+  background-position: -20px -20px;
+}
+
+.thumbnailGoatCarcass {
+  width: 150px;
+  height: 65px;
+  background-position: -150px -25px;
+}
+
+.thumbnailGoatLiver {
+  width: 60px;
+  height: 40px;
+  background-position: -360px -30px;
+}
+
+.thumbnailGoatLungs {
+  width: 90px;
+  height: 50px;
+  background-position: -460px -25px;
+}
+
+.thumbnailGoatHeart {
+  width: 70px;
+  height: 40px;
+  background-position: -600px -30px;
+}
+
+.thumbnailGoatMeatSliceTopRight {
+  width: 80px;
+  height: 50px;
+  background-position: -720px -25px;
+}
+
+.thumbnailGoatHead1 {
+  width: 80px;
+  height: 60px;
+  background-position: -30px -130px;
+}
+
+.thumbnailGoatHead2 {
+  width: 80px;
+  height: 60px;
+  background-position: -150px -125px;
+}
+
+/* NEW/UPDATED ITEMS BELOW */
+.thumbnailGoatLegHock { /* Previously Goat Meat Piece 1 */
+  width: 100px;
+  height: 120px;
+  background-position: -400px -100px;
+}
+
+.thumbnailSkinnedGoat {
+  width: 180px;
+  height: 105px;
+  background-position: -580px -105px;
+}
+
+.thumbnailGoatIntestines {
+  width: 140px;
+  height: 80px;
+  background-position: -790px -110px;
+}
+
+.thumbnailGoatBonesTop { /* Previously Goat Bones 1 */
+  width: 120px;
+  height: 60px;
+  background-position: -950px -120px;
+}
+
+.thumbnailGoatMeatSliceBottomLeft { /* Previously Goat Fur Piece 1 */
+  width: 80px;
+  height: 50px;
+  background-position: -30px -230px;
+}
+
+.thumbnailGoatBladderGland { /* Previously a different item in this spot */
+  width: 70px;
+  height: 50px;
+  background-position: -150px -230px;
+}
+
+.thumbnailGoatSkinPiece { /* Moved from previous position */
+  width: 130px;
+  height: 60px;
+  background-position: -290px -230px;
+}
+
+.thumbnailGoatTail { /* Previously Stomach/Bladder */
+  width: 70px;
+  height: 50px;
+  background-position: -430px -230px;
+}
+
+.thumbnailGoatBonesBottom { /* Previously Goat Bones 2, now longer */
+  width: 280px;
+  height: 60px;
+  background-position: -790px -230px;
+}

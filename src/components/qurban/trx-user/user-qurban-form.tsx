@@ -20,8 +20,8 @@ import { Progress } from "@/components/ui/progress"
 import { toast } from "@/hooks/use-toast"
 import { AnimalSelectionCard } from "./animal-selection-card"
 import { userQurbanSchema, type UserQurbanFormValues } from "@/lib/zod/qurban-form"
-import type { TipeHewan, TipeHewanWithImages } from "@/types/keuangan"
 import { ProductSelectionCard } from "./product-selection-card"; // New component
+import type { TipeHewan, TipeHewanWithImages } from "#@/types/qurban.ts"
 
 type Step = {
   id: string

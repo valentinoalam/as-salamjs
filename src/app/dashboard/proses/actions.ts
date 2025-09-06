@@ -1,7 +1,7 @@
 "use server"
 
 import { auth } from "@/auth"
-import prisma from "@/lib/prisma"
+import prisma from "#@/lib/server/prisma.ts"
 import { HewanStatus } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 

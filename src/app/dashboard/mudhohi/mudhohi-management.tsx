@@ -36,20 +36,28 @@ import {
 } from "@/components/ui/dialog"
 import { PaymentStatus, CaraBayar } from "@prisma/client"
 import { 
-  createMudhohi,
   getMudhohiList, 
   updateMudhohi, 
   updatePaymentStatus, 
-} from "@/services/mudhohi"
-import { exportToExcel } from "@/lib/excel"
+} from "#@/lib/server/repositories/mudhohi.ts"
+import { exportToExcel } from "#@/lib/utils/excel.ts"
 import { MoreHorizontal, CreditCard, Edit, Eye, CheckCircle, XCircle, Clock, AlertCircle, Search, Plus, RefreshCw, Download, HandCoins, ListPlus, Calendar, Hash, Mail, User, MessageSquare } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import type { AdminQurbanFormValues } from "@/lib/zod/qurban-form"
 import { AdminQurbanForm } from "@/components/qurban/trx-admin/admin-qurban-form"
 import Link from "next/link"
-import { type MudhohiManagementProps, MudhohiStatsSchema, MudhohiSchema, type MudhohiStats, type PaymentConfirmation, PaymentConfirmationSchema, type SearchFilter, SearchFilterSchema, type PaymentUpdateParams, type ApiResponse, type Mudhohi, type MudhohiEdit, MudhohiEditSchema } from "@/types/mudhohi"
+import { MudhohiStatsSchema, MudhohiSchema, type MudhohiStats, type PaymentConfirmation, PaymentConfirmationSchema, type SearchFilter, SearchFilterSchema, type Mudhohi, type MudhohiEdit, MudhohiEditSchema } from "@/lib/zod/mudhohi"
 import { getMudhohiById } from "@/app/qurban/konfirmasi/[id]/actions"
-import { formatAngkaManual, formatDate } from "@/lib/formatters"
+import { formatAngkaManual, formatDate } from "#@/lib/utils/formatters.ts"
+import type { TipeHewan } from "@/types/qurban"
+import type { ApiResponse } from "#@/lib/DTOs/global.ts"
+import type { PaymentUpdateParams } from "#@/lib/DTOs/mudhohi.ts"
+
+export interface MudhohiManagementProps {
+  initialStats: MudhohiStats
+  initialMudhohi: Mudhohi[]
+  tipeHewan: TipeHewan[]
+}
 
 export default function MudhohiManagement({ 
   initialStats, 
@@ -453,11 +461,19 @@ export default function MudhohiManagement({
 
   const handleSubmitMudhohi = async (data: AdminQurbanFormValues): Promise<ApiResponse> => {
     try {
-      const result: ApiResponse = await createMudhohi({
+      const response = await fetch("/api/mudhohi", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           ...data,
-          jatahPengqurban: data.jatahPengqurban?.map(p=>Number.parseInt(p)),
+          jatahPengqurban: data.jatahPengqurban?.map((p) => Number.parseInt(p)),
           tipeHewanId: Number.parseInt(data.tipeHewanId),
-        })
+        }),
+      });
+
+      const result: ApiResponse = await response.json();
 
       if (result.success) {
         setAddDialogOpen(false)

@@ -1,15 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Cell, Label, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import type { ProcessedData } from "@/types/keuangan";
-import { getOverviewData } from "@/services/keuangan";
+import { Cell, Label, Legend, Pie, PieChart } from "recharts";
+
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 
 import { TrendingUp } from "lucide-react";
-import { formatCurrency } from "@/lib/formatters";
-import { useKeuangan } from "@/contexts/keuangan-context";
+import { formatCurrency } from "#@/lib/utils/formatters.ts";
+import { useFinancialData } from "@/hooks/qurban/use-keuangan";
 
 // Define chart configuration for different categories
 const chartConfig = {
@@ -26,58 +24,8 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 export function Overview() {
-  const { overviewData: data } = useKeuangan()
-  
-  // const [loading, setLoading] = useState(true)
-  // const [error, setError] = useState<string | null>(null)
-  // useEffect(() => {
-  //   async function fetchData() {
-  //     try {
-  //       setLoading(true)
-  //       const rawData = await getOverviewData()
-        
-  //       // Separate and process the data
-  //       const pemasukanItems = rawData.filter(item => 
-  //         item.name.startsWith('Pemasukan')
-  //       )
-  //       const pengeluaranItems = rawData.filter(item => 
-  //         item.name.startsWith('Pengeluaran')
-  //       )
-
-  //       // Calculate totals
-  //       const totalPemasukan = pemasukanItems.reduce((sum, item) => sum + item.value, 0)
-  //       const totalPengeluaran = pengeluaranItems.reduce((sum, item) => sum + item.value, 0)
-
-  //       // Format data for charts
-  //       const pemasukanData = pemasukanItems.map(item => ({
-  //         name: item.name.replace('Pemasukan - ', ''),
-  //         value: item.value,
-  //         fill: item.color,
-  //       }))
-
-  //       const pengeluaranData = pengeluaranItems.map(item => ({
-  //         name: item.name.replace('Pengeluaran - ', ''),
-  //         value: item.value,
-  //         fill: item.color,
-  //       }))
-
-  //       setData({
-  //         pemasukanData,
-  //         pengeluaranData,
-  //         totalPemasukan,
-  //         totalPengeluaran,
-  //       })
-  //     } catch (err) {
-  //       setError('Failed to load financial data')
-  //       console.error('Error loading financial data:', err)
-  //     } finally {
-  //       setLoading(false)
-  //     }
-  //   }
-
-  //   fetchData()
-  // }, [])
-
+  const { overviewData: data } = useFinancialData()
+  console.log(data)
   if (!data) {
     return (
       <Card className="flex flex-col">
@@ -93,22 +41,6 @@ export function Overview() {
       </Card>
     )
   }
-
-  // if (error) {
-  //   return (
-  //     <Card className="flex flex-col">
-  //       <CardHeader className="items-center pb-0">
-  //         <CardTitle>Financial Overview</CardTitle>
-  //         <CardDescription>Error loading data</CardDescription>
-  //       </CardHeader>
-  //       <CardContent className="flex-1 pb-0">
-  //         <div className="mx-auto aspect-square max-h-[250px] flex items-center justify-center">
-  //           <div className="text-destructive">{error}</div>
-  //         </div>
-  //       </CardContent>
-  //     </Card>
-  //   )
-  // }
 
   const netAmount = data.totalPemasukan - data.totalPengeluaran
   const isPositive = netAmount >= 0
@@ -147,6 +79,11 @@ export function Overview() {
               outerRadius={60}
               strokeWidth={2}
             >
+              {data.pemasukanData.map((entry, index) => {
+                // Vibrant income colors - greens and blues for positive income
+                const incomeColors = ['#10B981', '#059669', '#34D399', '#6EE7B7', '#A7F3D0', '#0EA5E9', '#0284C7', '#38BDF8'];
+                return <Cell key={`cell-pemasukan-${index}`} fill={entry.color || incomeColors[index % incomeColors.length]} />
+              })}
               <Label
                 content={({ viewBox }) => {
                   if (viewBox && "cx" in viewBox && "cy" in viewBox) {
@@ -160,14 +97,14 @@ export function Overview() {
                         <tspan
                           x={viewBox.cx}
                           y={viewBox.cy}
-                          className="fill-foreground text-xs font-medium"
+                          className="fill-black text-xs font-medium"
                         >
                           Pemasukan
                         </tspan>
                         <tspan
                           x={viewBox.cx}
                           y={(viewBox.cy || 0) + 16}
-                          className="fill-muted-foreground text-xs"
+                          className="fill-emerald-500 text-xs"
                         >
                           {new Intl.NumberFormat('id-ID', {
                             style: 'currency',
@@ -204,19 +141,35 @@ export function Overview() {
                   <text
                     x={x}
                     y={y}
-                    fill="#333"
+                    fill="#1F2937"
                     textAnchor={x > cx ? 'start' : 'end'}
                     dominantBaseline="central"
                     fontSize="12px"
+                    fontWeight="500"
                     className="wrapp"
                   >
-                  <tspan x={x} dy={0}>{name}</tspan><tspan x={x} dy={16}>{amount}</tspan>
+                  <tspan x={x} dy={0}>{name}</tspan><tspan x={x} dy={16} className="font-semibold">{amount}</tspan>
                   </text>
                 );
               }}>
-                {data.pengeluaranData.map((entry, index) => (
-                  <Cell key={`cell-pengeluaran-${index}`} fill={entry.fill || '#8884d8'} />
-                ))}
+                {data.pengeluaranData.map((entry, index) => {
+                  // Vibrant expense colors - warm colors, oranges, reds, purples
+                  const expenseColors = [
+                    '#EF4444', // Red
+                    '#F97316', // Orange
+                    '#F59E0B', // Amber
+                    '#8B5CF6', // Violet
+                    '#EC4899', // Pink
+                    '#06B6D4', // Cyan
+                    '#84CC16', // Lime
+                    '#F472B6', // Pink-400
+                    '#A855F7', // Purple
+                    '#3B82F6', // Blue
+                    '#10B981', // Emerald
+                    '#F87171'  // Red-400
+                  ];
+                  return <Cell key={`cell-pengeluaran-${index}`} fill={entry.color || expenseColors[index % expenseColors.length]} />
+                })}
                 <Label
                   position="insideTop"
                   x="50%"
@@ -230,7 +183,7 @@ export function Overview() {
                           y={labelY}
                           textAnchor="middle"
                           dominantBaseline="middle"
-                          fill="red" 
+                          fill="#DC2626" 
                           className="text-xs font-medium"
                         >
                           Pengeluaran
@@ -259,25 +212,25 @@ export function Overview() {
       </CardContent>
       <CardFooter className="flex-col gap-2 text-sm">
         <div className="flex items-center gap-2 font-medium leading-none">
-          <span className={isPositive ? "text-green-600" : "text-red-600"}>
+          <span className={isPositive ? "text-emerald-600" : "text-red-500"}>
             Net {isPositive ? "Income" : "Loss"}: {" "}
             {new Intl.NumberFormat('id-ID', {
               style: 'currency',
               currency: 'IDR'
             }).format(Math.abs(netAmount))}
           </span>
-          <TrendingUp className={`h-4 w-4 ${isPositive ? "text-green-600" : "text-red-600 rotate-180"}`} />
+          <TrendingUp className={`h-4 w-4 ${isPositive ? "text-emerald-600" : "text-red-500 rotate-180"}`} />
         </div>
         <div className="leading-none text-muted-foreground">
           Inner circle shows income categories, outer ring shows expense categories
         </div>
         <div className="flex gap-4 text-xs text-muted-foreground">
-          <span>Total Income: {new Intl.NumberFormat('id-ID', {
+          <span className="text-emerald-600 font-medium">Total Income: {new Intl.NumberFormat('id-ID', {
             style: 'currency',
             currency: 'IDR',
             notation: 'compact'
           }).format(data.totalPemasukan)}</span>
-          <span>Total Expenses: {new Intl.NumberFormat('id-ID', {
+          <span className="text-red-500 font-medium">Total Expenses: {new Intl.NumberFormat('id-ID', {
             style: 'currency',
             currency: 'IDR',
             notation: 'compact'

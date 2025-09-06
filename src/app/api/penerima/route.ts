@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getPenerima, createPenerima } from "@/services/qurban"
+import { getPenerima, createPenerima } from "#@/lib/server/repositories/qurban.ts"
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams

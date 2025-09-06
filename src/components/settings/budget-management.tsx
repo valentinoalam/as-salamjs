@@ -34,7 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency } from "#@/lib/utils/formatters.ts";
 import { toast } from "@/hooks/use-toast";
 import { Pencil, Plus, Trash2, PiggyBank } from "lucide-react";
 

@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import QurbanSalesReport from "./qurban-sales-report"
-import { useKeuangan } from "@/contexts/keuangan-context"
 import { FinancialSummary } from "@/components/dashboard/summaries/financial-summary"
+import { useFinancialData } from "@/hooks/qurban/use-keuangan"
 
 const QurbanSales = () => {
-  const { qurbanSalesQuery } = useKeuangan()
+  const { qurbanSalesQuery } = useFinancialData()
   const { data: qSalesStats, isLoading, error } = qurbanSalesQuery
 
   const [mounted, setMounted] = useState(false)

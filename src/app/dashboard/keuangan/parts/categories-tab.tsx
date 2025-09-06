@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Edit, Plus, Trash2 } from "lucide-react"
-import { format } from "date-fns"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,13 +19,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import CategoryForm from "./category-form"
-import { useKeuangan } from "@/contexts/keuangan-context"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import type { Category } from "@/types/keuangan"
+import { useFinancialData } from "@/hooks/qurban/use-keuangan"
 
 export default function CategoriesTab() {
-  const { categoriesQuery, deleteCategory } = useKeuangan()
+  const { categoriesQuery, deleteCategory } = useFinancialData()
   const { data: categories, isLoading: isLoadingCategories } = categoriesQuery
   const [updating, setUpdating] = useState(false)
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -220,7 +219,7 @@ export default function CategoriesTab() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Delete Category</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Are you sure you want to delete the "{category.name}" category?
+                                Are you sure you want to delete the &quot;{category.name}&quot; category?
                                 This may affect related transactions and budgets.
                               </AlertDialogDescription>
                             </AlertDialogHeader>

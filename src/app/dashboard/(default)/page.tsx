@@ -7,29 +7,33 @@ import {
   Package 
 } from 'lucide-react';
 import { HewanStatus } from '@prisma/client';
-import { formatCurrency } from '@/lib/formatters';
+import { formatCurrency } from '#@/lib/utils/formatters.ts';
 // import { Badge } from '@/components/ui/badge';
 import FinancialCharts from './financial-charts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { useQurban } from "@/contexts/qurban-context"
+import { useQurban } from "@/hooks/qurban/use-qurban"
 import HewanStatusDisplay from "./hewan-status-display"
-import { useKeuangan } from "@/contexts/keuangan-context";
-import type { ProdukHewan, Shipment } from "@/types/qurban";
+import type { HewanQueryResult, ProdukHewan, Shipment } from "@/types/qurban";
+import { useFinancialData } from "@/hooks/qurban/use-keuangan";
+import { useProduct } from "#@/hooks/qurban/use-produk.tsx";
+import { useTabStore } from "#@/stores/ui-store.ts";
 
 export default function DashboardPage() {
   const { 
     meta, 
-    productsQuery, 
-    shipmentsQuery,
-    getProductsByType ,
     sapiQuery,
     dombaQuery
   } = useQurban()
   const {
+    productsQuery, 
+    shipmentsQuery,
+    getProductsByType
+  } = useProduct()
+  const {
     qurbanSalesQuery
-  } = useKeuangan()
+  } = useFinancialData()
   
   // Get Qurban sales data
   const { data: salesReport } = qurbanSalesQuery;
@@ -38,8 +42,6 @@ export default function DashboardPage() {
   // Get animal counts
   const { total: totalSapi } = meta.sapi
   const { total: totalDomba } = meta.domba
-  // Get financial data
-  // const [sapiData, dombaData, produkDaging, produkLainnya, distribution, penerima, distribusiLog] = await Promise.all([
 
   // Calculate financial stats
   const financialStats = {
@@ -94,7 +96,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-            <h1 className="ml-6 text-muted-foreground mt-2">
+      <h1 className="ml-6 text-muted-foreground mt-2">
         Ringkasan informasi Sistem Manajemen Qurban
       </h1>
 
@@ -175,7 +177,7 @@ export default function DashboardPage() {
       <FinancialCharts salesReport={salesReport!} />
 
       {/* Animal Status Tabs */}
-      <AnimalStatusTabs meta={meta} />
+      <AnimalStatusTabs meta={meta} sapi={sapiQuery} domba={dombaQuery}/>
 
       <Tabs defaultValue="inventori">
         <TabsList>
@@ -220,29 +222,36 @@ export default function DashboardPage() {
 
 // Separate components to prevent unnecessary re-renders
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const AnimalStatusTabs = ({ meta }: {meta: any}) => (
-  <Tabs defaultValue="sapi" className="w-full">
-    <TabsList className="grid w-full grid-cols-2">
-      <TabsTrigger value="sapi">
-        Status Sapi ({meta.sapi.slaughtered}/{meta.sapi.total})
-      </TabsTrigger>
-      <TabsTrigger value="domba">
-        Status Domba ({meta.domba.slaughtered}/{meta.domba.total})
-      </TabsTrigger>
-    </TabsList>
-    
-    <TabsContent value="sapi">
-      <AnimalStatusCard type="sapi" data={meta.sapi} />
-    </TabsContent>
-    
-    <TabsContent value="domba">
-      <AnimalStatusCard type="domba" data={meta.domba} />
-    </TabsContent>
-  </Tabs>
-)
+const AnimalStatusTabs = ({ meta, sapi, domba }: {meta: any, sapi: HewanQueryResult, domba: HewanQueryResult}) => {
+  const { tabs, setActiveTab } = useTabStore()
+  return (
+    <Tabs 
+      defaultValue="sapi" 
+      className="w-full" 
+      value={tabs.statusHewan}
+      onValueChange={(value) => setActiveTab("statusHewan", value)}>
+      <TabsList className="grid w-full grid-cols-2">
+        <TabsTrigger value="sapi">
+          Status Sapi ({meta.sapi.slaughtered}/{meta.sapi.total})
+        </TabsTrigger>
+        <TabsTrigger value="domba">
+          Status Domba ({meta.domba.slaughtered}/{meta.domba.total})
+        </TabsTrigger>
+      </TabsList>
+      
+      <TabsContent value="sapi">
+        <AnimalStatusCard type="sapi" data={meta.sapi} hewanQuery={sapi} />
+      </TabsContent>
+      
+      <TabsContent value="domba">
+        <AnimalStatusCard type="domba" data={meta.domba} hewanQuery={domba} />
+      </TabsContent>
+    </Tabs>
+  )
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const AnimalStatusCard = ({ type, data }: {type: "sapi" | "domba"; data: any}) => {
+const AnimalStatusCard = ({ type, data, hewanQuery }: {type: "sapi" | "domba"; data: any, hewanQuery: HewanQueryResult}) => {
   const progressValue = useMemo(() => 
     data.total > 0 ? (data.slaughtered / data.total) * 100 : 0, 
     [data.slaughtered, data.total]
@@ -263,13 +272,13 @@ const AnimalStatusCard = ({ type, data }: {type: "sapi" | "domba"; data: any}) =
         
         <div className="mb-4">
           <div className="flex justify-between text-sm mb-1">
-            <span>Progress Timbang</span>
+            <span>Progress Penyembelihan</span>
             <span>{data.slaughtered}/{data.total}</span>
           </div>
           <Progress value={progressValue} className="h-2" />
         </div>
 
-        <HewanStatusDisplay type={type} />
+        <HewanStatusDisplay type={type} query={hewanQuery} />
       </CardContent>
     </Card>
   )

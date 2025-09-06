@@ -1,4 +1,4 @@
-import { getCurrentUser } from "@/lib/auth"
+import { getCurrentUser } from "#@/lib/utils/auth.ts"
 import { redirect } from "next/navigation"
 import ProfileForm from "./profile-form"
 

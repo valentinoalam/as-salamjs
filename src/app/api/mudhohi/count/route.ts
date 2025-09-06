@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { countMudhohi } from "@/services/mudhohi"
+import { countMudhohi } from "#@/lib/server/repositories/mudhohi.ts"
 
 export async function GET() {
   try {

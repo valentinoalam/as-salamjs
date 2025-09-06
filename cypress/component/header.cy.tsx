@@ -1,4 +1,4 @@
-import Header from "@/components/header"
+import Header from "@/components/layout/header"
 import { useAuthStore } from "@/stores/auth-store"
 import { useUIStore } from "@/stores/ui-store"
 import { Role } from "@prisma/client"
@@ -34,7 +34,7 @@ describe("Header Component", () => {
         id: "1",
         name: "Test User",
         email: "test@example.com",
-        role: Role.USER,
+        role: Role.MEMBER,
         image: null,
       },
       isAuthenticated: true,

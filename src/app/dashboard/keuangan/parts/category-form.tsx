@@ -19,8 +19,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { useKeuangan } from "@/contexts/keuangan-context"
 import type { Category } from "@/types/keuangan"
+import { useFinancialData } from "@/hooks/qurban/use-keuangan"
 
 interface CategoryFormProps {
   isOpen: boolean
@@ -38,7 +38,7 @@ export default function CategoryForm({
   onCategoryUpdated,
 }: CategoryFormProps) {
   const [loading, setLoading] = useState(false)
-  const {createCategory, updateCategory } = useKeuangan()
+  const {createCategory, updateCategory } = useFinancialData()
   const isEditing = !!category
 
   const form = useForm<CategoryFormValues>({

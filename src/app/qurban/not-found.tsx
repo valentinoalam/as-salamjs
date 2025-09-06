@@ -1,5 +1,5 @@
 "use client"
-import { countHewanQurban } from '@/services/qurban';
+import { countHewanQurban } from '#@/lib/server/repositories/qurban.ts';
 import { useState, useEffect } from 'react';
 
 export default function NotFound() {
@@ -161,7 +161,7 @@ export default function NotFound() {
           <p className="mt-4 text-lg">Anda belum melakukan pemesanan.</p>
           <div className="mt-6 border-t pt-4">
             <p className="text-gray-600">
-              Silakan kembali ke halaman utama untuk melakukan pemesanan
+              Silakan Kembali ke halaman utama untuk melakukan pemesanan
             </p>
           </div>
         </div>

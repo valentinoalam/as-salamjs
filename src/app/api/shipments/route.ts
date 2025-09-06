@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { createShipment, getPendingShipments, getAllShipments } from "@/services/qurban"
-import { authOptions } from "@/lib/auth"
+import { createShipment, getPendingShipments, getAllShipments } from "#@/lib/server/repositories/qurban.ts"
+import { authOptions } from "#@/lib/utils/auth.ts"
 import { getServerSession } from "next-auth"
 
 export async function GET(request: Request) {

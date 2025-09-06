@@ -1,20 +1,26 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
-import { useState, useCallback, useEffect, useMemo } from "react"
+import { useState, useCallback, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { HewanStatus, type HewanQurban } from "@prisma/client"
 import { Loader2 } from "lucide-react"
-import { useQurban, type HewanQuery, type TipeHewan } from "@/contexts/qurban-context"
+import { useQurban } from "@/hooks/qurban/use-qurban"
+import type { HewanQueryResult } from "#@/types/qurban.ts"
+import type { JenisHewanInputDTO } from "#@/lib/DTOs/mudhohi.ts"
+import { TableSkeleton } from "../table-skeleton"
+import { useSettingsStore } from "#@/stores/settings-store.ts"
 
 interface ProgressProps {
-  tipeHewan: TipeHewan
+  tipeHewan: JenisHewanInputDTO
   meta: {total: number; target: number};
-  queryHewan: HewanQuery;
-  currentPage: number; // Adjust type accordingly
-  setPage: (key: any, value: any) => void; // Adjust type accordingly
+  queryHewan: HewanQueryResult;
+  currentPage: number;
+  setPage: (key: any, value: any) => void;
   currentGroup?: string;
 }
 
@@ -26,18 +32,27 @@ const ProgressHewan = ({
   setPage,
   currentGroup
 }: ProgressProps) => {
-  const  { updateHewan } = useQurban()
-  const { data: pagedData, isLoading, isError, refetch, pagination } = queryHewan
-  const { useGroups, itemsPerGroup, pageSize, totalPages, totalGroups } = pagination;
+  const { updateHewan } = useQurban()
+  const { data, isLoading, isError, refetch, pagination } = queryHewan;
+  const { itemsPerGroup } = useSettingsStore()
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
 
+  // Calculate groups and pages
+  const { useGroups, pageSize, totalPages, totalGroups } = pagination;
+  
   const groupButtons = useMemo(() => 
     Array.from(
-      { length: Math.ceil(meta.total / (itemsPerGroup || 50)) }, 
+      { length: Math.ceil(meta.total / itemsPerGroup) }, 
       (_, i) => String.fromCharCode(65 + i)
     ),
     [meta.total, itemsPerGroup]
   );
+  
+  const currentGroupIndex = groupButtons.indexOf(currentGroup || 'A');
+  const groupStartIndex = currentGroupIndex * itemsPerGroup;
+  const groupEndIndex = Math.min((currentGroupIndex + 1) * itemsPerGroup, meta.total);
+  const itemsInCurrentGroup = groupEndIndex - groupStartIndex;
+  const pagesInCurrentGroup = Math.ceil(itemsInCurrentGroup / pageSize);
 
   const handlePageChange = useCallback(
     (page: number) => {
@@ -51,19 +66,17 @@ const ProgressHewan = ({
     (group: string) => {
       const groupKey = tipeHewan === 'sapi' ? 'sapiGroup' : 'dombaGroup';
       const pageKey = tipeHewan === 'sapi' ? 'sapiPage' : 'dombaPage';
-      
+
       setPage(groupKey, group);
       setPage(pageKey, 1); // Reset to first page when group changes
     },
     [tipeHewan, setPage]
   );
 
-  const handleSlaughteredChange = useCallback( (hewanId: string, checked: boolean, type: "sapi" | "domba") => {
+  const handleSlaughteredChange = useCallback((hewanId: string, checked: boolean, type: "sapi" | "domba") => {
     try {
       setIsUpdating(hewanId);
-      // Send to server
       const status = checked ? HewanStatus.DISEMBELIH : HewanStatus.TERDAFTAR
-      console.log(hewanId, status)
       updateHewan({
         hewanId,
         status,
@@ -71,10 +84,21 @@ const ProgressHewan = ({
         tipeId: type === "sapi" ? 1 : 2,
       })
     } finally {
-      setIsUpdating(null) // Move cleanup here
+      setIsUpdating(null)
     }
-
   }, [updateHewan])
+
+  // Calculate page range for current group
+  const getPageRange = useCallback((pageIndex: number) => {
+    const startInGroup = pageIndex * pageSize;
+    const endInGroup = Math.min(startInGroup + pageSize, itemsInCurrentGroup);
+    
+    // Global numbering
+    const globalStart =  startInGroup + 1;
+    const globalEnd =  endInGroup;
+    
+    return `${globalStart} - ${globalEnd}`;
+  }, [itemsInCurrentGroup, pageSize]);
 
   if (isLoading) {
     return (
@@ -82,6 +106,7 @@ const ProgressHewan = ({
         <CardContent className="flex justify-center items-center py-8">
           <Loader2 className="h-8 w-8 animate-spin" />
           <span className="ml-2">Loading...</span>
+          <TableSkeleton showHeader={false} columns={4} />
         </CardContent>
       </Card>
     )
@@ -107,10 +132,9 @@ const ProgressHewan = ({
     <Card>
       <CardHeader>
         <CardTitle>Progres {tipeHewan}</CardTitle>
-        {/* Pagination Controls */}
         
         <div className="space-y-4">
-          { useGroups && totalGroups && totalGroups > 1 && (
+          {useGroups && totalGroups && totalGroups > 1 && (
             <div className="flex gap-2 flex-wrap">
               {groupButtons.map((group) => (
                 <Button
@@ -126,11 +150,8 @@ const ProgressHewan = ({
           )}
 
           <div className="flex gap-2 flex-wrap">
-            {Array.from({ length: totalPages }, (_, i) => {
-              const pageNum = i + 1
-              const start = i * pageSize + 1
-              const end = Math.min((i + 1) * pageSize, meta.total)
-
+            {Array.from({ length: pagesInCurrentGroup }, (_, i) => {
+              const pageNum = i + 1;
               return (
                 <Button
                   key={pageNum}
@@ -138,7 +159,7 @@ const ProgressHewan = ({
                   onClick={() => handlePageChange(pageNum)}
                   disabled={isLoading}
                 >
-                  {start} - {end}
+                  {getPageRange(i)}
                 </Button>
               )
             })}
@@ -148,7 +169,7 @@ const ProgressHewan = ({
 
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {pagedData.map((hewan: HewanQurban) => (
+          {data?.map((hewan: HewanQurban) => (
             <div
               key={hewan.hewanId}
               className="p-4 border rounded-lg flex items-center justify-between hover:bg-gray-50 transition-colors"

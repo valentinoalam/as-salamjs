@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { JenisHewan } from '@prisma/client'
-import prisma from '@/lib/prisma'
+import prisma from '#@/lib/server/prisma.ts'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',

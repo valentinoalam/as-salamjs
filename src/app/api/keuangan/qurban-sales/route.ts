@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getQurbanSalesStats } from "@/services/keuangan"
+import { getQurbanSalesStats } from "#@/lib/server/repositories/keuangan.ts"
 
 export async function GET() {
   try {

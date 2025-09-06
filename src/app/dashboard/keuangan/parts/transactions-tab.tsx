@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { TransactionType } from "@prisma/client"
 import { CalendarIcon, Plus, RefreshCw, Download, FileText, Search, Trash2, ChevronLeft, ChevronRight } from "lucide-react"
 import { format } from "date-fns"
-import { cn } from "@/lib/utils"
+import { cn } from "#@/lib/utils/utils.ts"
 
 import TransactionForm from "./transaction-form"
 import {
@@ -27,11 +27,10 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import type { DateRange } from "react-day-picker"
-import { exportToExcel } from "@/lib/excel"
-import { Overview } from "@/components/dashboard/summaries/overview"
+import { exportToExcel } from "#@/lib/utils/excel.ts"
 import type { Category, Image } from "@/types/keuangan"
-import { formatCurrency } from "@/lib/formatters"
-import { useKeuangan } from "@/contexts/keuangan-context"
+import { formatCurrency } from "#@/lib/utils/formatters.ts"
+import { useFinancialData } from "@/hooks/qurban/use-keuangan"
 
 const ITEMS_PER_PAGE = 10
 
@@ -51,7 +50,7 @@ export default function TransactionsTab() {
     setCategoryFilter,
     setDateRange,
     resetFilters,
-  } = useKeuangan()
+  } = useFinancialData()
 
   // Local UI state only
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -180,8 +179,6 @@ export default function TransactionsTab() {
   if (!hasMounted) return null
   return (
     <div className="space-y-6">
-      <Overview />
-      
       {/* Filters Section */}
       <Card>
         <CardContent className="p-4">

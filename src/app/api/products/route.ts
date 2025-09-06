@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getProdukHewan, addProductLog } from "@/services/qurban"
+import { getProdukHewan, addProductLog } from "#@/lib/server/repositories/qurban.ts"
 import type { JenisProduk } from "@prisma/client"
 
 export async function GET(request: NextRequest) {

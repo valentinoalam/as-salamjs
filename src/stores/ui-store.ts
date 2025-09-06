@@ -1,30 +1,57 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Role } from "@prisma/client"
+import { getPaginationConfig } from "#@/hooks/use-pagination.tsx"
+import type { PaginationConfig } from "#@/lib/DTOs/global.ts"
 import { create } from "zustand"
-import { persist } from "zustand/middleware"
+import { persist, createJSONStorage } from "zustand/middleware"
+import { useShallow } from 'zustand/react/shallow'
+import { useSettingsStore } from "./settings-store"
 
+interface MetaState {
+  sapi: { total: number; target: number; slaughtered: number };
+  domba: { total: number; target: number; slaughtered: number };
+}
 interface PaginationState {
   sapiPage: number
   sapiGroup: string
   dombaPage: number
   dombaGroup: string
+  mudhohiPage: number
+  penerimaPage: number
+  // Add more pagination states as needed
+}
+
+interface TabState {
+  counterInventori: string
+  counterTimbang: string
+  progressSembelih: string
+  statusHewan: string
+  keuangan: string
+  pengaturan: string
+  // Add more tab states as needed
+}
+
+interface FormState {
+  // Store form values that should persist
+  distribusiForm: {
+    receivedBy: string
+    institusi: string
+    distribusiId: string
+    jumlahPaket: number
+  }
+  // shipmentForm
+  // mudhohiForm
+  // transactionForm
+  // Add more form states as needed
 }
 
 interface UIState {
   showRegisterButton: boolean
-  user: {
-    id: string
-    name: string | null
-    email: string | null
-    role: Role | null
-    urlAvatar: string | null
-  } | null
-  setUser: (user: UIState['user']) => void
-  setShowRegisterButton: (show: boolean) => void
-}
+  tabs: TabState
+  forms: FormState
+  isHydrated: boolean
 
-interface UIState {
+  meta: MetaState;
   // Pagination
   pagination: PaginationState
 
@@ -51,12 +78,21 @@ interface UIState {
   // Sidebar and navigation
   isSidebarOpen: boolean
   isMobileMenuOpen: boolean
+  
+  sapiPaginationConfig: PaginationConfig
+  dombaPaginationConfig: PaginationConfig
 
   // Theme and preferences
   theme: "light" | "dark" | "system"
 
   // Actions
-  setPagination: (key: keyof PaginationState, value: any) => void
+  toggleSidebar: () => void
+  setActiveTab: (component: keyof TabState, tabValue: string) => void
+  setPagination: <K extends keyof PaginationState>(key: K, value: PaginationState[K]) => void
+  updateFormField: <K extends keyof FormState>(formName: K, fieldName: keyof FormState[K], value: any) => void
+  resetForm: (formName: keyof FormState) => void
+  setHydrated: (hydrated: boolean) => void
+  setShowRegisterButton: (show: boolean) => void
   setModal: (modal: string, isOpen: boolean) => void
   setSelectedItem: (type: string, id: string | null) => void
   setFilter: (type: string, value: string) => void
@@ -64,90 +100,214 @@ interface UIState {
   setSidebar: (isOpen: boolean) => void
   setMobileMenu: (isOpen: boolean) => void
   setTheme: (theme: "light" | "dark" | "system") => void
+  setMeta: (meta: MetaState) => void;
   resetFilters: () => void
   resetSelections: () => void
 }
 
+// Default values
+const defaultTabs: TabState = {
+  counterInventori: "distribusi",
+  progressSembelih: "sapi",
+  counterTimbang: 'timbang',
+  statusHewan: 'sapi',
+  keuangan: 'transactions',
+  pengaturan: 'tipe-hewan'
+}
+
+const defaultMeta: MetaState = {
+  sapi: { total: 0, target: 0, slaughtered: 0 },
+  domba: { total: 0, target: 0, slaughtered: 0 },
+};
+
+const defaultPagination: PaginationState = {
+  sapiPage: 1,
+  sapiGroup: "A",
+  dombaPage: 1,
+  dombaGroup: "A",
+  mudhohiPage: 1,
+  penerimaPage: 1,
+}
+
+const defaultForms: FormState = {
+  distribusiForm: {
+    receivedBy: "",
+    institusi: "",
+    distribusiId: "",
+    jumlahPaket: 1,
+  },
+}
+
 export const useUIStore = create<UIState>()(
+  
   persist(
-    (set, get) => ({
-      showRegisterButton: true,
-      user: null,
-      setUser: (user) => set({ user }),
-      setShowRegisterButton: (show) => set({ showRegisterButton: show }),
-      // Initial state
-      pagination: {
-        sapiPage: 1,
-        sapiGroup: "A",
-        dombaPage: 1,
-        dombaGroup: "A",
-      },
+    (set, get) => {
+      const { itemsPerGroup } = useSettingsStore.getState();
+      return ({
+        // Initial state
+        showRegisterButton: true,
+        isHydrated: false,
+        tabs: defaultTabs,
+        meta: defaultMeta,
+        pagination: defaultPagination,
 
-      isAddMudhohiModalOpen: false,
-      isEditMudhohiModalOpen: false,
-      isPaymentModalOpen: false,
-      isDeleteConfirmModalOpen: false,
+        isAddMudhohiModalOpen: false,
+        isEditMudhohiModalOpen: false,
+        isPaymentModalOpen: false,
+        isDeleteConfirmModalOpen: false,
 
-      selectedMudhohiId: null,
-      selectedPaymentId: null,
-      selectedHewanId: null,
+        selectedMudhohiId: null,
+        selectedPaymentId: null,
+        selectedHewanId: null,
 
-      searchQuery: "",
-      statusFilter: "all",
-      typeFilter: "all",
+        searchQuery: "",
+        statusFilter: "all",
+        typeFilter: "all",
 
-      isSubmitting: false,
-      isDeleting: false,
+        forms: defaultForms,
 
-      isSidebarOpen: true,
-      isMobileMenuOpen: false,
+        isSubmitting: false,
+        isDeleting: false,
 
-      theme: "system",
+        isSidebarOpen: true,
+        isMobileMenuOpen: false,
+        setMeta: (meta) => set({ meta }),
+        // Add pagination configs
+        sapiPaginationConfig: {
+          useGroups: false, 
+          itemsPerGroup: undefined,
+          pageSize: 10
+        },
+        dombaPaginationConfig: {
+          useGroups: true, 
+          itemsPerGroup,
+          pageSize: 10
+        },
+        theme: "system",
 
-      // Actions
-      setPagination: (key, value) =>
-        set((state) => ({
-          pagination: {
-            ...state.pagination,
-            [key]: value,
-          },
-        })),
+        // Actions
+        setShowRegisterButton: (show) => set({ showRegisterButton: show }),
+        toggleSidebar: () =>
+          set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
 
-      setModal: (modal, isOpen) => set({ [`is${modal}ModalOpen`]: isOpen } as any),
+        setActiveTab: (component, tabValue) =>
+          set((state) => ({
+            tabs: {
+              ...state.tabs,
+              [component]: tabValue,
+            },
+          })),
+        setPagination: (key, value) =>
+          set((state) => ({
+            pagination: {
+              ...state.pagination,
+              [key]: value,
+            },
+          })),
+        updateFormField: (formName, fieldName, value) =>
+          set((state) => ({
+            forms: {
+              ...state.forms,
+              [formName]: {
+                ...state.forms[formName],
+                [fieldName]: value,
+              },
+            },
+          })),
 
-      setSelectedItem: (type, id) => set({ [`selected${type}Id`]: id } as any),
+        resetForm: (formName) =>
+          set((state) => ({
+            forms: {
+              ...state.forms,
+              [formName]: defaultForms[formName],
+            },
+          })),
 
-      setFilter: (type, value) => set({ [`${type}Filter`]: value } as any),
+        setHydrated: (hydrated) =>
+          set({ isHydrated: hydrated }),
 
-      setLoading: (type, isLoading) => set({ [`is${type}`]: isLoading } as any),
+        setModal: (modal, isOpen) => set({ [`is${modal}ModalOpen`]: isOpen } as any),
 
-      setSidebar: (isOpen) => set({ isSidebarOpen: isOpen }),
+        setSelectedItem: (type, id) => set({ [`selected${type}Id`]: id } as any),
 
-      setMobileMenu: (isOpen) => set({ isMobileMenuOpen: isOpen }),
+        setFilter: (type, value) => set({ [`${type}Filter`]: value } as any),
 
-      setTheme: (theme) => set({ theme }),
+        setLoading: (type, isLoading) => set({ [`is${type}`]: isLoading } as any),
 
-      resetFilters: () =>
-        set({
-          searchQuery: "",
-          statusFilter: "all",
-          typeFilter: "all",
-        }),
+        setSidebar: (isOpen) => set({ isSidebarOpen: isOpen }),
 
-      resetSelections: () =>
-        set({
-          selectedMudhohiId: null,
-          selectedPaymentId: null,
-          selectedHewanId: null,
-        }),
-    }),
+        setMobileMenu: (isOpen) => set({ isMobileMenuOpen: isOpen }),
+
+        setTheme: (theme) => set({ theme }),
+
+        resetFilters: () =>
+          set({
+            searchQuery: "",
+            statusFilter: "all",
+            typeFilter: "all",
+          }),
+
+        resetSelections: () =>
+          set({
+            selectedMudhohiId: null,
+            selectedPaymentId: null,
+            selectedHewanId: null,
+          }),
+      }
+    )},
     {
       name: "ui-storage",
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         pagination: state.pagination,
         isSidebarOpen: state.isSidebarOpen,
+        tabs: state.tabs,
+        forms: state.forms,
         theme: state.theme,
       }),
+      onRehydrateStorage: () => (state) => {
+        // Set hydrated to true after rehydration
+        if (state) {
+          state.setHydrated(true)
+        }
+      },
     },
   ),
 )
+
+// Optional: Create separate stores for different concerns if needed
+export const useTabStore = () => useUIStore(useShallow((state) => ({
+  tabs: state.tabs,
+  setActiveTab: state.setActiveTab,
+})))
+export const useMetaStore = () => useUIStore(useShallow((state) => ({
+  meta: state.meta,
+  setMeta: state.setMeta,
+})));
+export const usePaginationStore = () => useUIStore(useShallow((state) => ({
+  pagination: state.pagination,
+  setPagination: state.setPagination,
+})))
+
+export const usePaginationConfigStore = () => useUIStore(useShallow((state) => ({
+  sapiPaginationConfig: state.sapiPaginationConfig,
+  dombaPaginationConfig: state.dombaPaginationConfig,
+})))
+
+export const useFormStore = () => useUIStore(useShallow((state) => ({
+  forms: state.forms,
+  updateFormField: state.updateFormField,
+  resetForm: state.resetForm,
+})))
+
+export const useSidebarStore = () => useUIStore(useShallow((state) => ({
+  isSidebarOpen: state.isSidebarOpen,
+  toggleSidebar: state.toggleSidebar,
+})))
+
+// Hydration helper hook for Next.js SSR
+export const useHydration = () => {
+  const isHydrated = useUIStore(useShallow((state) => state.isHydrated))
+  
+  return isHydrated
+}

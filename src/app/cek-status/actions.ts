@@ -1,6 +1,6 @@
 "use server"
 
-import prisma from "@/lib/prisma"
+import prisma from "#@/lib/server/prisma.ts"
 
 // Simulate OTP generation and storage
 // In a real application, you would use a proper OTP service and database
@@ -12,9 +12,9 @@ const otpStore = new Map<string, { otp: string; expires: Date }>()
 export async function requestOtp(phoneNumber: string) {
   try {
     // Check if the phone number exists in the database
-    const qurban = await prisma.hewanQurban.findFirst({
+    const qurban = await prisma.mudhohi.findFirst({
       where: {
-        shohibPhone: phoneNumber,
+        phone: phoneNumber,
       },
     })
 
@@ -83,19 +83,23 @@ export async function verifyOtp(phoneNumber: string, otp: string) {
     }
 
     // OTP is valid, fetch qurban data
-    const qurban = await prisma.hewanQurban.findFirst({
+    const qurban = await prisma.mudhohi.findFirst({
       where: {
-        shohibPhone: phoneNumber,
+        phone: phoneNumber,
       },
-      select: {
-        id: true,
-        animalId: true,
-        type: true,
-        status: true,
-        shohibName: true,
-        shohibPhone: true,
-        meatPackageCount: true,
-        processedAt: true,
+      include: {
+        hewan: {
+          select: {
+            hewanId: true,
+            status: true,
+            slaughteredAt: true,
+          },
+          include: {
+            tipe: true,
+          },
+        },
+        jatahPengqurban: true,
+        payment: true,
       },
     })
 

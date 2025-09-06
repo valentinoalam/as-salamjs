@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getMudhohi, countMudhohi } from "@/services/mudhohi"
-import { createMudhohi } from "@/services/mudhohi"
+import { getMudhohi, countMudhohi } from "#@/lib/server/repositories/mudhohi.ts"
+import { createMudhohi } from "#@/lib/server/repositories/createMudhohi.ts"
 import { revalidatePath } from "next/cache"
 import type { PaymentStatus } from "@prisma/client"
-import { getCurrentUser } from "@/lib/auth"
+import { getCurrentUser } from "#@/lib/utils/auth.ts"
 
 export async function GET(request: NextRequest) {
   try {

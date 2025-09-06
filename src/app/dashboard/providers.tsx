@@ -1,10 +1,13 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client'
 import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'; // For localStorage
+
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { KeuanganProvider } from '@/contexts/keuangan-context';
 import { SidebarProvider } from '@/components/ui/sidebar';
-import { useUIState } from '@/contexts/ui-state-context';
+import { useSidebarStore } from '#@/stores/ui-store.ts';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -26,16 +29,21 @@ export function Providers({ children }: ProvidersProps) {
       },
     },
   })
+  // Create a persister for localStorage
+  const persister = createAsyncStoragePersister({
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+  });
 
-  const {isSidebarOpen, toggleSidebar} = useUIState()
+  const {isSidebarOpen, toggleSidebar} = useSidebarStore()
   return (
-		<QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider 
+      client={queryClient}
+      persistOptions={{ persister }}
+    >
       <SidebarProvider open={isSidebarOpen} onOpenChange={toggleSidebar} className="flex w-auto h-screen overflow-hidden relative">
-        <KeuanganProvider>
           {children}
-        </KeuanganProvider>
         <ReactQueryDevtools initialIsOpen={false} />
       </SidebarProvider>
-		</QueryClientProvider>
+		</PersistQueryClientProvider>
   );
 }

@@ -4,8 +4,9 @@ import { Inter } from "next/font/google"
 import "@/styles/globals.css"
 import { ThemeProvider } from "@/components/layout/providers/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
-import { JsonLd } from "@/schemas_org"
-import { generateMetaData } from "@/lib/metadata"
+import { Footer } from "@/components/layout/footer"
+import { JsonLd } from "#@/lib/schemas_org/index.ts"
+import { generateMetaData } from "#@/lib/utils/metadata.ts"
 import { NextAuthProvider } from "@/components/layout/providers/next-auth-provider"
 import { getServerSession } from "next-auth"
 import { authOptions } from "./api/auth/[...nextauth]/route"
@@ -127,6 +128,7 @@ export default async function RootLayout({
           <AuthProvider>
             <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
               {children}
+              <Footer />
               <Toaster />
             </ThemeProvider>
           </AuthProvider>

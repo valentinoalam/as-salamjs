@@ -10,23 +10,15 @@ import { Label } from "@/components/ui/label"
 import { toast } from "@/hooks/use-toast"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { updateUserProfile } from "./actions"
-import type { Role } from "@prisma/client"
-
-type User = {
-  id: string
-  name: string | null
-  email: string | null
-  urlAvatar?: string | null
-  role: Role
-}
+import type { AuthUser } from "#@/types/user.ts"
 
 interface ProfileFormProps {
-  user: User
+  user: AuthUser
 }
 
 export default function ProfileForm({ user }: ProfileFormProps) {
   const [loading, setLoading] = useState(false)
-  const [avatarUrl, setAvatarUrl] = useState(user.urlAvatar || "")
+  const [avatarUrl, setAvatarUrl] = useState(user.image || "")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
 
@@ -48,7 +40,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
 
       const result = await updateUserProfile({
         userId: user.id,
-        urlAvatar: avatarUrl,
+        image: avatarUrl,
         password: password || undefined,
       })
 
@@ -102,7 +94,10 @@ export default function ProfileForm({ user }: ProfileFormProps) {
             <div className="text-center">
               <h3 className="font-medium text-lg">{user.name}</h3>
               <p className="text-sm text-muted-foreground">{user.email}</p>
-              <p className="text-xs text-muted-foreground mt-1">Role: {user.role.replace("_", " ")}</p>
+              <p className="text-xs text-muted-foreground mt-1">Role: {" "}
+            {user.roles
+              ?.map((role) => role.replace("_", " "))
+              .join(", ")}</p>
             </div>
           </div>
 

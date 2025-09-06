@@ -6,10 +6,9 @@ import { useForm } from "react-hook-form"
 import { TransactionType } from "@prisma/client"
 import { CalendarIcon } from "lucide-react"
 import { format } from "date-fns"
-import { cn } from "@/lib/utils"
+import { cn } from "#@/lib/utils/utils.ts"
 import { toast } from "@/hooks/use-toast"
 import { budgetSchema, type BudgetFormValues } from "@/lib/zod/keuangan"
-import { createBudget, updateBudget } from "@/services/keuangan"
 
 import {
   Dialog,
@@ -26,6 +25,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Calendar } from "@/components/ui/calendar"
 import type { Category } from "@/types/keuangan"
+import { useFinancialData } from "@/hooks/qurban/use-keuangan"
 
 type Budget = {
   id: string
@@ -55,6 +55,7 @@ export default function BudgetForm({
   onBudgetCreated,
   onBudgetUpdated,
 }: BudgetFormProps) {
+  const { createBudget, updateBudget } = useFinancialData()
   const [loading, setLoading] = useState(false)
   const isEditing = !!budget
   const [selectedType, setSelectedType] = useState<TransactionType>(budget?.category.type || TransactionType.PEMASUKAN)
@@ -79,27 +80,11 @@ export default function BudgetForm({
       if (isEditing && budget) {
         // Update existing budget
         const result = await updateBudget(budget.id, data)
-        if (result.success) {
-          toast({
-            title: "Budget Updated",
-            description: "The budget has been updated successfully.",
-          })
-          onBudgetUpdated(true, result.data as Budget)
-        } else {
-          throw new Error(result.error || "Failed to update budget")
-        }
+        onBudgetUpdated( result.success, data as Budget)
       } else {
         // Create new budget
         const result = await createBudget(data)
-        if (result.success) {
-          toast({
-            title: "Budget Added",
-            description: "The budget has been created successfully.",
-          })
-          onBudgetCreated(true, result.data as Budget)
-        } else {
-          throw new Error(result.error || "Failed to create budget")
-        }
+        onBudgetCreated(result.success, data as Budget)
       }
     } catch (error) {
       console.error(`Error ${isEditing ? "updating" : "creating"} budget:`, error)

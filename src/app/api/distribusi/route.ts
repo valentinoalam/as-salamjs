@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { getDistribution } from "@/services/qurban"
+import prisma from "#@/lib/server/prisma.ts";
+import { getDistribution } from "#@/lib/server/repositories/qurban.ts"
 
 export async function GET() {
   try {

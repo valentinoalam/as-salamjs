@@ -10,13 +10,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
 import { Counter, JenisHewan } from "@prisma/client"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useQurban } from "@/contexts/qurban-context"
 import { ConnectionStatus } from "@/components/connection-status"
-import { exportToExcel } from "@/lib/excel"
+import { exportToExcel } from "#@/lib/utils/excel.ts"
 import { Download, Minus, Plus } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { ProdukHewan, ShipmentProduct } from "@/types/qurban"
 import { ShipmentHistory } from "@/components/qurban/shipment-history"
+import { useProduct } from "#@/hooks/qurban/use-produk.tsx"
+import { useTabStore } from "#@/stores/ui-store.ts"
 
 export default function CounterTimbangPage() {
   const { 
@@ -27,7 +28,8 @@ export default function CounterTimbangPage() {
     getProductsByType,
     getProductById,
     getProductLogsByPlace
-  } = useQurban()
+  } = useProduct()
+  const { tabs, setActiveTab } = useTabStore()
   const productLogs = getProductLogsByPlace(Counter.TIMBANG)
   // Filter products for daging (meat) products
   const produkDaging = getProductsByType('daging')
@@ -337,7 +339,7 @@ export default function CounterTimbangPage() {
       </div>
     )
   }
- const handleExportToExcel = () => {
+  const handleExportToExcel = () => {
     const rows = allProdukHewan.map(p => ({
       ID: p.id,
       Nama: p.nama,
@@ -357,7 +359,9 @@ export default function CounterTimbangPage() {
     <div className="space-y-8">
       <ConnectionStatus isConnected={isConnected} />
 
-      <Tabs defaultValue="timbang">
+      <Tabs defaultValue="timbang"
+        value={tabs.counterTimbang}
+        onValueChange={(value) => setActiveTab("counterTimbang", value)}>
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="timbang">Timbang</TabsTrigger>
           <TabsTrigger value="pengiriman">Pengiriman ke Inventori</TabsTrigger>
@@ -680,7 +684,7 @@ export default function CounterTimbangPage() {
                       <h3 className="font-medium mb-2">Products to Ship</h3>
                       <ul className="space-y-2">
                         {shipmentProducts.map((item) => {
-                          const product = productsQuery.data.find((p) => p.id === item.produkId)
+                          const product = productsQuery?.data?.find((p) => p.id === item.produkId)
                           return (
                             <li key={item.produkId} className="flex justify-between items-center">
                               <span>
@@ -724,7 +728,7 @@ export default function CounterTimbangPage() {
           </Card>
         </TabsContent>
         <TabsContent value="history">
-          <Tabs defaultValue="account" className="p-4">
+          <Tabs defaultValue="riwayat-pengiriman" className="p-4">
             <TabsList>
               <TabsTrigger value="riwayat-pengiriman">Riwayat Pengiriman</TabsTrigger>
               <TabsTrigger value="riwayat-product">Riwayat PerProduk</TabsTrigger>
@@ -776,7 +780,7 @@ export default function CounterTimbangPage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              Product History - {productsQuery.data.find((p) => p.id === selectedProductForHistory)?.nama}
+              Product History - {productsQuery?.data?.find((p) => p.id === selectedProductForHistory)?.nama}
             </DialogTitle>
             <DialogDescription>Log riwayat produk ini</DialogDescription>
           </DialogHeader>

@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react"
-import { Plus, Clipboard, CheckCircle2, Trash2, Save, Download, AlertCircle, CheckCircle } from "lucide-react"
+import { Plus, Trash2, Save, Download, Clipboard, AlertCircle, CheckCircle2, CheckCircle, FileSpreadsheet } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "@/hooks/use-toast"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { getTipeHewan } from "@/services/mudhohi"
+import { getTipeHewan } from "#@/lib/server/repositories/mudhohi.ts"
 import { z } from "zod"
 import type { CaraBayar, PaymentStatus, TipeHewan } from "@prisma/client"
 import { useRouter } from "next/navigation"
@@ -25,9 +25,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { MultiSelect } from "@/components/multi-select"
-import { getProdukForAnimal } from "../form/create-produk-hewan-form"
+import { MultiSelect } from "#@/components/ui/multi-select.tsx"
+import { getProdukForAnimal } from "#@/lib/server/services/tipe-hewan.ts"
 
 // Enhanced validation schemas
 const EmailSchema = z.string().email("Format email tidak valid").optional().or(z.literal(""))
@@ -155,6 +156,7 @@ export default function MudhohiSheet({availableHewan}: {availableHewan: TipeHewa
   const [pastePreview, setPastePreview] = useState<string[][]>([])
   const [pasteError, setPasteError] = useState<string | null>(null)
   const [columnMapping, setColumnMapping] = useState<Record<number, keyof MudhohiData>>({})
+  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false)
   const tableRef = useRef<HTMLDivElement>(null)
   const generateId = () => `temp_${Math.random().toString(36).slice(2, 9)}`
 
@@ -330,7 +332,7 @@ export default function MudhohiSheet({availableHewan}: {availableHewan: TipeHewa
     if (validationErrors.length > 0) {
       toast({
         title: "Validasi Gagal",
-        description: `Ditemukan ${validationErrors.length} kesalahan. Periksa kembali data Anda.`,
+        description: `Ditemukan ${validationErrors.length} kesalahan. Periksa Kembali data Anda.`,
         variant: "destructive",
       })
       setShowValidationErrors(true); // Tampilkan error saat tombol simpan ditekan
@@ -705,6 +707,230 @@ export default function MudhohiSheet({availableHewan}: {availableHewan: TipeHewa
       })
   }
 
+  // Create Google Sheets template
+  const createGoogleSheetsTemplate = async () => {
+    setIsCreatingTemplate(true)
+
+    try {
+      const response = await fetch("/api/create-template", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          templateType: "googlesheets",
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to create template")
+      }
+
+      // Open the created Google Sheets template in a new tab
+      window.open(result.templateUrl, "_blank")
+
+      toast({
+        title: "Template Berhasil Dibuat",
+        description: "Template Google Sheets telah dibuat dan dibuka di tab baru",
+      })
+    } catch (error: any) {
+      console.error("Error creating template:", error)
+      toast({
+        title: "Gagal Membuat Template",
+        description: error.message || "Terjadi kesalahan saat membuat template",
+        variant: "destructive",
+      })
+    } finally {
+      setIsCreatingTemplate(false)
+    }
+  }
+
+  // Download CSV template
+  const downloadCSVTemplate = () => {
+    const headers = [
+      "Nama Pengqurban",
+      "Nama Peruntukan",
+      "Alamat",
+      "Jenis Hewan",
+      "Jumlah Hewan",
+      "Cara Bayar",
+      "Status Pembayaran",
+      "Kode Dash",
+      "Tanggal",
+      "Potong Sendiri",
+      "Ambil Daging",
+      "Sudah Ambil Daging",
+      "Pesan Khusus",
+      "Keterangan",
+      "Barcode Image",
+    ]
+
+    // Sample data for template
+    const sampleData = [
+      [
+        "Ahmad Fauzi",
+        "Keluarga Ahmad",
+        "Jl. Merdeka No. 123",
+        "sapi",
+        "1",
+        "transfer",
+        "lunas",
+        "DASH001",
+        "2024-01-15",
+        "tidak",
+        "ya",
+        "tidak",
+        "Untuk keluarga",
+        "Qurban tahun ini",
+        "",
+      ],
+      [
+        "Siti Aminah",
+        "Almarhum Bapak",
+        "Jl. Sudirman No. 456",
+        "kambing",
+        "2",
+        "tunai",
+        "lunas",
+        "DASH002",
+        "2024-01-15",
+        "ya",
+        "tidak",
+        "tidak",
+        "Untuk arwah bapak",
+        "",
+        "",
+      ],
+      [
+        "Budi Santoso",
+        "Keluarga Besar",
+        "Jl. Gatot Subroto No. 789",
+        "sapi",
+        "1",
+        "transfer",
+        "menunggu",
+        "DASH003",
+        "2024-01-16",
+        "tidak",
+        "ya",
+        "tidak",
+        "",
+        "Qurban bersama",
+        "",
+      ],
+    ]
+
+    const csvContent = [headers.join(","), ...sampleData.map((row) => row.join(","))].join("\n")
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "template-data-mudhohi.csv"
+    a.click()
+    window.URL.revokeObjectURL(url)
+
+    toast({
+      title: "Template Downloaded",
+      description: "Template CSV telah diunduh. Isi data sesuai format dan copy-paste ke sini.",
+    })
+  }
+
+  // Download Excel template
+  const downloadExcelTemplate = () => {
+    const headers = [
+      "Nama Pengqurban",
+      "Nama Peruntukan",
+      "Alamat",
+      "Jenis Hewan",
+      "Jumlah Hewan",
+      "Cara Bayar",
+      "Status Pembayaran",
+      "Kode Dash",
+      "Tanggal",
+      "Potong Sendiri",
+      "Ambil Daging",
+      "Sudah Ambil Daging",
+      "Pesan Khusus",
+      "Keterangan",
+      "Barcode Image",
+    ]
+
+    // Sample data for template
+    const sampleData = [
+      [
+        "Ahmad Fauzi",
+        "Keluarga Ahmad",
+        "Jl. Merdeka No. 123",
+        "sapi",
+        "1",
+        "transfer",
+        "lunas",
+        "DASH001",
+        "2024-01-15",
+        "tidak",
+        "ya",
+        "tidak",
+        "Untuk keluarga",
+        "Qurban tahun ini",
+        "",
+      ],
+      [
+        "Siti Aminah",
+        "Almarhum Bapak",
+        "Jl. Sudirman No. 456",
+        "kambing",
+        "2",
+        "tunai",
+        "lunas",
+        "DASH002",
+        "2024-01-15",
+        "ya",
+        "tidak",
+        "tidak",
+        "Untuk arwah bapak",
+        "",
+        "",
+      ],
+      [
+        "Budi Santoso",
+        "Keluarga Besar",
+        "Jl. Gatot Subroto No. 789",
+        "sapi",
+        "1",
+        "transfer",
+        "menunggu",
+        "DASH003",
+        "2024-01-16",
+        "tidak",
+        "ya",
+        "tidak",
+        "",
+        "Qurban bersama",
+        "",
+      ],
+    ]
+
+    // Create Excel-compatible CSV with UTF-8 BOM
+    const BOM = "\uFEFF"
+    const csvContent = BOM + [headers.join("\t"), ...sampleData.map((row) => row.join("\t"))].join("\n")
+
+    const blob = new Blob([csvContent], { type: "application/vnd.ms-excel;charset=utf-8;" })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "template-data-mudhohi.xls"
+    a.click()
+    window.URL.revokeObjectURL(url)
+
+    toast({
+      title: "Template Downloaded",
+      description: "Template Excel telah diunduh. Buka dengan Excel, isi data, dan copy-paste ke sini.",
+    })
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -741,6 +967,31 @@ export default function MudhohiSheet({availableHewan}: {availableHewan: TipeHewa
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
+              
+              {/* Template Download Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Template
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={createGoogleSheetsTemplate} disabled={isCreatingTemplate}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    {isCreatingTemplate ? "Membuat..." : "Buat Google Sheets"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={downloadExcelTemplate}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Excel Template
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={downloadCSVTemplate}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download CSV Template
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <Button onClick={exportToCSV} variant="outline" size="sm">
                 <Download className="h-4 w-4 mr-2" />
                 Export CSV
@@ -791,7 +1042,8 @@ export default function MudhohiSheet({availableHewan}: {availableHewan: TipeHewa
                 <AlertTitle>Tip: Copy-Paste dari Spreadsheet</AlertTitle>
                 <AlertDescription>
                   Anda dapat menyalin (Ctrl+C) data dari Excel atau Google Sheets dan tempel (Ctrl+V) langsung ke tabel
-                  ini, atau gunakan tombol &quot;Paste dari Spreadsheet&quot;.
+                  ini, atau gunakan tombol &quot;Paste dari Spreadsheet&quot;. 
+                  Gunakan tombol &quot;Template&quot; untuk mengunduh format yang benar.
                 </AlertDescription>
               </Alert>
               <Table>

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { updateHewanInventoryStatus } from "@/services/qurban"
+import { updateHewanInventoryStatus } from "#@/lib/server/repositories/qurban.ts"
 
 export async function POST(req: Request) {
   try {

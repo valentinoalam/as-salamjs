@@ -57,20 +57,16 @@
     ".next/types/**/*.ts", // For Next.js generated types (e.g., from server actions, API routes)
     "server/socket-server.ts", // Explicitly include server-side TS files if they are outside typical src/pages etc.
     "server.ts", // Explicitly include server.ts if it's a top-level server entry.
-    // "jest.config.ts", 
-    // "jest.setup.ts", // Include your Jest setup file for type checking
-    "src", // Ensures all files under `src` are included. Redundant if "**/*.ts", "**/*.tsx" covers it but explicit can be clearer.
+    "prisma/seed.ts",
+    // "src", // Ensures all files under `src` are included. Redundant if "**/*.ts", "**/*.tsx" covers it but explicit can be clearer.
     "cypress/**/*.ts", // This line is crucial for Cypress test files
     "cypress/**/*.js", // If you have JS files in Cypress
     "cypress/support/*.d.ts",// Ensure your custom Cypress support types are included
-    // "types/**/*.d.ts" // If you have a dedicated 'types' folder for global declarations
   ],
   "exclude": [
     "node_modules", // Standard exclusion
     "jest.config.cjs",
-    "./cypress.config.ts", // Exclude the Cypress config itself from being type-checked as part of the app.
-                            // Cypress handles its own config.
-    // Recommended exclusions for Next.js and build artifacts:
+    "./cypress.config.ts", 
     ".next",
     "dist",
     "build", // Common build output folder

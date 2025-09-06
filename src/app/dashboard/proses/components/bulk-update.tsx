@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 interface HewanQurban {
   id: string
-  animalId: string
+  hewanId: string
   type: string
   status: HewanStatus
 }
@@ -50,15 +50,15 @@ export function BulkUpdateStatus() {
     }
   }
 
-  const toggleSelectHewan = (animalId: string) => {
-    setSelectedHewan((prev) => (prev.includes(animalId) ? prev.filter((id) => id !== animalId) : [...prev, animalId]))
+  const toggleSelectHewan = (hewanId: string) => {
+    setSelectedHewan((prev) => (prev.includes(hewanId) ? prev.filter((id) => id !== hewanId) : [...prev, hewanId]))
   }
 
   const selectAll = () => {
     if (selectedHewan.length === searchResults.length) {
       setSelectedHewan([])
     } else {
-      setSelectedHewan(searchResults.map((hewan) => hewan.animalId))
+      setSelectedHewan(searchResults.map((hewan) => hewan.hewanId))
     }
   }
 
@@ -72,13 +72,13 @@ export function BulkUpdateStatus() {
     try {
       // Process each selected animal
       const results = await Promise.all(
-        selectedHewan.map((animalId) =>
+        selectedHewan.map((hewanId) =>
           fetch("/api/hewan/update-status", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ animalId }),
+            body: JSON.stringify({ hewanId }),
           }).then((res) => res.json()),
         ),
       )
@@ -203,12 +203,12 @@ export function BulkUpdateStatus() {
                             <input
                               type="checkbox"
                               className="h-4 w-4 rounded border-gray-300"
-                              checked={selectedHewan.includes(hewan.animalId)}
-                              onChange={() => toggleSelectHewan(hewan.animalId)}
+                              checked={selectedHewan.includes(hewan.hewanId)}
+                              onChange={() => toggleSelectHewan(hewan.hewanId)}
                               disabled={!nextStatus}
                             />
                           </TableCell>
-                          <TableCell className="font-medium">{hewan.animalId}</TableCell>
+                          <TableCell className="font-medium">{hewan.hewanId}</TableCell>
                           <TableCell>{hewan.type}</TableCell>
                           <TableCell>{getStatusBadge(hewan.status)}</TableCell>
                           <TableCell>

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server"
-import { updateBudget, deleteBudget } from "@/services/keuangan"
+import { updateBudget, deleteBudget } from "#@/lib/server/repositories/keuangan.ts"
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
     const data = await request.json()
-    const result = await updateBudget(params.id, data)
+    const {id} = await params
+    const result = await updateBudget(id, data)
     return NextResponse.json(result)
   } catch (error) {
     console.error("Error updating budget:", error)
@@ -14,7 +15,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const result = await deleteBudget(params.id)
+    const {id} = await params
+    const result = await deleteBudget(id)
     return NextResponse.json(result)
   } catch (error) {
     console.error("Error deleting budget:", error)

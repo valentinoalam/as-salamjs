@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
-import prisma from "@/lib/prisma"
+import prisma from "#@/lib/server/prisma.ts"
 import { HewanStatus } from "@prisma/client"
 
 // Define the sequence of statuses for progression
@@ -25,15 +25,15 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json()
-    const { animalId, targetStatus } = body
+    const { hewanId, targetStatus } = body
 
-    if (!animalId) {
+    if (!hewanId) {
       return NextResponse.json({ success: false, message: "Animal ID is required" }, { status: 400 })
     }
 
-    // Find the animal by animalId
+    // Find the animal by hewanId
     const hewan = await prisma.hewanQurban.findFirst({
-      where: { animalId },
+      where: { hewanId },
     })
 
     if (!hewan) {
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       message: `Status hewan berhasil diperbarui ke ${nextStatus}`,
       data: {
         id: updatedHewan.id,
-        animalId: updatedHewan.animalId,
+        hewanId: updatedHewan.hewanId,
         type: updatedHewan.type,
         status: updatedHewan.status,
         previousStatus: hewan.status,

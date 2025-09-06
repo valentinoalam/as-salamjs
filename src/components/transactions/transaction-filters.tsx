@@ -89,7 +89,7 @@ export function TransactionFilters() {
     setFromDate(undefined);
     setToDate(undefined);
     setSelectedCategory("");
-    router.push("/transactions");
+    router.push("/dashboard/transactions");
   };
   
   return (

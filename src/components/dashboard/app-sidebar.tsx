@@ -16,8 +16,7 @@ import {
 import moment from 'moment-hijri'
 import FooterSidebar from "./footer-sidebar"
 import { usePathname } from "next/navigation"
-import { useEffect, useState } from "react"
-import { checkAccess } from "@/app/actions"
+import { useAuthStore } from "@/stores/auth-store"
 
 const data = {
   event: ["Itikaf", "Qurban"],
@@ -63,6 +62,20 @@ const data = {
         {
           title: "Counter Inventori",
           url: "/dashboard/counter-inventori",
+          // icon: Package,
+          // role: ["ADMIN", "USER"],
+        },
+        {
+          title: "Counter Pengambilan",
+          url: "/counter-pengambilan",
+          // icon: UserCheck,
+          // role: ["ADMIN", "USER"],
+        },
+        {
+          title: "Counter Distribusi",
+          url: "/counter-distribusi",
+          // icon: Ticket,
+          // role: ["ADMIN", "USER"],
         },
       ],
     },
@@ -82,17 +95,8 @@ const getDefaultEvent = () => {
 }
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
-  const [accessiblePages, setAccessiblePages] = useState<string[]>([])
+  const { accessiblePages } = useAuthStore()
 
-  useEffect(() => {
-    const fetchAccessiblePages = async () => {
-      const result = await checkAccess()
-      setAccessiblePages(result.accessiblePages)
-    }
-
-  fetchAccessiblePages()
-    
-  }, [])
   return (
     <Sidebar {...props}>
       <SidebarHeader>
@@ -111,7 +115,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           if (item.items) {
             // For groups with sub-items, filter accessible sub-items
             const accessibleItems = item.items.filter((subItem) => {
-              const slug = subItem.url.startsWith("/dashboard/") ? subItem.url.slice(1) : subItem.url
+              const slug = subItem?.url.startsWith("/dashboard/") ? subItem.url.slice(1) : subItem.url
               const isAccessible =
                 (accessiblePages.includes(slug) || subItem.url === "/")
               return isAccessible

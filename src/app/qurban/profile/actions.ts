@@ -1,13 +1,13 @@
 "use server"
 
-import prisma from "@/lib/prisma"
+import prisma from "#@/lib/server/prisma.ts"
 import { revalidatePath } from "next/cache"
-import { getCurrentUser } from "@/lib/auth"
+import { getCurrentUser } from "#@/lib/utils/auth.ts"
 import type { User } from "@prisma/client"
 
 export async function updateUserProfile(data: {
   userId: string
-  urlAvatar?: string
+  image?: string
   password?: string
 }) {
   try {
@@ -21,8 +21,8 @@ export async function updateUserProfile(data: {
     // Prepare update data
     const updateData: User = {} as User
 
-    if (data.urlAvatar !== undefined) {
-      updateData.urlAvatar = data.urlAvatar
+    if (data.image !== undefined) {
+      updateData.image = data.image
     }
 
     if (data.password) {

@@ -1,91 +1,14 @@
 "use client";
-
-import { useEffect, useState } from "react";
 import { Progress } from "@/components/ui/progress";
-import { formatCurrency } from "@/lib/formatters";
-
-interface Budget {
-  id: string;
-  amount: number;
-  spent: number;
-  categoryId: string;
-  category: {
-    name: string;
-  };
-  startDate: string;
-  endDate: string;
-}
+import { formatCurrency } from "#@/lib/utils/formatters.ts";
+import { useFinancialData } from "@/hooks/qurban/use-keuangan";
 
 export function BudgetProgress() {
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { budgetsQuery } = useFinancialData()
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { data: budgets, isLoading, isError } = budgetsQuery
 
-  useEffect(() => {
-    const fetchBudgets = async () => {
-      try {
-        const response = await fetch('/api/budgets');
-        if (response.ok) {
-          const data = await response.json();
-          setBudgets(data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch budgets:', error);
-        // Mock data
-        setBudgets([
-          {
-            id: '1',
-            amount: 10000000,
-            spent: 9000000,
-            categoryId: '1',
-            category: {
-              name: 'Pembelian Hewan Qurban - Sapi'
-            },
-            startDate: '2025-07-01',
-            endDate: '2025-07-31'
-          },
-          {
-            id: '2',
-            amount: 2000000,
-            spent: 1500000,
-            categoryId: '2',
-            category: {
-              name: 'Biaya Distribusi Daging'
-            },
-            startDate: '2025-07-01',
-            endDate: '2025-07-31'
-          },
-          {
-            id: '3',
-            amount: 1500000,
-            spent: 1250000,
-            categoryId: '3',
-            category: {
-              name: 'Biaya Pemotongan & Pengulitan'
-            },
-            startDate: '2025-07-01',
-            endDate: '2025-07-31'
-          },
-          {
-            id: '4',
-            amount: 1000000,
-            spent: 750000,
-            categoryId: '4',
-            category: {
-              name: 'Belanja Bumbu & Bahan Masakan'
-            },
-            startDate: '2025-07-01',
-            endDate: '2025-07-31'
-          },
-        ]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchBudgets();
-  }, []);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-8">
         {[1, 2, 3, 4].map((i) => (
@@ -102,7 +25,7 @@ export function BudgetProgress() {
     );
   }
 
-  if (budgets.length === 0) {
+  if (budgets?.length === 0) {
     return (
       <div className="text-center p-8 bg-muted/50 rounded-lg">
         <p className="text-lg text-muted-foreground">Belum ada anggaran yang dibuat</p>
@@ -115,9 +38,10 @@ export function BudgetProgress() {
 
   return (
     <div className="space-y-8">
-      {budgets.map((budget) => {
-        const percentage = Math.min(Math.round((budget.spent / budget.amount) * 100), 100);
-        const remaining = budget.amount - budget.spent;
+      {budgets?.map((budget) => {
+        const spent = budget.spent || 0
+        const percentage = Math.min(Math.round((spent / budget.amount) * 100), 100);
+        const remaining = budget.amount - spent;
         
         let statusColor = "bg-primary";
         if (percentage > 85) statusColor = "bg-destructive";
@@ -132,7 +56,7 @@ export function BudgetProgress() {
             <Progress value={percentage} className={`h-2 ${statusColor}`} />
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>
-                <span className="font-medium">{formatCurrency(budget.spent)}</span> dari {formatCurrency(budget.amount)}
+                <span className="font-medium">{formatCurrency(spent)}</span> dari {formatCurrency(budget.amount)}
               </span>
               <span>
                 Sisa: <span className={remaining < 0 ? "text-destructive font-medium" : "font-medium"}>

@@ -2,14 +2,14 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingDown, TrendingUp, Wallet, Scale } from "lucide-react";
-import { formatCurrency } from "@/lib/formatters";
-import { useKeuangan } from "@/contexts/keuangan-context";
+import { formatCurrency } from "#@/lib/utils/formatters.ts";
+import { useFinancialData } from "@/hooks/qurban/use-keuangan";
 
   
 export function FinancialSummary({qSales}: {qSales: number}) {
-  const { statsQuery } = useKeuangan();
+  const { statsQuery } = useFinancialData();
   const { data: stats, error} = statsQuery
-
+  console.log(statsQuery)
   // Error state
   if (error) {
     return (
@@ -65,35 +65,36 @@ export function FinancialSummary({qSales}: {qSales: number}) {
       {/* Income Card */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total pemasukan dari {incomeTransactionCount} transaksi</CardTitle>
+          <CardTitle className="text-sm font-black">Total pemasukan dari {incomeTransactionCount} transaksi</CardTitle>
           <TrendingUp className="h-4 w-4 text-green-600" />
         </CardHeader>
         <CardContent>
 
           <div className="text-2xl font-bold text-green-600">
-            {formatCurrency(totalIncome)}
+            {formatCurrency(totalIncome)} 
           </div>
-          { qSales && <p className="text-xs text-muted-foreground">Pemasukan lain-lainnya: {formatCurrency(otherIncome)}</p> }
+          <p className="text-xs text-muted-foreground">Sebanyak <span className="font-bold text-green-600">{formatCurrency(otherIncome)}</span> dari selain qurban</p>
         </CardContent>
       </Card>
 
       {/* Expense Card */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total pengeluaran dari {expenseTransactionCount} transaksi</CardTitle>
+          <CardTitle className="text-sm font-black">Total pengeluaran</CardTitle>
           <TrendingDown className="h-4 w-4 text-red-600" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-red-600">
             {formatCurrency(totalExpense)}
           </div>
+          <p className="text-xs text-muted-foreground">dari {expenseTransactionCount} transaksi</p>
         </CardContent>
       </Card>
 
       {/* Balance Card */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Saldo</CardTitle>
+          <CardTitle className="text-sm font-black">Saldo</CardTitle>
           <BalanceIcon className={`h-4 w-4 ${balanceColor}`} />
         </CardHeader>
         <CardContent>

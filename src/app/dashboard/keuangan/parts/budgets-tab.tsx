@@ -20,11 +20,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import BudgetForm from "./budget-form"
-import { formatCurrency } from "@/lib/formatters"
+import { formatCurrency } from "#@/lib/utils/formatters.ts"
 import { Progress } from "@/components/ui/progress"
-import { useKeuangan } from "@/contexts/keuangan-context"
 import type { Budget, Category } from "@/types/keuangan"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useFinancialData } from "@/hooks/qurban/use-keuangan";
 
 export default function BudgetsTab() {
   const {
@@ -32,7 +32,7 @@ export default function BudgetsTab() {
     categoriesQuery,
     transactionsQuery,
     deleteBudget,
-  } = useKeuangan()
+  } = useFinancialData()
   
   const { data: budgets, isLoading: isBudgetsLoading } = budgetsQuery
   const { data: transactions, isLoading: isTransactionsLoading } = transactionsQuery

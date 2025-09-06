@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import type { TransactionType } from "@prisma/client"
-import { getTransactions, createTransaction } from "@/services/keuangan"
+import { getTransactions, createTransaction } from "#@/lib/server/repositories/keuangan.ts"
 
 export async function GET(request: Request) {
   try {

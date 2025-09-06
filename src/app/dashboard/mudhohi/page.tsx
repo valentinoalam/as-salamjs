@@ -1,5 +1,5 @@
-import { getTipeHewan } from "@/services/mudhohi"
-import { getMudhohiStats, getMudhohiList } from "@/services/mudhohi"
+import { getTipeHewan } from "#@/lib/server/repositories/mudhohi.ts"
+import { getMudhohiStats, getMudhohiList } from "#@/lib/server/repositories/mudhohi.ts"
 import MudhohiManagement from "./mudhohi-management"
 
 export default async function MudhohiPage() {

@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { v4 as uuidv4 } from "uuid"
-import { prisma } from "@/lib/prisma"
+import { prisma } from "#@/lib/server/prisma.ts"
 import { mkdir, writeFile } from "fs/promises"
 import { join } from "path"
 

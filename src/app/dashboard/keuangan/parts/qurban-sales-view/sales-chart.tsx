@@ -11,7 +11,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts"
-import { cn } from "@/lib/utils";
+import { cn } from "#@/lib/utils/utils.ts";
 
 interface BarChartProps {
   data: any[];

@@ -1,5 +1,4 @@
 import { SocketProvider } from '@/contexts/socket-context';
-import { QurbanProvider } from '@/contexts/qurban-context';
 
 export default function DashboardLayout({
   children,
@@ -8,9 +7,7 @@ export default function DashboardLayout({
 }) {
   return (
     <SocketProvider>
-      <QurbanProvider>
-        {children}
-      </QurbanProvider>
+      {children}
     </SocketProvider>
   );
 }

@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server"
-import { getBudgets, createBudget } from "@/services/keuangan"
+import { NextRequest, NextResponse } from "next/server"
+import { getBudgets, createBudget } from "#@/lib/server/repositories/keuangan.ts"
 
 export async function GET() {
   try {
@@ -11,7 +11,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
     const result = await createBudget(data)

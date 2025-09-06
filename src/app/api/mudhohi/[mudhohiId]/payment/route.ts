@@ -1,6 +1,6 @@
 // app/api/mudhohi/[mudhohiId]/payment/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import prisma from '#@/lib/server/prisma.ts'
 import { PaymentStatus } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 
@@ -9,7 +9,7 @@ export async function PATCH(
   { params }: { params: { mudhohiId: string } }
 ) {
   try {
-    const mudhohiId = params.mudhohiId
+    const mudhohiId = await params.mudhohiId
     const body = await req.json()
     const { paymentStatus, dibayarkan, kodeResi } = body
 

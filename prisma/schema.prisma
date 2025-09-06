@@ -15,18 +15,29 @@ enum Role {
   PETUGAS_INVENTORY
   PETUGAS_TIMBANG
   MEMBER
+  USER
 }
 
+model UserRole {
+  id     String @id @default(cuid())
+  userId String
+  role   Role   @default(MEMBER)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, role])
+  @@map("user_roles")
+}
 model User {
   id        String    @id @default(cuid()) @db.Char(36)
   name      String?   @unique
   email     String?   @unique
   phone     String?   
   password  String?   @default("password123")
-  urlAvatar String? 
-  role      Role      @default(MEMBER)
+  image     String? 
+  roles     UserRole[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  emailVerified DateTime? 
   mudhohi   Mudhohi[]
   accounts  Account[]
   sessions  Session[]
@@ -100,7 +111,7 @@ model Pembayaran {
   paymentStatus    PaymentStatus
   dibayarkan       Int
   urlTandaBukti    String?
-  kodeResi         String?
+  kodeResi         String?   @unique
   createdAt        DateTime  @default(now()) @map("date_created")
   updatedAt        DateTime? @updatedAt
   tipe             TipeHewan? @relation(fields: [tipeid], references: [id])
@@ -111,29 +122,32 @@ model Pembayaran {
 model Mudhohi {
   id               String   @id @default(cuid()) @db.Char(36)
   userId           String   @db.Char(36)
-  nama_pengqurban  String   @db.VarChar(200)
+  nama_pengqurban  String   @db.VarChar(200) 
   nama_peruntukan  String?   @db.VarChar(200)
   alamat           String?
+  phone            String?
   pesan_khusus     String?   @db.VarChar(500)
   keterangan       String?   @db.VarChar(500)
   potong_sendiri   Boolean
   ambil_daging     Boolean?
   dash_code        String
   qrcode_url       String?
+  sudah_terima_kupon  Boolean @default(false)
+  year             Int       //make default the year now
   createdAt        DateTime  @default(now()) @map("date_created")
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   payment          Pembayaran?
   hewan            HewanQurban[]
-  kupon            Kupon[]
-  jatahQurbanid    String?
-  jatahPengqurban  Penerima? @relation(fields: [jatahQurbanid], references: [id])
-
+  jatahPengqurban  Penerima[]
+  // @@unique([nama_pengqurban, year])
+  @@index([createdAt, userId, nama_pengqurban]) // From your previous context
 }
 
 model HewanQurban {
   id                String       @id @default(cuid())
-  tipeId            Int       
-  hewanId           String          @unique // External ID for the animal
+  tipeId            Int   
+  group             String?    
+  hewanId           String       @unique // External ID for the animal
   // Animal slaughter progress
   status            HewanStatus  @default(TERDAFTAR)
   slaughtered       Boolean      @default(false)
@@ -150,7 +164,7 @@ model HewanQurban {
   tipe              TipeHewan    @relation(fields: [tipeId], references: [id])
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
-  @@index([tipeId, hewanId])
+  @@index([tipeId, createdAt])
 }
 
 
@@ -160,7 +174,11 @@ enum JenisHewan {
   DOMBA
   KAMBING
 }
-
+enum KategoriHewan {
+  HEWAN_BESAR
+  HEWAN_KECIL
+  ALL
+}
 model TipeHewan {
   id              Int          @id @default(autoincrement())
   nama            String       @unique // Type of animal (e.g., "sapi", "domba")
@@ -225,7 +243,7 @@ model ProdukDikirim {
   putaranId   Int
   produkId    Int
   jumlah      Int
-  produk      ProdukHewan   @relation(fields: [produkId], references: [id])
+  produk      ProdukHewan   @relation(fields: [produkId], references: [id], onDelete: Cascade)
   LogPutaranPickup LogPutaranPickup @relation(fields: [putaranId], references: [id])
 }
 
@@ -239,7 +257,7 @@ model LogPutaranPickup {
 }
 model ProductLog {
   id                Int         @id @default(autoincrement())
-  produk            ProdukHewan @relation(fields: [produkId], references: [id])
+  produk            ProdukHewan @relation(fields: [produkId], references: [id], onDelete: Cascade)
   produkId          Int
   event             String      // "menambahkan" or "memindahkan"
   place             Counter
@@ -250,7 +268,7 @@ model ProductLog {
 
 model ErrorLog {
   id                Int         @id @default(autoincrement())
-  produk            ProdukHewan @relation(fields: [produkId], references: [id])
+  produk            ProdukHewan @relation(fields: [produkId], references: [id], onDelete: Cascade)
   produkId          Int
   diTimbang         Int      
   diInventori       Int
@@ -265,8 +283,8 @@ model Distribusi {
   kategori     String        @unique// Contoh: "Pengqurban Sapi", "Panitia", dsb
   target       Int           @default(0)   // Total kupon yang hendak dibagikan
   realisasi    Int           @default(0)   // Jumlah kupon yang telah disalurkan
-  dibuatPada   DateTime      @default(now())
-  diperbaruiPada DateTime    @updatedAt
+  createdAt   DateTime      @default(now())
+  updatedAt DateTime    @updatedAt
   penerimaList Penerima[]    @relation("DistribusiKePenerima")
 }
 
@@ -276,39 +294,70 @@ enum JenisDistribusi {
 }
 
 enum StatusKupon {
-  TERSEDIA
-  DISALURKAN
-  DISIMPAN
-  KEMBALI
-  TIDAK_KEMBALI
+  AVAILABLE
+  DISTRIBUTED
+  RETURNED
+  NOT_BACK
 }
 model Kupon {
   id             Int       @id @default(autoincrement())
-  status         StatusKupon  @default(TERSEDIA)
-  penerima       Penerima[]
-  mudhohi        Mudhohi[]
+  status         StatusKupon  @default(AVAILABLE)
+  RedoRequest    RedoRequest[]
+  createdAt      DateTime   @default(now())
+  resetAt        DateTime?  @updatedAt @db.Timestamp()
+  returnedAt     DateTime?  @updatedAt @db.Timestamp() 
+
   @@index([id, status])
 }
 
 model Penerima {
   id             String         @id @default(cuid()) @db.Char(36)
   distribusiId   String
+  mudhohiId      String?
   diterimaOleh   String?        // Nama penerima aktual
   nama           String?        // Bisa individu atau institusi
   noIdentitas    String?
   jenisId        String?
   alamat         String?
   telepon        String?
-  dibuatPada     DateTime       @default(now()) @map("date_created")
+  createdAt      DateTime       @default(now()) @map("date_created")
   keterangan     String?        @db.VarChar(500)
   waktuTerima    DateTime?
   sudahMenerima  Boolean        @default(false)
+  jumlahKupon    Int?           
+  sudah_terima_kupon  Boolean?
   jenis          JenisDistribusi
   distribusi     Distribusi     @relation("DistribusiKePenerima", fields: [distribusiId], references: [id])
   logDistribusi  LogDistribusi?
-  kupon          Kupon[]
-  mudhohi        Mudhohi[]
-  @@index([jenis, distribusiId,sudahMenerima])
+  mudhohi        Mudhohi? @relation(fields: [mudhohiId], references: [id])
+
+  @@index([jenis, distribusiId,  sudahMenerima])
+
+}
+model DistributionEvent {
+  id        Int       @id @default(autoincrement())
+  isActive  Boolean   @default(false)
+  startTime DateTime? @map("startTime") //@db.Timestamp("3")
+  endTime   DateTime? @map("endTime") //@db.Timestamp("3")
+  createdAt DateTime  @default(now()) @map("createdAt") //@db.Timestamp("3")
+  updatedAt DateTime? @updatedAt @map("updatedAt") //@db.Timestamp("3")
+
+  @@map("DistributionEvent") // Explicitly map to the table name
+}
+
+model RedoRequest {
+  id         Int       @id @default(autoincrement())
+  kuponId    Int       @map("penerimaId") 
+  code       String
+  expiresAt  DateTime  @map("expiresAt") //@db.Timestamp("3")
+  isUsed     Boolean   @default(false)
+  createdAt  DateTime  @default(now()) @map("createdAt") //@db.Timestamp("3")
+
+  kupon     Kupon  @relation(fields: [kuponId], references: [id], onDelete: Cascade)
+  @@index([kuponId])
+  @@index([code])
+  @@index([expiresAt])
+  @@map("RedoRequest") // Explicitly map to the table name
 
 }
 
@@ -316,9 +365,9 @@ model Penerima {
 model ProdukDiterima {
   logDistribusiId   String
   jenisProdukId     Int
-  jenisProduk       ProdukHewan @relation(fields: [jenisProdukId], references: [id])
+  jenisProduk       ProdukHewan @relation(fields: [jenisProdukId], references: [id], onDelete: Cascade)
   jumlahPaket       Int
-  LogDistribusi     LogDistribusi @relation(fields: [logDistribusiId  ], references: [id])
+  LogDistribusi     LogDistribusi @relation(fields: [logDistribusiId], references: [id], onDelete: Cascade)
 
   @@id([logDistribusiId, jenisProdukId])
 }
@@ -326,9 +375,9 @@ model ProdukDiterima {
 model LogDistribusi {
   id                String        @id @default(cuid())
   penerimaId        String        @unique
-  penerima          Penerima      @relation(fields: [penerimaId], references: [id])
+  penerima          Penerima      @relation(fields: [penerimaId], references: [id], onDelete: Cascade)
   listProduk        ProdukDiterima[] // Daftar produk yang diberikan
-  dibuatPada        DateTime      @default(now())
+  createdAt         DateTime      @default(now())
 }
 
 // Financial tracking
@@ -363,20 +412,6 @@ model Transaction {
   updatedAt   DateTime           @updatedAt
 }
 
-model Image {
-  id            String       @id @default(uuid())
-  url           String
-  alt           String?
-  transactionId String?
-  relatedId     String?
-  relatedType   String?
-  createdAt     DateTime     @default(now())
-
-  @@map("images")
-  transaction   Transaction? @relation(fields: [transactionId], references: [id])
-  @@index([relatedType])
-}
-
 model Budget {
   id          String      @id @default(uuid())
   amount      Float
@@ -390,6 +425,34 @@ model Budget {
   @@map("budgets")
 }
 
+model Image {
+  id            String       @id @default(uuid())
+  url           String       @unique
+  alt           String?
+  width         Int?
+  height        Int?
+  size          Int?
+  transactionId String?
+  relatedId     String?
+  relatedType   String?
+  createdAt     DateTime     @default(now())
+
+  @@map("images")
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+  @@index([relatedType])
+}
+
+model CustomGroup {
+  id            String    @id @default(uuid())
+  name          String    @unique
+  itemCount     Int     @default(10)
+  description   String?
+  order         Int?
+  isActive      Boolean @default(true)
+  animalType    KategoriHewan?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime?
+}
 model Setting {
   id          String    @id @default(uuid())
   key         String    @unique
@@ -398,4 +461,24 @@ model Setting {
   updatedAt   DateTime  @updatedAt
 
   @@map("settings")
+}
+
+model Address {
+  id          String   @id @default(cuid())
+  name        String   // Name/label for the address (e.g., "Kantor Pusat", "Gudang")
+  street      String   // Street address
+  city        String   // City
+  province    String   // Province/State
+  postalCode  String?  // Postal code
+  country     String   @default("Indonesia")
+  latitude    Float?   // For map display
+  longitude   Float?   // For map display
+  phone       String?  // Contact phone
+  email       String?  // Contact email
+  isActive    Boolean  @default(true)
+  isPrimary   Boolean  @default(false) // Mark as primary address
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("addresses")
 }

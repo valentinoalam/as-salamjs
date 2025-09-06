@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getDistribution } from "@/services/qurban"
+import { getDistribution } from "#@/lib/server/repositories/qurban.ts"
 
 export async function GET() {
   try {

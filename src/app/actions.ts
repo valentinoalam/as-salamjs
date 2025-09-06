@@ -1,5 +1,5 @@
 "use server"
-import { getCurrentUser, hasAccess } from "@/lib/auth"
+import { getCurrentUser, hasAccess } from "#@/lib/utils/auth.ts"
 
 export async function checkAccess() {
   const user = await getCurrentUser()
@@ -16,6 +16,7 @@ export async function checkAccess() {
     "dashboard/progres-sembelih",
     "dashboard/counter-timbang",
     "dashboard/counter-inventori",
+    "dashboard/distribusi",
     "dashboard/panitia",
     "dashboard/mudhohi",
     "dashboard/keuangan",
@@ -31,7 +32,7 @@ export async function checkAccess() {
   )
 
   return {
-    role: user.role,
+    roles: user.roles,
     accessiblePages: accessiblePages.filter((page) => page.canAccess).map((page) => page.page),
   }
 }

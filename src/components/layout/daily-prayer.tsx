@@ -8,7 +8,7 @@ import { IconShubuh, IconSuruq, IconDhuha, IconDhuhur, IconAshar, IconMagrib, Ic
 import { CityAutocomplete } from "@/components/layout/city-autocomplete"
 import { Drawer, DrawerClose, DrawerContent, DrawerFooter, DrawerHeader, DrawerOverlay, DrawerTrigger } from '@/components/ui/drawer';
 import { Button } from "../ui/button"
-import { cn } from "@/lib/utils"
+import { cn } from "#@/lib/utils/utils.ts"
 import AnalogClock from "./clock"
 
 interface PrayerTime {

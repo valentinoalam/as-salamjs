@@ -1,0 +1,72 @@
+@font-face {
+        font-family: 'UthmanTN_v2'; /* Replace with your font family name */
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('@/assets/UthmanTN_v2-0/UthmanTN_v2-0.ttf'); /* Add other font formats if available */
+    }
+    @font-face {
+        font-family: 'Basmalah'; /* Replace with your font family name */
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('@/assets/font/Basmalah Ver01.otf'); /* Add other font formats if available */
+    }
+    @font-face {
+        font-family: 'KFGQPC_KSA'; /* Replace with your font family name */
+        src: url('@/assets/font/KFGQPC-KSA/KSARegular.ttf'); /* Add other font formats if available */
+    }
+    @font-face {
+        font-family: 'Lateef'; /* Replace with your font family name */
+        src: url('@/assets/font/Lateef/Lateef-ExtraLight.ttf'); /* Add other font formats if available */
+    }
+    @font-face {
+        font-family: 'UthmanicHafs';
+        src: url('@/assets/font/UthmanicHafs1_V22/UthmanicHafs1_V22.ttf'); /* Add other font formats if available */
+    }
+    @font-face {
+        font-family: 'UthmanicHafs13';
+        src: url('@/assets/font/UthmanicHafs1_Ver13/UthmanicHafs1 Ver13.ttf'); /* Add other font formats if available */
+    }
+
+
+    @font-face {
+        font-family: 'MeQuran';
+        src: url('//cdn.alquran.cloud/public/fonts/me_quran-webfont.otf');
+    }
+    
+    @font-face {
+        font-family: 'MeQuran2';
+        src: url('//cdn.alquran.cloud/public/fonts/me_quran_2.ttf');
+    }
+    
+    @font-face {
+        font-family: 'Othmani';
+        src: url('//cdn.alquran.cloud/public/fonts/ar-Othmani.ttf');
+    }
+    
+    @font-face {
+        font-family: 'Quran';
+        font-style: normal;
+        font-weight: 100;
+        font-display: swap;
+        src: url('@/assets/font/QUR_STD.TTF');
+    }
+
+    @font-face {
+        font-family: 'Uthmani';
+        src: url("//cdn.alquran.cloud/public/fonts/uthman_tn09.otf") format("opentype");
+    }
+    @font-face {
+        font-family: 'UthmanTN_v2'; /* Replace with your font family name */
+        font-style: normal;
+        font-weight: 400;
+        src: url('@/assets/font/UthmanTN_v2-0/UthmanTN_v2-0.ttf'); /* Add other font formats if available */
+    }
+    @font-face {
+        font-family: 'UthmanicHafs';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('@/assets/font/UthmanicHafs_V22/UthmanicHafs_V22.ttf'); /* Add other font formats if available */
+    }

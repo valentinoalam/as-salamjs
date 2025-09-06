@@ -1,158 +1,123 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { toast } from "@/hooks/use-toast"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Role } from "@prisma/client"
-import { createUser, updateUserRole, deleteUser } from "@/services/panitia"
+import type { Role } from "@prisma/client"
+import { Badge } from "#@/components/ui/badge.tsx"
+import { Plus, Trash2, Users, UserCheck, ChevronLeft, ChevronRight, Edit, UserMinus, UserPlus } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { useUsers, useUpdateUser, useDeleteUser } from "@/hooks/use-users"
+import { UserFormModal } from "./user-form-modal"
+import type { UserWithRoles } from "#@/types/user.ts"
 
-type User = {
-  id: string
-  name: string | null
-  email: string | null
-  urlAvatar: string | null
-  role: Role
-  createdAt: Date
-  updatedAt: Date
+
+const roleLabels: Record<Role, string> = {
+  ADMIN: "Admin",
+  PETUGAS_PENDAFTARAN: "Petugas Pendaftaran",
+  PETUGAS_INVENTORY: "Petugas Inventory",
+  PETUGAS_TIMBANG: "Petugas Penyembelihan",
+  USER: "User",
+  MEMBER: "Member",
+  PETUGAS_KEUANGAN: "Petugas Keuangan",
 }
 
-interface UserManagementProps {
-  initialUsers: User[]
+const roleColors: Record<Role, string> = {
+  ADMIN: "bg-red-100 text-red-800",
+  PETUGAS_PENDAFTARAN: "bg-blue-100 text-blue-800",
+  PETUGAS_INVENTORY: "bg-orange-100 text-orange-800",
+  PETUGAS_TIMBANG: "bg-yellow-100 text-yellow-800",
+  USER: "bg-gray-100 text-gray-800",
+  MEMBER: "bg-purple-100 text-purple-800",
+  PETUGAS_KEUANGAN: "bg-green-100 text-green-800",
 }
 
-export default function UserManagement({ initialUsers }: UserManagementProps) {
-  const [users, setUsers] = useState<User[]>(initialUsers)
-  const [loading, setLoading] = useState(false)
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    urlAvatar: "",
-    role: Role.MEMBER,
+export default function UserManagement() {
+  const [showMembersOnly, setShowMembersOnly] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalMode, setModalMode] = useState<"create" | "edit">("create")
+  const [selectedUser, setSelectedUser] = useState<UserWithRoles | null>(null)
+
+  const itemsPerPage = 6
+  const rolesFilter = showMembersOnly ? ["MEMBER"] as Role[] : undefined
+
+  const {
+    data: usersData,
+    isLoading,
+    error,
+  } = useUsers({
+    nameFilter: searchTerm || undefined,
+    rolesFilter,
+    skip: (currentPage - 1) * itemsPerPage,
+    take: itemsPerPage,
   })
 
-  const handleChange = (field: string, value: any) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }))
+  const updateUserMutation = useUpdateUser()
+  const deleteUserMutation = useDeleteUser()
+
+  const totalPages = usersData ? Math.ceil(usersData.total / itemsPerPage) : 0
+
+  // Reset to first page when switching filters or searching
+  const handleFilterChange = (membersOnly: boolean) => {
+    setShowMembersOnly(membersOnly)
+    setCurrentPage(1)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-
-    try {
-      const result = await createUser(formData)
-
-      if (result.success) {
-        toast({
-          title: "User Created",
-          description: "The user has been created successfully.",
-        })
-
-        // Add the new user to the list
-        setUsers((prev) => [...prev, result.user as User])
-
-        // Reset form
-        setFormData({
-          name: "",
-          email: "",
-          password: "",
-          urlAvatar: "",
-          role: Role.MEMBER,
-        })
-      } else {
-        throw new Error(result.error || "Failed to create user")
-      }
-    } catch (error) {
-      console.error("Error creating user:", error)
-      toast({
-        title: "Error",
-        description: "Failed to create user. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
+  const handleSearch = (value: string) => {
+    setSearchTerm(value)
+    setCurrentPage(1)
   }
 
-  const handleRoleChange = async (userId: string, newRole: Role) => {
-    try {
-      const result = await updateUserRole(userId, newRole)
+  const handleCreateUser = () => {
+    setSelectedUser(null)
+    setModalMode("create")
+    setModalOpen(true)
+  }
 
-      if (result.success) {
-        toast({
-          title: "Role Updated",
-          description: "The user's role has been updated successfully.",
-        })
-
-        // Update the user in the list
-        setUsers((prev) => prev.map((user) => (user.id === userId ? { ...user, role: newRole } : user)))
-      } else {
-        throw new Error(result.error || "Failed to update role")
-      }
-    } catch (error) {
-      console.error("Error updating role:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update role. Please try again.",
-        variant: "destructive",
-      })
-    }
+  const handleEditUser = (user: UserWithRoles) => {
+    setSelectedUser(user)
+    setModalMode("edit")
+    setModalOpen(true)
   }
 
   const handleDeleteUser = async (userId: string) => {
     if (!confirm("Are you sure you want to delete this user?")) {
       return
     }
+    await deleteUserMutation.mutateAsync(userId)
 
-    try {
-      const result = await deleteUser(userId)
-
-      if (result.success) {
-        toast({
-          title: "User Deleted",
-          description: "The user has been deleted successfully.",
-        })
-
-        // Remove the user from the list
-        setUsers((prev) => prev.filter((user) => user.id !== userId))
-      } else {
-        throw new Error(result.error || "Failed to delete user")
-      }
-    } catch (error) {
-      console.error("Error deleting user:", error)
-      toast({
-        title: "Error",
-        description: "Failed to delete user. Please try again.",
-        variant: "destructive",
-      })
-    }
   }
 
-  const getRoleLabel = (role: Role) => {
-    switch (role) {
-      case Role.ADMIN:
-        return "Admin"
-      case Role.PETUGAS_PENDAFTARAN:
-        return "Petugas Pendaftaran"
-      case Role.PETUGAS_INVENTORY:
-        return "Petugas Inventory"
-      case Role.PETUGAS_TIMBANG:
-        return "Petugas Timbang"
-      case Role.MEMBER:
-        return "Member"
-      default:
-        return role
+  const toggleUserMemberRole = async (user: UserWithRoles) => {
+    const currentRoles = user.roles.map((r) => r.role)
+    const hasUser = currentRoles.includes("USER")
+    const hasMember = currentRoles.includes("MEMBER")
+
+    let newRoles: Role[]
+
+    if (hasUser && hasMember) {
+      // Has both, remove USER (keep MEMBER + other roles)
+      newRoles = currentRoles.filter((role) => role !== "USER")
+    } else if (hasMember && !hasUser) {
+      // Has MEMBER only, add USER
+      newRoles = [...currentRoles, "USER"]
+    } else if (hasUser && !hasMember) {
+      // Has USER only, add MEMBER
+      newRoles = [...currentRoles, "MEMBER"]
+    } else {
+      // Has neither, add MEMBER (default)
+      newRoles = [...currentRoles, "MEMBER"]
     }
+
+    await updateUserMutation.mutateAsync({
+      id: user.id,
+      data: { roles: newRoles },
+    })
   }
 
   const getInitials = (name: string | null) => {
@@ -165,127 +130,245 @@ export default function UserManagement({ initialUsers }: UserManagementProps) {
       .substring(0, 2)
   }
 
+  const getUserAccessType = (user: UserWithRoles) => {
+    const hasUserRole = user.roles.some((r) => r.role === "USER")
+    const hasMemberRole = user.roles.some((r) => r.role === "MEMBER")
+
+    if (hasUserRole && hasMemberRole) return "Both"
+    if (hasMemberRole) return "Member Dashboard"
+    if (hasUserRole) return "User Dashboard"
+    return "No Dashboard Access"
+  }
+
+  const getDashboardToggleButton = (user: UserWithRoles) => {
+    const hasUser = user.roles.some((r) => r.role === "USER")
+    const hasMember = user.roles.some((r) => r.role === "MEMBER")
+
+    if (hasUser && hasMember) {
+      return (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => toggleUserMemberRole(user)}
+          className="gap-1 flex-1"
+          disabled={updateUserMutation.isPending}
+        >
+          <UserMinus className="w-4 h-4" />
+          Remove User Access
+        </Button>
+      )
+    } else if (hasMember) {
+      return (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => toggleUserMemberRole(user)}
+          className="gap-1 flex-1"
+          disabled={updateUserMutation.isPending}
+        >
+          <UserPlus className="w-4 h-4" />
+          Add User Access
+        </Button>
+      )
+    } else {
+      return (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => toggleUserMemberRole(user)}
+          className="gap-1 flex-1"
+          disabled={updateUserMutation.isPending}
+        >
+          <UserPlus className="w-4 h-4" />
+          Make Member
+        </Button>
+      )
+    }
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-8">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center text-red-600">
+              Error loading users: {error instanceof Error ? error.message : "Unknown error"}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-8">
       <Card>
         <CardHeader>
-          <CardTitle>Add New User</CardTitle>
-          <CardDescription>Create a new user and assign a role</CardDescription>
-        </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => handleChange("name", e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleChange("email", e.target.value)}
-                  required
-                />
+          <CardTitle className="flex items-center justify-between">
+            <span>Manage Users</span>
+            <div className="flex items-center gap-4">
+              <Button onClick={handleCreateUser} className="gap-1">
+                <Plus className="w-4 h-4" />
+                Add User
+              </Button>
+              <div className="flex items-center space-x-2">
+                <Users className="w-4 h-4" />
+                <Label htmlFor="filter-switch" className="text-sm">
+                  All Users
+                </Label>
+                <Switch id="filter-switch" checked={showMembersOnly} onCheckedChange={handleFilterChange} />
+                <UserCheck className="w-4 h-4" />
+                <Label htmlFor="filter-switch" className="text-sm">
+                  Members Only
+                </Label>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => handleChange("password", e.target.value)}
-                  placeholder="Leave blank to send invite email"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="urlAvatar">Avatar URL (optional)</Label>
-                <Input
-                  id="urlAvatar"
-                  value={formData.urlAvatar}
-                  onChange={(e) => handleChange("urlAvatar", e.target.value)}
-                  placeholder="https://example.com/avatar.jpg"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
-              <Select value={formData.role} onValueChange={(value) => handleChange("role", value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={Role.ADMIN}>Admin</SelectItem>
-                  <SelectItem value={Role.PETUGAS_PENDAFTARAN}>Petugas Pendaftaran</SelectItem>
-                  <SelectItem value={Role.PETUGAS_INVENTORY}>Petugas Inventory</SelectItem>
-                  <SelectItem value={Role.PETUGAS_TIMBANG}>Petugas Timbang</SelectItem>
-                  <SelectItem value={Role.MEMBER}>Member</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Creating..." : "Create User"}
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Manage Users</CardTitle>
-          <CardDescription>View and manage existing users</CardDescription>
+          </CardTitle>
+          <CardDescription>
+            {usersData
+              ? `Showing ${usersData.users.length} of ${usersData.total} ${showMembersOnly ? "members" : "users"}`
+              : "Loading..."}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {users.map((user) => (
-              <div key={user.id} className="flex items-center justify-between p-4 border rounded-md">
-                <div className="flex items-center gap-4">
-                  <Avatar>
-                    <AvatarImage src={user.urlAvatar || undefined} alt={user.name || "User"} />
-                    <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium">{user.name || "Unnamed User"}</p>
-                    <p className="text-sm text-muted-foreground">{user.email}</p>
-                  </div>
+            {/* Search */}
+            <div className="flex items-center space-x-2">
+              <Input
+                placeholder="Search users by name..."
+                value={searchTerm}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="max-w-sm"
+              />
+            </div>
+
+            {/* Users List */}
+            <div className="space-y-4">
+              {isLoading ? (
+                <div className="text-center p-4">Loading users...</div>
+              ) : usersData?.users.length === 0 ? (
+                <div className="text-center p-4 border rounded-md">
+                  <p className="text-muted-foreground">
+                    {searchTerm ? "No users match your search" : "No users found"}
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Select defaultValue={user.role} onValueChange={(value) => handleRoleChange(user.id, value as Role)}>
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Select a role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={Role.ADMIN}>Admin</SelectItem>
-                      <SelectItem value={Role.PETUGAS_PENDAFTARAN}>Petugas Pendaftaran</SelectItem>
-                      <SelectItem value={Role.PETUGAS_INVENTORY}>Petugas Inventory</SelectItem>
-                      <SelectItem value={Role.PETUGAS_TIMBANG}>Petugas Timbang</SelectItem>
-                      <SelectItem value={Role.MEMBER}>Member</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button variant="destructive" size="sm" onClick={() => handleDeleteUser(user.id)}>
-                    Delete
+              ) : (
+                usersData?.users.map((user) => {
+                  const isMember = user.roles.some((r) => r.role === "MEMBER")
+
+                  return (
+                    <div
+                      key={user.id}
+                      className="flex flex-col md:flex-row items-start justify-between p-4 border rounded-md gap-4"
+                    >
+                      <div className="flex items-start gap-4 flex-1">
+                        <Avatar>
+                          <AvatarImage src={user.image || undefined} alt={user.name || "User"} />
+                          <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+                        </Avatar>
+                        <div className="space-y-2">
+                          <div>
+                            <p className="font-medium">{user.name || "Unnamed User"}</p>
+                            <p className="text-sm text-muted-foreground">{user.email}</p>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {user.roles.map(({ role }) => (
+                              <Badge key={role} className={roleColors[role]}>
+                                {roleLabels[role]}
+                              </Badge>
+                            ))}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Dashboard Access: {getUserAccessType(user)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2 w-full md:w-96">
+                        {/* Only show role management for members */}
+                        {isMember && (
+                          <Button variant="outline" size="sm" onClick={() => handleEditUser(user)} className="gap-1">
+                            <Edit className="w-4 h-4" />
+                            Edit Roles
+                          </Button>
+                        )}
+
+                        {!isMember && (
+                          <div className="text-sm text-muted-foreground p-2 bg-gray-50 rounded">
+                            Only members can be assigned additional roles
+                          </div>
+                        )}
+
+                        <div className="flex gap-2">
+                          {getDashboardToggleButton(user)}
+
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="gap-1"
+                            disabled={deleteUserMutation.isPending}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Previous
+                  </Button>
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      const page = i + 1
+                      return (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {page}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                    <ChevronRight className="w-4 h-4" />
                   </Button>
                 </div>
-              </div>
-            ))}
-            {users.length === 0 && (
-              <div className="text-center p-4 border rounded-md">
-                <p className="text-muted-foreground">No users found</p>
               </div>
             )}
           </div>
         </CardContent>
       </Card>
+
+      <UserFormModal open={modalOpen} onOpenChange={setModalOpen} user={selectedUser} mode={modalMode} />
     </div>
   )
 }

@@ -8,8 +8,7 @@ import type { UserQurbanFormValues } from "@/lib/zod/qurban-form"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import type { TipeHewanWithImages } from "@/types/keuangan"
-
+import type { TipeHewanWithImages } from "#@/types/qurban.ts"
 interface PemesananFormProps {
   tipeHewan: TipeHewanWithImages[]
 }

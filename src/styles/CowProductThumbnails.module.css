@@ -1,0 +1,147 @@
+.thumbnailContainer {
+  display: inline-block;
+  border: 1px solid #eee;
+  margin: 10px;
+  vertical-align: top;
+  text-align: center;
+  padding-bottom: 5px;
+}
+
+.thumbnailImage {
+  background-image: url('/mmm.webp'); /* <-- Path to your new spritesheet */
+  background-repeat: no-repeat;
+  display: block;
+}
+
+/* Individual thumbnail styles for cow products */
+.thumbnailCowBrownWhite {
+  width: 180px;
+  height: 130px;
+  background-position: -10px -10px;
+}
+
+.thumbnailSausageLinks {
+  width: 100px;
+  height: 60px;
+  background-position: -300px 0px;
+}
+
+.thumbnailSteakTopRight {
+  width: 100px;
+  height: 60px;
+  background-position: -430px 0px;
+}
+
+.thumbnailCowHeadBrown {
+  width: 90px;
+  height: 70px;
+  background-position: -300px -90px;
+}
+
+.thumbnailCowEye {
+  width: 60px;
+  height: 60px;
+  background-position: -360px -170px;
+}
+
+.thumbnailSkinnedCarcass {
+  width: 100px;
+  height: 150px;
+  background-position: -500px -90px;
+}
+
+.thumbnailCowTail {
+  width: 30px;
+  height: 150px;
+  background-position: -650px 0px;
+}
+
+.thumbnailCowBoneLong {
+  width: 50px;
+  height: 200px;
+  background-position: -750px 0px;
+}
+
+.thumbnailCowBrain {
+  width: 80px;
+  height: 70px;
+  background-position: -880px 0px;
+}
+
+.thumbnailCowTongue {
+  width: 60px;
+  height: 40px;
+  background-position: -890px -90px;
+}
+
+.thumbnailCowBlackWhite {
+  width: 180px;
+  height: 130px;
+  background-position: -10px -200px;
+}
+
+.thumbnailCowHidePatterned {
+  width: 100px;
+  height: 70px;
+  background-position: -300px -200px;
+}
+
+.thumbnailCowBladderContainer {
+  width: 50px;
+  height: 100px;
+  background-position: -450px -200px;
+}
+
+.thumbnailCowLegHoof {
+  width: 100px;
+  height: 140px;
+  background-position: -580px -200px;
+}
+
+.thumbnailCowBonesAssorted {
+  width: 120px;
+  height: 80px;
+  background-position: -700px -200px;
+}
+
+.thumbnailCowLungs {
+  width: 100px;
+  height: 80px;
+  background-position: -850px -200px;
+}
+
+.thumbnailCowIntestines {
+  width: 130px;
+  height: 80px;
+  background-position: -300px -320px;
+}
+
+.thumbnailBeefSteakRound {
+  width: 100px;
+  height: 80px;
+  background-position: -450px -320px;
+}
+
+.thumbnailRawhideSticks {
+  width: 200px;
+  height: 60px;
+  background-position: -620px -320px;
+}
+
+.thumbnailSausagePieces {
+  width: 100px;
+  height: 60px;
+  background-position: -880px -320px;
+}
+
+.thumbnailCowLiver {
+  width: 80px;
+  height: 60px;
+  background-position: -760px -280px; /* Adjusted to new position */
+}
+
+.thumbnailCowHeart {
+  width: 70px;
+  height: 60px;
+  background-position: -860px -280px; /* Adjusted to new position */
+}

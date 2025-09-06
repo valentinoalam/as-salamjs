@@ -1,13 +1,18 @@
 // Define query keys
 export const queryKeys = {
-  sapi: ['hewan', 'sapi'] as const,
-  domba: ['hewan', 'domba'] as const,
-  products: ['products', 'product'] as const,
-  shipments: ['shipments'] as const,
-  productLogs: ['productLogs'] as const,
-  errorLogs: ['errorLogs'] as const,
-  meta: ['meta'] as const,
-  mudhohi: ['mudhohi'] as const,
-  distribusi: ['distribusi'] as const,
-  penerima: ['penerima'] as const,
+  sapi: ['hewan', 'sapi'],
+  domba: ['hewan', 'domba'],
+  products: ['products'],
+  shipments: ['shipments'],
+  productLogs: ['productLogs'],
+  errorLogs: ['errorLogs'],
+  meta: ['meta'],
+  mudhohi: ['mudhohi'],
+  distribusi: ['distribusi'],
+  penerima: ['penerima'],
+}
+
+export const qurbanKeys = {
+  sapi: (page: number) => [...queryKeys.sapi, page],
+  domba: (group: string, page: number) => [...queryKeys.domba, group, page]
 }

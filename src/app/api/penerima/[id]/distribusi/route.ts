@@ -1,12 +1,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
-import { updateStatsPenerima } from "@/services/qurban";
+import { updateStatsPenerima } from "#@/lib/server/repositories/qurban.ts";
 
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const penerimaId = params.id;
+  const penerimaId = await params.id;
   
   try {
     const { produkQurban } = await req.json();

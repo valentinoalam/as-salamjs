@@ -6,20 +6,21 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Printer, Download } from "lucide-react"
 import QRCode from "react-qr-code"
+import type { HewanQurban } from "#@/types/mudhohi.ts"
 
 interface QurbanCouponProps {
-  data: any
+  data: HewanQurban
 }
 
 export function QurbanCoupon({ data }: QurbanCouponProps) {
   const couponRef = useRef<HTMLDivElement>(null)
 
   const handlePrint = useReactToPrint({
-    content: () => couponRef.current,
-    documentTitle: `Kupon_Qurban_${data.animalId}`,
+    contentRef: couponRef,
+    documentTitle: `Kupon_Qurban_${data.hewanId}`,
   })
 
-  const isReadyForPickup = data.status === "DICACAH"
+  const isReadyForPickup = data.status === "DIINVENTORI"
 
   return (
     <div className="space-y-4 py-2">
@@ -60,13 +61,26 @@ export function QurbanCoupon({ data }: QurbanCouponProps) {
               </div>
 
               <div className="flex justify-between items-center mb-4">
-                <div>
-                  <h3 className="font-bold text-lg">{data.shohibName}</h3>
-                  <p className="text-sm text-muted-foreground">Nomor ID: {data.animalId}</p>
-                </div>
+                {data.mudhohi && (
+                  <div className="grid grid-cols-2 gap-1">
+                    <div> {/* This div will hold either the ul or the single name */}
+                      {data.mudhohi.length > 1 ? (
+                        <ul>
+                          {data.mudhohi.map((m) => (
+                            <li key={m.id || m.nama_pengqurban}>{m.nama_pengqurban}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <h3 className="text-sm">{data.mudhohi[0]?.nama_pengqurban}</h3>
+                      )}
+                      <p className="text-sm text-muted-foreground">Nomor ID: {data.hewanId}</p>
+                    </div>
+                    
+                  </div>
+                )}
                 <div className="bg-white p-2 rounded-lg">
                   <QRCode
-                    value={`SMQ-${data.id}-${data.animalId}`}
+                    value={`SMQ-${data.id}-${data.hewanId}`}
                     size={80}
                     style={{ height: "auto", maxWidth: "100%", width: "80px" }}
                   />
@@ -80,7 +94,7 @@ export function QurbanCoupon({ data }: QurbanCouponProps) {
                 <div className="p-3 space-y-2 text-sm">
                   <div className="grid grid-cols-2 gap-1">
                     <div className="font-medium">Jenis Hewan:</div>
-                    <div>{data.type}</div>
+                    <div>{data.tipe?.nama}</div>
                   </div>
                   <div className="grid grid-cols-2 gap-1">
                     <div className="font-medium">Jumlah Paket:</div>

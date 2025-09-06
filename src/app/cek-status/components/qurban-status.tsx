@@ -1,11 +1,12 @@
 "use client"
 
+import type { HewanQurban } from "#@/types/mudhohi.ts"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { CheckCircle2, Clock, AlertCircle } from "lucide-react"
 
 interface QurbanStatusProps {
-  data: any
+  data: HewanQurban
 }
 
 export function QurbanStatus({ data }: QurbanStatusProps) {
@@ -16,13 +17,13 @@ export function QurbanStatus({ data }: QurbanStatusProps) {
       case "TIBA":
         return <Badge variant="outline">Tiba di Lokasi</Badge>
       case "SEHAT":
-        return <Badge variant="secondary">Sehat</Badge>
+        return <Badge variant="outline">Sehat</Badge>
       case "SAKIT":
         return <Badge variant="destructive">Sakit</Badge>
       case "DISEMBELIH":
-        return <Badge variant="warning">Disembelih</Badge>
+        return <Badge variant="secondary">Disembelih</Badge>
       case "DICACAH":
-        return <Badge variant="success">Dicacah</Badge>
+        return <Badge variant="default">Dicacah</Badge>
       default:
         return <Badge variant="outline">{status}</Badge>
     }
@@ -76,17 +77,29 @@ export function QurbanStatus({ data }: QurbanStatusProps) {
       <div className="space-y-3 pt-2">
         <div className="grid grid-cols-2 gap-1">
           <div className="text-sm font-medium text-muted-foreground">Jenis Hewan</div>
-          <div className="text-sm">{data.type}</div>
+          <div className="text-sm">{data.tipe?.nama}</div>
         </div>
         <div className="grid grid-cols-2 gap-1">
           <div className="text-sm font-medium text-muted-foreground">ID Hewan</div>
-          <div className="text-sm">{data.animalId}</div>
+          <div className="text-sm">{data.hewanId}</div>
         </div>
-        <div className="grid grid-cols-2 gap-1">
-          <div className="text-sm font-medium text-muted-foreground">Atas Nama</div>
-          <div className="text-sm">{data.shohibName}</div>
-        </div>
-        {data.status === "DICACAH" && (
+        {data.mudhohi && (
+          <div className="grid grid-cols-2 gap-1">
+            <div className="text-sm font-medium text-muted-foreground">Atas Nama</div>
+            <div> {/* This div will hold either the ul or the single name */}
+              {data.mudhohi.length > 1 ? (
+                <ul>
+                  {data.mudhohi.map((m) => (
+                    <li key={m.id || m.nama_pengqurban}>{m.nama_pengqurban}</li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-sm">{data.mudhohi[0]?.nama_pengqurban}</div>
+              )}
+            </div>
+          </div>
+        )}
+        {data.status === "DITIMBANG" && (
           <div className="grid grid-cols-2 gap-1">
             <div className="text-sm font-medium text-muted-foreground">Jumlah Paket</div>
             <div className="text-sm">{data.meatPackageCount} paket</div>

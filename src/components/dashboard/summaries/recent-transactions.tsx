@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency } from "#@/lib/utils/formatters.ts";
 import { ArrowUp, ArrowDown, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { TransactionType } from "@prisma/client";
@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { getLatestTransactions } from "@/services/keuangan";
+import { getLatestTransactions } from "#@/lib/server/repositories/keuangan.ts";
 
 interface Transaction {
   id: string;

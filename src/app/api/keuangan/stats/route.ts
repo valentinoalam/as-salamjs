@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getTransactionStats } from "@/services/keuangan"
+import { getTransactionStats } from "#@/lib/server/repositories/keuangan.ts"
 
 export async function GET() {
   try {

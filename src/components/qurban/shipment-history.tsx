@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useQurban } from "@/contexts/qurban-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -10,9 +9,10 @@ import { format } from "date-fns"
 import { id } from "date-fns/locale"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { PengirimanStatus } from "@prisma/client"
+import { useProduct } from "#@/hooks/qurban/use-produk.tsx"
 
 export function ShipmentHistory() {
-  const { shipmentsQuery } = useQurban()
+  const { shipmentsQuery } = useProduct()
   const [expandedShipments, setExpandedShipments] = useState<Set<number>>(new Set())
 
   const toggleShipment = (id: number) => {
@@ -42,7 +42,7 @@ export function ShipmentHistory() {
     )
   }
 
-  if (shipmentsQuery.data.length === 0) {
+  if (shipmentsQuery.data?.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -65,7 +65,7 @@ export function ShipmentHistory() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {shipmentsQuery.data.map((shipment) => (
+          {shipmentsQuery.data?.map((shipment) => (
             <Collapsible
               key={shipment.id}
               open={expandedShipments.has(shipment.id)}

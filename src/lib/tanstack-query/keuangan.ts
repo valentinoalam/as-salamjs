@@ -14,28 +14,6 @@ import type {
 import { TransactionType } from '@prisma/client'
 import { useMutation, useQueryClient, type QueryKey, type UseMutationOptions, type UseQueryOptions } from '@tanstack/react-query'
 
-// Generic API response type
-export type ApiResponse<T> = {
-  success: boolean
-  data?: T
-  error?: string 
-  transactionId?: string
-}
-
-export type ApiError = {
-  message: string
-  status?: number
-  code?: string
-}
-
-export interface DataQuery<T> {
-  data: T | undefined;
-  isLoading: boolean;
-  isError: boolean;
-  error: Error | null;
-  refetch: () => void;
-}
-
 // Enhanced filter types
 type TransactionFilters = {
   type?: TransactionType
@@ -121,11 +99,9 @@ export async function fetchQurbanSalesStats(): Promise<QurbanSalesStats> {
   return apiClient<QurbanSalesStats>(API_ENDPOINTS.qurbanSales)
 }
 
-export async function fetchWeeklyAnimalSales(year?: number, month?: number): Promise<ChartDataResponse> {
+export async function fetchWeeklyAnimalSales(year?: number): Promise<ChartDataResponse> {
   const params = new URLSearchParams()
   if (year) params.append("year", year.toString())
-  if (month) params.append("month", month.toString())
-  
   const url = params.toString() ? `${API_ENDPOINTS.weeklySales}?${params}` : API_ENDPOINTS.weeklySales
   return apiClient<ChartDataResponse>(url)
 }

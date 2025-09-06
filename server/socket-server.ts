@@ -1,6 +1,6 @@
 import type { Server as HTTPServer } from "http"
 import { Server as SocketIOServer } from "socket.io"
-import { getProdukHewan, getErrorLogs } from "@/services/qurban"
+import { getProdukHewan, getErrorLogs } from "#@/lib/server/repositories/qurban.ts"
 
 export function setupSocketServer(httpServer: HTTPServer) {
   const io = new SocketIOServer(httpServer, {
@@ -57,10 +57,9 @@ export function setupSocketServer(httpServer: HTTPServer) {
     // }
 
     // Handle update-hewan event
-    socket.on("update-hewan", async (data, callback) => {
-      console.log("update-hewan:", data)
+    socket.on("update-hewan", (data) => {
       io.emit("update-hewan", data)
-      callback({ success: true, message: "Updated" });
+      // callback({ success: true, message: "Updated" });
     })
 
     // // Handle update-product event

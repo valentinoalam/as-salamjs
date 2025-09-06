@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
-import prisma from "@/lib/prisma"
+import prisma from "#@/lib/server/prisma.ts"
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,19 +21,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Search term is required" }, { status: 400 })
     }
 
-    // Search for animals by animalId or type
+    // Search for animals by hewanId or type
     const animals = await prisma.hewanQurban.findMany({
       where: {
-        OR: [{ animalId: { contains: term, mode: "insensitive" } }, { type: { contains: term, mode: "insensitive" } }],
+        OR: [{ hewanId: { contains: term, mode: "insensitive" } }, { type: { contains: term, mode: "insensitive" } }],
       },
       select: {
         id: true,
-        animalId: true,
+        hewanId: true,
         type: true,
         status: true,
       },
       orderBy: {
-        animalId: "asc",
+        hewanId: "asc",
       },
       take: 20, // Limit results
     })

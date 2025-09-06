@@ -2,7 +2,7 @@ import type React from "react"
 import { render, screen, waitFor } from "@testing-library/react"
 import { useSession } from "next-auth/react"
 import MudhohiPage from "@/app/dashboard/mudhohi/page"
-import prisma from "@/lib/prisma"
+import prisma from "#@/lib/server/prisma.ts"
 
 // Mock dependencies
 jest.mock("next-auth/react")

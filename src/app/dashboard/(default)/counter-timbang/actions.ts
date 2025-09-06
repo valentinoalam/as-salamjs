@@ -1,6 +1,6 @@
 "use server"
 
-import { addProductLog as dbAddProductLog, createShipment as dbCreateShipment } from "@/services/qurban"
+import { addProductLog as dbAddProductLog, createShipment as dbCreateShipment } from "#@/lib/server/repositories/qurban.ts"
 import { revalidatePath } from "next/cache"
 import type { Counter } from "@prisma/client"
 

@@ -74,6 +74,69 @@
     max-width: 1400px;
   }
 }
+@utility spriteContainer {
+  /* Ensure the container is the size of a single sprite frame */
+  overflow: hidden; /* Hide anything outside the current frame */
+  image-rendering: pixelated; /* Good for pixel art, prevents blurring on scaling */
+  /* You can add more styling here, e.g., borders, shadows */
+}
+
+@utility auth-loader-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: linear-gradient(135deg, #1a2a6c, #2a3a7c);
+  color: white;
+    
+  .auth-loader {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    margin-bottom: 20px;
+  }
+
+  .spinner-circle {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(2px);
+  }
+
+  .spinner-arc {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    border-top-color: #4facfe;
+    border-right-color: #4facfe;
+    animation: spin 1.2s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
+  }
+
+  .auth-loading-text {
+    margin-top: 20px;
+    font-size: 1.2rem;
+    letter-spacing: 1px;
+    text-align: center;
+    max-width: 80%;
+    line-height: 1.5;
+    background: linear-gradient(to right, #a1c4fd, #c2e9fb);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 500;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+}
 
 /*
   The default border color has changed to `currentcolor` in Tailwind CSS v4,

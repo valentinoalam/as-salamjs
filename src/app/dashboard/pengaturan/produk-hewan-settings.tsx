@@ -1,4 +1,3 @@
-// produk-hewan-settings.tsx
 "use client"
 
 import type React from "react"
@@ -25,6 +24,10 @@ import { updateProdukHewan, deleteProdukHewan } from "./actions"
 import type { TipeHewan } from "@prisma/client"
 import type { ProdukHewan } from "@/types/qurban"
 import ProductHewanForm from "@/components/qurban/form/create-produk-hewan-form"
+import { ProductSpriteIcon } from "#@/components/product-sprite-img.tsx"
+import { ProductSelector } from "#@/components/product-selector.tsx"
+import { getProductIllustration } from "#@/lib/product-illustrations.ts"
+import { ProdukMapping } from "./product-mapping"
 
 // Zod validation schemas
 const produkHewanSchema = z.object({
@@ -206,6 +209,7 @@ export function ProdukHewanSettings({ initialProdukHewan, tipeHewan }: ProdukHew
               <TableRow>
                 {/* <TableHead>ID</TableHead> */}
                 <TableHead>Nama</TableHead>
+                <TableHead>Image</TableHead>
                 <TableHead>Berat</TableHead>
                 <TableHead>Prod perHewan</TableHead>
                 <TableHead>Stok</TableHead>
@@ -224,6 +228,15 @@ export function ProdukHewanSettings({ initialProdukHewan, tipeHewan }: ProdukHew
                   <TableRow key={produk.id}>
                     {/* <TableCell>{produk.id}</TableCell> */}
                     <TableCell>{produk.nama}</TableCell>
+                    <TableCell className="flex items-center space-x-2">
+                      <ProductSpriteIcon
+                        productId={produk.nama.toLowerCase().replace(/\s+/g, "-")}
+                        size="sm"
+                        showTooltip={true}
+                        fallbackIcon={<span className="text-xs">📦</span>}
+                      />
+                      <span>{produk.nama}</span>
+                    </TableCell>
                     {/* <TableCell>{produk.JenisHewan || "-"}</TableCell>
                     <TableCell>{getJenisProdukLabel(produk.JenisProduk)}</TableCell> */}
                     <TableCell>{produk.berat ? `${produk.berat} kg` : "-"}</TableCell>
@@ -254,6 +267,7 @@ export function ProdukHewanSettings({ initialProdukHewan, tipeHewan }: ProdukHew
         </div>
       </CardContent>
 
+      <ProdukMapping produkHewan={produkHewan} />
       {/* Create Dialog */}
       <ProductHewanForm 
         tipeHewan={tipeHewan}
@@ -271,6 +285,23 @@ export function ProdukHewanSettings({ initialProdukHewan, tipeHewan }: ProdukHew
               <DialogDescription>Perbarui informasi produk hewan</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="illustration" className="text-right">
+                  Ilustrasi
+                </Label>
+                <div className="col-span-3">
+                  <ProductSelector
+                    onProductSelect={(productId) => {
+                      const illustration = getProductIllustration(productId)
+                      if (illustration) {
+                        setFormData((prev) => ({ ...prev, nama: illustration.name }))
+                      }
+                    }}
+                    selectedProductId={formData.nama.toLowerCase().replace(/\s+/g, "-")}
+                    className="max-h-60 overflow-y-auto"
+                  />
+                </div>
+              </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-nama" className="text-right">
                   Nama

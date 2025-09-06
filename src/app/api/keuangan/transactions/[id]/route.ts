@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { deleteTransaction } from "@/services/keuangan"
+import { deleteTransaction } from "#@/lib/server/repositories/keuangan.ts"
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {

@@ -1,10 +1,9 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import prisma from "@/lib/prisma"
+import prisma from "#@/lib/server/prisma.ts"
 import type { JenisHewan, JenisProduk } from "@prisma/client"
-import type { TipeHewanWithImages } from "@/types/keuangan"
-import type { ProdukHewan } from "@/types/qurban"
+import type { ProdukHewan, TipeHewanWithImages } from "@/types/qurban"
 
 // TipeHewan actions
 export async function addTipeHewan(data: {

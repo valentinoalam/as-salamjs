@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { receiveShipment } from "@/services/qurban"
+import { receiveShipment } from "#@/lib/server/repositories/qurban.ts"
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const { id } = await params 

@@ -1,4 +1,3 @@
-import { KeuanganProvider } from "@/contexts/keuangan-context"
 import type React from "react"
 import type { Metadata } from "next"
 export const metadata: Metadata = {

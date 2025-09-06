@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { TransactionType } from "@prisma/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { cn } from "@/lib/utils";
+import { cn } from "#@/lib/utils/utils.ts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,7 +22,7 @@ import { ArrowUpDown } from "lucide-react";
 
 const formSchema = z.object({
   name: z.string().min(3, "Nama kategori minimal 3 karakter"),
-  type: z.enum([TransactionType.INCOME, TransactionType.EXPENSE]),
+  type: z.enum([TransactionType.PEMASUKAN, TransactionType.PENGELUARAN]),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -35,7 +34,7 @@ export function NewCategoryForm() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      type: TransactionType.EXPENSE,
+      type: TransactionType.PENGELUARAN,
     },
   });
   
@@ -101,9 +100,9 @@ export function NewCategoryForm() {
                         variant="outline"
                         className={cn(
                           "rounded-r-none flex-1 border-r-0",
-                          field.value === TransactionType.INCOME && "bg-green-100 dark:bg-green-900 border-green-200 dark:border-green-800"
+                          field.value === TransactionType.PEMASUKAN && "bg-green-100 dark:bg-green-900 border-green-200 dark:border-green-800"
                         )}
-                        onClick={() => field.onChange(TransactionType.INCOME)}
+                        onClick={() => field.onChange(TransactionType.PEMASUKAN)}
                       >
                         <ArrowUpDown className="h-4 w-4 mr-2 text-green-500" />
                         Pemasukan
@@ -113,9 +112,9 @@ export function NewCategoryForm() {
                         variant="outline"
                         className={cn(
                           "rounded-l-none flex-1",
-                          field.value === TransactionType.EXPENSE && "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800"
+                          field.value === TransactionType.PENGELUARAN && "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800"
                         )}
-                        onClick={() => field.onChange(TransactionType.EXPENSE)}
+                        onClick={() => field.onChange(TransactionType.PENGELUARAN)}
                       >
                         <ArrowUpDown className="h-4 w-4 mr-2 text-red-500" />
                         Pengeluaran

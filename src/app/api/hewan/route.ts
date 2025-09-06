@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getHewanQurban } from "@/services/qurban"
+import { getHewanQurban } from "#@/lib/server/repositories/qurban.ts"
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -11,7 +11,6 @@ export async function GET(request: NextRequest) {
   const group = searchParams.get("group")
   const itemsPerGroup = Number(searchParams.get("itemsPerGroup")) || 50
 
-  
   if (!type || (type !== "sapi" && type !== "domba")) {
     return NextResponse.json({ error: "Invalid type parameter. Must be 'sapi' or 'domba'." }, { status: 400 })
   }

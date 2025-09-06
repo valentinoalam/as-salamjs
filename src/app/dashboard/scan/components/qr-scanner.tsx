@@ -13,7 +13,7 @@ export function QRScanner() {
   const [scanResult, setScanResult] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [lastScanned, setLastScanned] = useState<{
-    animalId: string
+    hewanId: string
     status: string
     previousStatus: string
     timestamp: Date
@@ -57,13 +57,13 @@ export function QRScanner() {
     setError(null)
 
     try {
-      // Extract animalId from QR code
-      // Assuming QR format is "SMQ-{id}-{animalId}" or just the animalId
-      let animalId = qrData
+      // Extract hewanId from QR code
+      // Assuming QR format is "SMQ-{id}-{hewanId}" or just the hewanId
+      let hewanId = qrData
       if (qrData.startsWith("SMQ-")) {
         const parts = qrData.split("-")
         if (parts.length >= 3) {
-          animalId = parts[2]
+          hewanId = parts[2]
         }
       }
 
@@ -73,7 +73,7 @@ export function QRScanner() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ animalId }),
+        body: JSON.stringify({ hewanId }),
       })
 
       const result = await response.json()
@@ -81,7 +81,7 @@ export function QRScanner() {
       if (result.success) {
         toast.success(result.message)
         setLastScanned({
-          animalId: result.data.animalId,
+          hewanId: result.data.hewanId,
           status: result.data.status,
           previousStatus: result.data.previousStatus,
           timestamp: new Date(),
@@ -158,7 +158,7 @@ export function QRScanner() {
               <div>
                 <h4 className="font-medium">Berhasil Update Status</h4>
                 <p className="text-sm text-muted-foreground mt-1">
-                  ID Hewan: <span className="font-medium">{lastScanned.animalId}</span>
+                  ID Hewan: <span className="font-medium">{lastScanned.hewanId}</span>
                 </p>
                 <div className="flex items-center gap-2 mt-2">
                   <Badge variant="outline">{lastScanned.previousStatus}</Badge>

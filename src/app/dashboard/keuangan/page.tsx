@@ -1,43 +1,44 @@
 "use client"
 
-import { useState } from "react"
+import { lazy, Suspense } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import TransactionsTab from "./parts/transactions-tab"
-import CategoriesTab from "./parts/categories-tab"
-import BudgetsTab from "./parts/budgets-tab"
-import QurbanSales from "./parts/qurban-sales-view/view"
-import QurbanTransactionTab from "./parts/qurban-trx-tab"
-// import { BudgetProgress } from '@/components/dashboard/summaries/budget-progress';
+import { TableSkeleton } from "@/components/table-skeleton";
+import { useUIStore } from "@/stores/ui-store";
 
+// Lazily load your components
+const TransactionsTab = lazy(() => import("./parts/transactions-tab"));
+const CategoriesTab = lazy(() => import("./parts/categories-tab"));
+const BudgetsTab = lazy(() => import("./parts/budgets-tab"));
+const OverviewKeuanganQurbanTab = lazy(() => import("./parts/overview-tab"));
 export default function KeuanganPage() {
-  const [activeTab, setActiveTab] = useState("transactions")
-
+  const {tabs, setActiveTab} = useUIStore()
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-bold">Manajemen Keuangan</h1>
-      <QurbanSales />
-      {/* <BudgetProgress /> */}
-      <Tabs defaultValue="transactions" value={activeTab} onValueChange={setActiveTab}>
+      <Tabs defaultValue="overview" value={tabs.keuangan} onValueChange={(value) => setActiveTab("keuangan", value)}>
         <TabsList className="mb-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="transactions">Transaksi</TabsTrigger>
-          <TabsTrigger value="qurban">Qurban</TabsTrigger>
           <TabsTrigger value="categories">Kategori</TabsTrigger>
           <TabsTrigger value="budgets">Anggaran</TabsTrigger>
         </TabsList>
+        <Suspense fallback={<TableSkeleton rows={5} columns={4} />}>
+          <TabsContent value="overview">
+            <OverviewKeuanganQurbanTab />
+          </TabsContent>
 
-        <TabsContent value="transactions">
-          <TransactionsTab />
-        </TabsContent>
-        <TabsContent value="qurban">
-          <QurbanTransactionTab />
-        </TabsContent>
-        <TabsContent value="categories">
-          <CategoriesTab />
-        </TabsContent>
+          <TabsContent value="transactions">
+            <TransactionsTab />
+          </TabsContent>
 
-        <TabsContent value="budgets">
-          <BudgetsTab/>
-        </TabsContent>
+          <TabsContent value="categories">
+            <CategoriesTab />
+          </TabsContent>
+
+          <TabsContent value="budgets">
+            <BudgetsTab/>
+          </TabsContent>
+        </Suspense>
       </Tabs>
     </div>
   )

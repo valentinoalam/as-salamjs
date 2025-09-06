@@ -1,6 +1,6 @@
 import GoogleSheetsImport from "@/components/qurban/trx-admin/google-sheets-import";
 import MudhohiSheet from "@/components/qurban/trx-admin/mudhohi-sheet";
-import { getTipeHewan } from "@/services/mudhohi"
+import { getTipeHewan } from "#@/lib/server/repositories/mudhohi.ts"
 export default async function MudhohiBatchForm() {
   const tipeHewan = await getTipeHewan()
   return (

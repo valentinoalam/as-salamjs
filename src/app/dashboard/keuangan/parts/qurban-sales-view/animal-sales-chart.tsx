@@ -13,10 +13,10 @@ export default function ChartComponent({ chartData }: { chartData: ChartDataResp
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <TrendingUp className="h-5 w-5" />
-          Weekly Sales Comparison by Animal Type
+          Weekly Progress Qurban Registration
         </CardTitle>
         <CardDescription>
-          Stacked bar chart showing qurban sales for each week in Dzulqodah 1446H
+          Stacked bar chart showing qurban registration comparison of each animal by week till Idul Adha
         </CardDescription>
       </CardHeader>
       <CardContent className="h-96 w-full">

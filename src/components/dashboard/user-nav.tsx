@@ -1,4 +1,5 @@
-import { signOut, useSession } from 'next-auth/react';
+import { signOut } from 'next-auth/react';
+import { redirect } from 'next/navigation';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -9,32 +10,24 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { LogOut, Settings, User } from 'lucide-react';
+import { LogOut, Settings, UserIcon } from 'lucide-react';
 import Link from 'next/link';
+import { useAuthStore } from '#@/stores/auth-store.ts';
 
 export function UserNav() {
-  const { data: session } = useSession({ required: false });
-
-  if (!session?.user) {
-    return null;
-  }
-
-  const initials = session.user.name
-    ? session.user.name
+  const { user,  isAuthenticated } = useAuthStore()
+  if(!isAuthenticated || !user) redirect('/api/auth/signin');
+    // // Redirect logged-in users based on role
+    // if (session?.user.role === "ADMIN") redirect("/admin/dashboard");
+    // if (session?.user.role === "MEMBER") redirect("/profile");
+  const initials = user?.name
+    ? user.name
         .split(' ')
         .map((n: string) => n[0])
         .join('')
         .toUpperCase()
         .slice(0, 2)
     : 'U';
-
-  const roleLabels: Record<string, string> = {
-    'ADMIN': 'Administrator',
-    'PETUGAS_PENDAFTARAN': 'Panitia Pendaftaran',
-    'PETUGAS_KEUANGAN': 'Panitia Keuangan',
-    'PETUGAS_TIMBANG': 'Panitia Lapangan',
-    'PETUGAS_INVENTORY': 'Panitia Distribusi',
-  };
 
   return (
     <DropdownMenu>
@@ -48,19 +41,23 @@ export function UserNav() {
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{session.user.name}</p>
-            <p className="text-xs leading-none text-muted-foreground">
-              {session.user.email}
-            </p>
-            <p className="text-xs leading-none text-muted-foreground mt-1">
-              {roleLabels[session.user.role as string] || session.user.role}
-            </p>
+            <p className="text-sm font-medium leading-none">{user.name}</p>
+            <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem>
+          <span>
+            Role:{" "}
+            {user.roles
+              ?.map((role) => role.replace("_", " "))
+              .join(", ")}
+          </span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/dashboard/profile">
-            <User className="mr-2 h-4 w-4" />
+            <UserIcon className="mr-2 h-4 w-4" />
             <span>Profil</span>
           </Link>
         </DropdownMenuItem>

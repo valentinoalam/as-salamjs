@@ -1,13 +1,14 @@
 'use client'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useUIState } from "@/contexts/ui-state-context"
 import ProgressHewan from "@/components/qurban/progress-hewan"
-import { useQurban } from "@/contexts/qurban-context"
+import { useQurban } from "@/hooks/qurban/use-qurban"
+import { usePaginationStore, useTabStore } from "#@/stores/ui-store.ts";
 
 export default function ProgressSembelihPage() {
   const { meta, isConnected, sapiQuery, dombaQuery } = useQurban();
-  const { tabs, setActiveTab, pagination, setPagination, isHydrated } = useUIState();
-  if(!isHydrated) return <div>Loading...</div> 
+  const { pagination, setPagination } = usePaginationStore()
+  const { tabs, setActiveTab } = useTabStore()
+
   return (
     <div className="space-y-8">
       <div className="flex items-center gap-2">
@@ -15,7 +16,7 @@ export default function ProgressSembelihPage() {
         <span className="text-sm">{isConnected ? "Connected" : "Disconnected"}</span>
       </div>
 
-      <Tabs
+      <Tabs defaultValue="sapi"
         value={tabs.progressSembelih}
         onValueChange={(value) => setActiveTab("progressSembelih", value)}
       >
@@ -40,7 +41,7 @@ export default function ProgressSembelihPage() {
             meta={meta.domba}
             queryHewan={dombaQuery}
             currentPage={pagination.dombaPage} // You might want to pass specific pagination state
-            currentGroup={pagination.dombaGroup}
+            currentGroup={pagination.dombaGroup!}
             setPage={setPagination} // Or a specific setter
           />
         </TabsContent>

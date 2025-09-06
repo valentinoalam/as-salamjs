@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import { prisma } from "#@/lib/server/prisma.ts"
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
@@ -14,7 +14,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       where: { id },
       data: {
         target,
-        diperbaruiPada: new Date(),
+        updatedAt: new Date(),
       },
     })
 

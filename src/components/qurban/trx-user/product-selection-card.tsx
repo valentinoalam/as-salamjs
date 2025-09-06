@@ -1,9 +1,9 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getProdukForAnimal } from "../form/create-produk-hewan-form";
 import type { JenisHewan } from "@prisma/client";
-import { MultiSelect } from "@/components/multi-select";
+import { MultiSelect } from "#@/components/ui/multi-select.tsx";
 import { getJenisProdukLabel } from "../trx-admin/mudhohi-sheet";
+import { getProdukForAnimal } from "#@/lib/server/services/tipe-hewan.ts";
 
 interface ProductSelectionCardProps {
   jenisHewan: JenisHewan;

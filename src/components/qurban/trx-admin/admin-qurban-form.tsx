@@ -17,10 +17,10 @@ import { Separator } from "@/components/ui/separator"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "@/hooks/use-toast"
-import { cn } from "@/lib/utils"
+import { cn } from "#@/lib/utils/utils.ts"
 import { adminQurbanSchema, getPaymentStatusFromAmount, type AdminQurbanFormValues } from "@/lib/zod/qurban-form"
-import type { TipeHewan } from "@/types/keuangan"
 import { ProductSelectionCard } from "../trx-user/product-selection-card"
+import type { TipeHewan } from "@/types/qurban"
 
 interface AdminQurbanFormProps {
   tipeHewan: TipeHewan[]

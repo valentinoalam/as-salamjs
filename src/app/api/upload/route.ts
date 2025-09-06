@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { getGoogleClient } from "@/lib/gClient"
+import { OAuth2Client } from "google-auth-library"
+import { getGoogleClient } from "#@/lib/utils/gClient.ts"
 import { google } from "googleapis"
 import { Readable } from "stream"
 
@@ -28,7 +29,8 @@ export async function POST(request: Request) {
     if (!client) {
       return NextResponse.json({ error: "Google authentication failed" }, { status: 500 })
     }
-    const drive = google.drive({ version: "v3", auth: client })
+    const auth = new OAuth2Client(client._clientId, client._clientSecret)
+    const drive = google.drive({ version: "v3", auth })
     // Create readable stream from buffer
     const readableStream = new Readable()
     readableStream.push(buffer)

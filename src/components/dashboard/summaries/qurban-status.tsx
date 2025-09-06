@@ -1,6 +1,6 @@
 // import React, { useCallback, useMemo } from 'react'
 // import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-// import { useQurban, type HewanQuery, type TipeHewan } from '@/contexts/qurban-context';
+// import { useQurban, type HewanQuery, type TipeHewan } from '@/hooks/qurban/use-qurban';
 // import { 
 //   Card, 
 //   CardContent, 

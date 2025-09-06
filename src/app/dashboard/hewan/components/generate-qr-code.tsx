@@ -11,7 +11,7 @@ import { useRef } from "react"
 interface GenerateQRCodeProps {
   hewan: {
     id: string
-    animalId: string
+    hewanId: string
     type: string
   }
 }
@@ -20,11 +20,11 @@ export function GenerateQRCode({ hewan }: GenerateQRCodeProps) {
   const [isOpen, setIsOpen] = useState(false)
   const printRef = useRef<HTMLDivElement>(null)
 
-  const qrValue = `SMQ-${hewan.id}-${hewan.animalId}`
+  const qrValue = `SMQ-${hewan.id}-${hewan.hewanId}`
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
-    documentTitle: `QR_Code_${hewan.animalId}`,
+    documentTitle: `QR_Code_${hewan.hewanId}`,
   })
 
   const downloadQRCode = () => {
@@ -34,7 +34,7 @@ export function GenerateQRCode({ hewan }: GenerateQRCodeProps) {
 
       const downloadLink = document.createElement("a")
       downloadLink.href = pngUrl
-      downloadLink.download = `QR_Code_${hewan.animalId}.png`
+      downloadLink.download = `QR_Code_${hewan.hewanId}.png`
       document.body.appendChild(downloadLink)
       downloadLink.click()
       document.body.removeChild(downloadLink)
@@ -57,7 +57,7 @@ export function GenerateQRCode({ hewan }: GenerateQRCodeProps) {
           <div className="flex flex-col items-center justify-center p-4">
             <div ref={printRef} className="p-6 bg-white rounded-lg">
               <div className="text-center mb-4">
-                <h3 className="font-bold">ID: {hewan.animalId}</h3>
+                <h3 className="font-bold">ID: {hewan.hewanId}</h3>
                 <p className="text-sm text-muted-foreground">{hewan.type}</p>
               </div>
               <div className="flex justify-center">

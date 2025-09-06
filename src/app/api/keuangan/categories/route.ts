@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getCategories, createCategory } from "@/services/keuangan"
+import { getCategories, createCategory } from "#@/lib/server/repositories/keuangan.ts"
 
 export async function GET() {
   try {

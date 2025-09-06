@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState } from "react"
 import { toast } from "sonner"
-import { PlusCircle, Pencil, Trash2 } from "lucide-react"
+import { PlusCircle, Pencil, Trash2, Image as ImageIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,12 +21,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
 import { addTipeHewan, updateTipeHewan, deleteTipeHewan } from "./actions"
-import { formatCurrency } from "@/lib/formatters"
+import { formatCurrency } from "#@/lib/utils/formatters.ts"
 import { JenisHewan } from "@prisma/client"
 import { ImageUpload } from "@/components/ui/image-upload"
-import type { TipeHewanWithImages } from "@/types/keuangan"
+import type { TipeHewanWithImages } from "#@/types/qurban.ts"
+import Image from "next/image"
 
 type TipeHewanFormData = {
   nama: string
@@ -75,10 +76,11 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
       icon: "",
       target: 0,
       harga: 0,
-      hargaKolektif: 0,
+      hargaKolektif: undefined,
       note: "",
       jenis: JenisHewan.SAPI,
     })
+    setUploadedImages([])
   }
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -91,7 +93,7 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
         icon: formData.icon || undefined,
         target: formData.target,
         harga: formData.harga,
-        hargaKolektif: formData.hargaKolektif? formData.hargaKolektif :  undefined,
+        hargaKolektif: formData.hargaKolektif || undefined,
         note: formData.note,
         jenis: formData.jenis,
         imageUrls: uploadedImages,
@@ -123,7 +125,7 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
         icon: formData.icon || undefined,
         target: formData.target,
         harga: formData.harga,
-        hargaKolektif: formData.hargaKolektif? formData.hargaKolektif : undefined,
+        hargaKolektif: formData.hargaKolektif || undefined,
         note: formData.note,
         jenis: formData.jenis,
         imageUrls: uploadedImages,
@@ -173,10 +175,11 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
       icon: tipe.icon || "",
       target: tipe.target || 0,
       harga: tipe.harga,
-      hargaKolektif: formData.hargaKolektif? formData.hargaKolektif : undefined,
+      hargaKolektif: tipe.hargaKolektif || undefined,
       note: tipe.note || "",
       jenis: tipe.jenis,
     })
+    setUploadedImages(tipe.images?.map(img => img.url) || [])
     setIsEditDialogOpen(true)
   }
 
@@ -195,207 +198,273 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
     return labels[jenis] || jenis
   }
 
+  const getJenisHewanColor = (jenis: JenisHewan) => {
+    const colors = {
+      [JenisHewan.UNTA]: "bg-orange-100 text-orange-800 border-orange-200",
+      [JenisHewan.SAPI]: "bg-blue-100 text-blue-800 border-blue-200",
+      [JenisHewan.KAMBING]: "bg-green-100 text-green-800 border-green-200",
+      [JenisHewan.DOMBA]: "bg-purple-100 text-purple-800 border-purple-200",
+    }
+    return colors[jenis] || "bg-gray-100 text-gray-800 border-gray-200"
+  }
+
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle>Tipe Hewan</CardTitle>
-          <CardDescription>Kelola tipe hewan yang tersedia dalam sistem</CardDescription>
-        </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Tambah Tipe Hewan
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <form onSubmit={handleAdd}>
-              <DialogHeader>
-                <DialogTitle>Tambah Tipe Hewan</DialogTitle>
-                <DialogDescription>Tambahkan tipe hewan baru ke dalam sistem</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="nama" className="text-right">
-                    Nama
-                  </Label>
-                  <Input
-                    id="nama"
-                    name="nama"
-                    value={formData.nama}
-                    onChange={handleChange}
-                    className="col-span-3"
-                    required
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="jenis" className="text-right">
-                    Jenis Hewan
-                  </Label>
-                  <Select value={formData.jenis} onValueChange={(value) => handleSelectChange("jenis", value)}>
-                    <SelectTrigger className="col-span-3">
-                      <SelectValue placeholder="Pilih jenis hewan" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={JenisHewan.UNTA}>Unta</SelectItem>
-                      <SelectItem value={JenisHewan.SAPI}>Sapi</SelectItem>
-                      <SelectItem value={JenisHewan.DOMBA}>Domba</SelectItem>
-                      <SelectItem value={JenisHewan.DOMBA}>Domba</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="icon" className="text-right">
-                    Icon
-                  </Label>
-                  <Input
-                    id="icon"
-                    name="icon"
-                    value={formData.icon}
-                    onChange={handleChange}
-                    className="col-span-3"
-                    placeholder="URL ikon atau nama ikon"
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="target" className="text-right">
-                    Target
-                  </Label>
-                  <Input
-                    id="target"
-                    name="target"
-                    type="number"
-                    value={formData.target}
-                    onChange={handleChange}
-                    className="col-span-3"
-                    required
-                    min={0}
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="harga" className="text-right">
-                    Harga
-                  </Label>
-                  <Input
-                    id="harga"
-                    name="harga"
-                    type="number"
-                    value={formData.harga}
-                    onChange={handleChange}
-                    className="col-span-3"
-                    required
-                    min={0}
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="hargaKolektif" className="text-right">
-                    Harga Kolektif
-                  </Label>
-                  <Input
-                    id="hargaKolektif"
-                    name="hargaKolektif"
-                    type="number"
-                    value={formData.hargaKolektif}
-                    onChange={handleChange}
-                    className="col-span-3"
-                    required
-                    min={0}
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="note" className="text-right">
-                    Catatan
-                  </Label>
-                  <Textarea
-                    id="note"
-                    name="note"
-                    value={formData.note}
-                    onChange={handleChange}
-                    className="col-span-3"
-                    rows={3}
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-start gap-4">
-                  <Label className="text-right mt-2">Gambar</Label>
-                  <div className="col-span-3">
-                    <ImageUpload
-                      relatedId={selectedTipeHewan?.id.toString() || "temp"}
-                      relatedType="TipeHewan"
-                      existingImages={selectedTipeHewan?.images || []}
-                      onImagesChange={(images) => {
-                        setUploadedImages(images.map((img) => img.url))
-                      }}
-                      maxFiles={3}
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Tipe Hewan</CardTitle>
+            <CardDescription>Kelola tipe hewan yang tersedia dalam sistem</CardDescription>
+          </div>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Tambah Tipe Hewan
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+              <form onSubmit={handleAdd}>
+                <DialogHeader>
+                  <DialogTitle>Tambah Tipe Hewan</DialogTitle>
+                  <DialogDescription>Tambahkan tipe hewan baru ke dalam sistem</DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="nama" className="text-right">
+                      Nama
+                    </Label>
+                    <Input
+                      id="nama"
+                      name="nama"
+                      value={formData.nama}
+                      onChange={handleChange}
+                      className="col-span-3"
+                      required
                     />
                   </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="jenis" className="text-right">
+                      Jenis Hewan
+                    </Label>
+                    <Select value={formData.jenis} onValueChange={(value) => handleSelectChange("jenis", value)}>
+                      <SelectTrigger className="col-span-3">
+                        <SelectValue placeholder="Pilih jenis hewan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={JenisHewan.UNTA}>Unta</SelectItem>
+                        <SelectItem value={JenisHewan.SAPI}>Sapi</SelectItem>
+                        <SelectItem value={JenisHewan.KAMBING}>Kambing</SelectItem>
+                        <SelectItem value={JenisHewan.DOMBA}>Domba</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="icon" className="text-right">
+                      Icon
+                    </Label>
+                    <Input
+                      id="icon"
+                      name="icon"
+                      value={formData.icon}
+                      onChange={handleChange}
+                      className="col-span-3"
+                      placeholder="URL ikon atau nama ikon"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="target" className="text-right">
+                      Target
+                    </Label>
+                    <Input
+                      id="target"
+                      name="target"
+                      type="number"
+                      value={formData.target}
+                      onChange={handleChange}
+                      className="col-span-3"
+                      required
+                      min={0}
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="harga" className="text-right">
+                      Harga
+                    </Label>
+                    <Input
+                      id="harga"
+                      name="harga"
+                      type="number"
+                      value={formData.harga}
+                      onChange={handleChange}
+                      className="col-span-3"
+                      required
+                      min={0}
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="hargaKolektif" className="text-right">
+                      Harga Kolektif
+                    </Label>
+                    <Input
+                      id="hargaKolektif"
+                      name="hargaKolektif"
+                      type="number"
+                      value={formData.hargaKolektif || ""}
+                      onChange={handleChange}
+                      className="col-span-3"
+                      min={0}
+                      placeholder="Opsional"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="note" className="text-right">
+                      Catatan
+                    </Label>
+                    <Textarea
+                      id="note"
+                      name="note"
+                      value={formData.note}
+                      onChange={handleChange}
+                      className="col-span-3"
+                      rows={3}
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-start gap-4">
+                    <Label className="text-right mt-2">Gambar</Label>
+                    <div className="col-span-3">
+                      <ImageUpload
+                        relatedId="temp"
+                        relatedType="TipeHewan"
+                        existingImages={[]}
+                        onImagesChange={(images) => {
+                          setUploadedImages(images.map((img) => img.url))
+                        }}
+                        maxFiles={3}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={loading}>
+                    Batal
+                  </Button>
+                  <Button type="submit" disabled={loading}>
+                    {loading ? "Menyimpan..." : "Simpan"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
+      </Card>
+
+      {/* Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {tipeHewan.length === 0 ? (
+          <div className="col-span-full">
+            <Card className="p-8">
+              <div className="text-center text-muted-foreground">
+                <ImageIcon className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                <p>Tidak ada data tipe hewan</p>
+                <p className="text-sm">Tambahkan tipe hewan baru untuk memulai</p>
+              </div>
+            </Card>
+          </div>
+        ) : (
+          tipeHewan.map((tipe) => (
+            <Card key={tipe.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+              <div className="relative">
+                {tipe.images && tipe.images.length > 0 ? (
+                  <div className="aspect-video bg-gray-100 overflow-hidden">
+                    <Image fill
+                      src={tipe.images[0].url}
+                      alt={tipe.nama}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const img = e.target as HTMLImageElement
+                        img.style.display = 'none'
+                        img.nextElementSibling?.classList.remove('hidden')
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="aspect-video bg-gray-100 flex items-center justify-center">
+                    <ImageIcon className="h-12 w-12 text-gray-400" />
+                  </div>
+                )}
+                <div className="absolute top-2 right-2 flex gap-1">
+                  <Button size="sm" variant="secondary" onClick={() => openEditDialog(tipe)}>
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => openDeleteDialog(tipe)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+                <div className="absolute top-2 left-2">
+                  <Badge className={getJenisHewanColor(tipe.jenis)}>
+                    {getJenisHewanLabel(tipe.jenis)}
+                  </Badge>
                 </div>
               </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={loading}>
-                  Batal
-                </Button>
-                <Button type="submit" disabled={loading}>
-                  {loading ? "Menyimpan..." : "Simpan"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Nama</TableHead>
-                <TableHead>Jenis</TableHead>
-                <TableHead>Target</TableHead>
-                <TableHead>Harga</TableHead>
-                <TableHead>Harga Kolektif</TableHead>
-                <TableHead>Catatan</TableHead>
-                <TableHead className="text-right">Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tipeHewan.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center">
-                    Tidak ada data tipe hewan
-                  </TableCell>
-                </TableRow>
-              ) : (
-                tipeHewan.map((tipe) => (
-                  <TableRow key={tipe.id}>
-                    <TableCell>{tipe.id}</TableCell>
-                    <TableCell>{tipe.nama}</TableCell>
-                    <TableCell>{getJenisHewanLabel(tipe.jenis)}</TableCell>
-                    <TableCell>{tipe.target}</TableCell>
-                    <TableCell>{formatCurrency(tipe.harga)}</TableCell>
-                    <TableCell>{tipe.hargaKolektif && formatCurrency(tipe.hargaKolektif)}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{tipe.note || "-"}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => openEditDialog(tipe)}>
-                        <Pencil className="h-4 w-4" />
-                        <span className="sr-only">Edit</span>
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(tipe)}>
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Delete</span>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
+              
+              <CardContent className="p-4">
+                <div className="space-y-3">
+                  <div>
+                    <h3 className="font-semibold text-lg">{tipe.nama}</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Target</p>
+                      <p className="font-medium">{tipe.target}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Harga</p>
+                      <p className="font-medium">{formatCurrency(tipe.harga)}</p>
+                    </div>
+                  </div>
+                  
+                  {tipe.hargaKolektif && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Harga Kolektif</p>
+                      <p className="font-medium text-sm">{formatCurrency(tipe.hargaKolektif)}</p>
+                    </div>
+                  )}
+                  
+                  {tipe.note && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Catatan</p>
+                      <p className="text-sm line-clamp-2">{tipe.note}</p>
+                    </div>
+                  )}
+                  
+                  {tipe.images && tipe.images.length > 1 && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2">Gambar Lainnya</p>
+                      <div className="flex gap-2 overflow-x-auto">
+                        {tipe.images.slice(1).map((image, index) => (
+                          <div key={image.id} className="flex-shrink-0">
+                            <Image width={64} height={64}
+                              src={image.url}
+                              alt={`${tipe.nama} ${index + 2}`}
+                              className="w-16 h-16 object-cover rounded border"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <form onSubmit={handleEdit}>
             <DialogHeader>
               <DialogTitle>Edit Tipe Hewan</DialogTitle>
@@ -426,7 +495,7 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
                   <SelectContent>
                     <SelectItem value={JenisHewan.UNTA}>Unta</SelectItem>
                     <SelectItem value={JenisHewan.SAPI}>Sapi</SelectItem>
-                    <SelectItem value={JenisHewan.DOMBA}>Domba</SelectItem>
+                    <SelectItem value={JenisHewan.KAMBING}>Kambing</SelectItem>
                     <SelectItem value={JenisHewan.DOMBA}>Domba</SelectItem>
                   </SelectContent>
                 </Select>
@@ -482,11 +551,11 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
                   id="edit-hargaKolektif"
                   name="hargaKolektif"
                   type="number"
-                  value={formData.hargaKolektif}
+                  value={formData.hargaKolektif || ""}
                   onChange={handleChange}
                   className="col-span-3"
-                  required
                   min={0}
+                  placeholder="Opsional"
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
@@ -539,9 +608,21 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <p>
-              Anda akan menghapus tipe hewan: <strong>{selectedTipeHewan?.nama}</strong>
-            </p>
+            <div className="flex items-center gap-4">
+              {selectedTipeHewan?.images && selectedTipeHewan.images.length > 0 && (
+                <Image width={64} height={64}
+                  src={selectedTipeHewan.images[0].url}
+                  alt={selectedTipeHewan.nama}
+                  className="w-16 h-16 object-cover rounded border"
+                />
+              )}
+              <div>
+                <p className="font-medium">{selectedTipeHewan?.nama}</p>
+                <p className="text-sm text-muted-foreground">
+                  {selectedTipeHewan && getJenisHewanLabel(selectedTipeHewan.jenis)}
+                </p>
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setIsDeleteDialogOpen(false)} disabled={loading}>
@@ -553,6 +634,6 @@ export function TipeHewanSettings({ initialTipeHewan }: TipeHewanSettingsProps) 
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </div>
   )
 }

@@ -1,9 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
 import type React from "react"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Phone, Send, Loader2, RefreshCw } from "lucide-react"
 
@@ -16,7 +16,6 @@ import { QurbanStatus } from "./qurban-status"
 import { QurbanCoupon } from "./qurban-coupon"
 
 export function StatusChecker() {
-  const router = useRouter()
   const [phoneNumber, setPhoneNumber] = useState("")
   const [otp, setOtp] = useState("")
   const [isRequestingOtp, setIsRequestingOtp] = useState(false)

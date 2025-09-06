@@ -8,7 +8,7 @@ import { useForm } from "react-hook-form"
 import { CalendarIcon, X } from "lucide-react"
 import { format } from "date-fns"
 import { TransactionType } from "@prisma/client"
-import { cn } from "@/lib/utils"
+import { cn } from "#@/lib/utils/utils.ts"
 import { toast } from "@/hooks/use-toast"
 import { transactionSchema, type TransactionFormValues } from "@/lib/zod/keuangan"
 import {
@@ -29,7 +29,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { Category } from "@/types/keuangan"
-import { useKeuangan } from "@/contexts/keuangan-context"
+import { useFinancialData } from "@/hooks/qurban/use-keuangan"
 
 interface TransactionFormProps {
   isOpen: boolean
@@ -44,7 +44,7 @@ export default function TransactionForm({
   categories,
   onTransactionCreated,
 }: TransactionFormProps) {
-  const { createTransaction, uploadReceipt } = useKeuangan()
+  const { createTransaction, uploadReceipt } = useFinancialData()
   const [loading, setLoading] = useState(false)
   const [receiptFiles, setReceiptFiles] = useState<File[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)

@@ -1,30 +1,44 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import type { PaginatedQueryResult, PaginationData, QueryResult } from "#@/lib/DTOs/global.ts";
 import type {
   Counter,
   HewanQurban,
   HewanStatus,
   JenisHewan,
-  JenisProduk,
-  ProductLog,
-  StatusKupon
+  JenisProduk
 } from "@prisma/client"
-import type { UseQueryOptions } from "@tanstack/react-query";
 
-export interface QueryResult<T> {
-  data: T[]
-  isLoading: boolean
-  isError: boolean
-  isEmpty?: boolean
-  message?: string
-  refetch: () => Promise<any>
-  pagination?: PaginationData
+export type StatusKupon = "AVAILABLE" | "DISTRIBUTED" | "RETURNED" | "NOT_BACK"
+export const StatusKupon = {
+  AVAILABLE: "AVAILABLE" as const,
+  DISTRIBUTED: "DISTRIBUTED" as const,
+  RETURNED: "RETURNED" as const,
+  NOT_BACK: "NOT_BACK" as const,
+}
+
+type TipeHewanImage = {
+  id: string
+  url: string
+  alt: string
+}
+
+export type TipeHewan = {
+  id: number
+  nama: string
+  icon: string | null
+  target?: number
+  harga: number
+  hargaKolektif?: number | null
+  note?: string | null
+  jenis: JenisHewan
+  createdAt: Date
+  updatedAt: Date
+}
+export interface TipeHewanWithImages extends TipeHewan {
+  images: TipeHewanImage[]
 }
 
 // Add paginated query result interfaces
-export interface PaginatedQueryResult<T> extends QueryResult<T> {
-  pagination: PaginationData
-  refetch: (options?: { page?: number; pageSize?: number }) => Promise<any>
-}
 export interface HewanQueryResult extends PaginatedQueryResult<HewanQurban> {
   refetch: (options?: { page?: number, group?: string }) => Promise<any>
   pagination: PaginationData
@@ -40,13 +54,22 @@ export interface ProductLogQueryResult extends QueryResult<ProductLogWithProduct
   refetch: (filters?: { produkId?: number; place?: Counter }) => Promise<any>
 }
 export type PengirimanStatus = "DIKIRIM" | "DITERIMA";
-export type TipeHewan = "sapi" | "domba" 
+
+export interface ProductLog {
+  id: number;
+  timestamp: number;
+  produkId: number;
+  event: "menambahkan" | "memindahkan" | "mengkoreksi";
+  place: Counter;
+  value: number;
+  note?: string;
+}
 
 export type ProdukHewan = {
   id: number
   nama: string
   berat: number | null
-  avgProdPerHewan?: number | null
+  avgProdPerHewan: number | null
   kumulatif: number
   targetPaket: number
   diTimbang: number
@@ -62,6 +85,12 @@ export interface HewanQurbanResponse {
     totalPages: number
     currentGroup?: string
     totalGroups?: number
+    pageSize: number
+    total: number,
+    hasNext: boolean
+    hasPrev: boolean
+    useGroups: boolean
+    itemsPerGroup: number
   };
 }
 // Add ProductLog type
@@ -96,13 +125,13 @@ export type Distribusi = {
   kategori: string
   target: number
   realisasi: number
-  dibuatPada: Date
-  diperbaruiPada: Date
+  createdAt: Date
+  updatedAt: Date
 }
 
 export type logDistribusi = {
   id: string;
-  dibuatPada: Date;
+  createdAt: Date;
   penerimaId: string;
   distributionId: string;
   jumlahPaket: number;
@@ -134,21 +163,29 @@ export interface LogDistribusi {
   id: string;
   penerimaId: string;
   distribusiId: string;
-  dibuatPada: Date;
+  createdAt: Date;
   listProduk: ProdukDiterima[];
 }
 
+export type Kupon = {
+  id: number;
+  status: StatusKupon;
+  createdAt?: Date;
+  updatedAt?: Date;
+};
 export interface Penerima {
   id: string;
   distribusiId: string;
   kuponId?: string | null;
+  jumlahKupon?: number | null;       
+  sudah_terima_kupon?:  boolean | null;
   diterimaOleh?: string | null;
   nama?: string | null;
   noIdentitas?: string | null;
   jenisId?: string | null;
   alamat?: string | null;
   telepon?: string | null;
-  dibuatPada: Date;
+  createdAt: Date;
   waktuTerima?: Date | null;
   sudahMenerima: boolean;
   keterangan?: string | null;
@@ -158,10 +195,6 @@ export interface Penerima {
     id: string;
     kategori: string;
   };
-  kupon: {
-    id: number;
-    status: StatusKupon
-  }[]
 }
 
 export type ErrorLog = {
@@ -177,97 +210,7 @@ export type ErrorLog = {
     nama: string
   } | ProdukHewan
 }
-// Define pagination configuration type
-interface PaginationConfig {
-  useGroups: boolean
-  itemsPerGroup?: number
-  pageSize: number
-}
 
-// Update PaginationData interface
-export interface PaginationData {
-  currentPage: number
-  totalPages: number
-  pageSize: number
-  total: number
-  hasNext: boolean
-  hasPrev: boolean
-  currentGroup?: string
-  totalGroups?: number
-  useGroups?: boolean
-  itemsPerGroup?: number
-}
-
-export type PaginationDataOld = PaginationConfig & {
-  currentPage: number
-  totalPages: number
-  currentGroup?: string
-  totalGroups?: number
-}
-export type QueryWithToastOptions<TData, TError> = UseQueryOptions<TData, TError> & {
-  errorMessage?: string
-}
-
-// // Add localStorage utility functions
-// export const getCachedData = <T,>(key: string): { data: T } | null => {
-//   if (typeof window === 'undefined') return null;
-//   const data = localStorage.getItem(key);
-//   return data ? JSON.parse(data) : null;
-// };
-
-// export const setCachedData = (key: string, data: any, ttl = 5 * 60 * 1000) => {
-//   if (typeof window === 'undefined') return;
-//   const item = {
-//     data,
-//     timestamp: Date.now(),
-//     ttl
-//   };
-//   localStorage.setItem(key, JSON.stringify(item));
-// };
-
-// export const isCacheValid = (key: string): boolean => {
-//   if (typeof window === 'undefined') return false;
-//   const item = localStorage.getItem(key);
-//   if (!item) return false;
-  
-//   const { timestamp, ttl } = JSON.parse(item);
-//   return Date.now() - timestamp < ttl;
-// };
-
-// export function getValidCacheData<T>(cacheKey: string) {
-//   if (isCacheValid(cacheKey)) {
-//     const cached = getCachedData<T>(cacheKey);
-//     if (cached) return cached.data;
-//   }
-//   return null;
-// }
-
-// Custom hook for determining pagination configuration
-export const getPaginationConfig = (target: number, total: number): PaginationConfig => {
-  if (total > 100) {
-    return { 
-      useGroups: true, 
-      itemsPerGroup: 50,
-      pageSize: 10, 
-    }
-  }
-  if (target <= 100 && total <= 50) return { 
-    useGroups: false, 
-    pageSize: 10,
-  }
-  if (total > 50 && total <= 60) return { 
-    useGroups: false, 
-    pageSize: 15, 
-  }
-  if (total > 60 && total <= 100) return { 
-    useGroups: false, 
-    pageSize: 20,
-  }
-  return { 
-    useGroups: false, 
-    pageSize: 10,
-  }
-}
 // Define the shape of our context
 export interface QurbanContextType {
   // Data states and loading
@@ -296,7 +239,6 @@ export interface QurbanContextType {
   getProductLogsByPlace: (place: Counter) => ProductLogWithProduct[]
   getProductLogsByProduct: (produkId: number) => ProductLogWithProduct[]
 
-  // getAvailableProducts: ProdukHewan[];
   // Methods for updating data
   updateHewan: (data: {
     hewanId: string

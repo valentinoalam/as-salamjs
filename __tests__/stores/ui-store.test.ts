@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { renderHook, act } from "@testing-library/react"
 import { useUIStore } from "@/stores/ui-store"
 
@@ -15,6 +16,8 @@ describe("UI Store", () => {
         sapiGroup: "A",
         dombaPage: 1,
         dombaGroup: "A",
+        mudhohiPage: 0,
+        penerimaPage: 0
       },
       isAddMudhohiModalOpen: false,
       isEditMudhohiModalOpen: false,
